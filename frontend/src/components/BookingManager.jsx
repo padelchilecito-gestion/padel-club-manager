@@ -22,9 +22,20 @@ const BookingManager = () => {
         courtId: '',
         time: '',
         clientName: '',
-        clientPhone: ''
+        clientPhone: '',
+        isFixed: false,
+        dayOfWeek: '1', // Lunes por defecto
+        endDate: ''
     });
     const [createAvailableSlots, setCreateAvailableSlots] = useState([]);
+
+    const handleChange = e => {
+        const { name, value, type, checked } = e.target;
+        setCreateFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
 
     const fetchBookings = useCallback(async (selectedDate) => {
         setLoading(true);
@@ -88,7 +99,10 @@ const BookingManager = () => {
                     courtId: res.data[0]._id,
                     time: '',
                     clientName: '',
-                    clientPhone: ''
+                    clientPhone: '',
+                    isFixed: false,
+                    dayOfWeek: '1',
+                    endDate: ''
                 });
             }
             setIsCreateModalOpen(true);
@@ -116,30 +130,51 @@ const BookingManager = () => {
     
     const handleCreateBooking = async (e) => {
         e.preventDefault();
-        const { courtId, time, clientName, clientPhone } = createFormData;
-        if (!courtId || !time || !clientName || !clientPhone) {
-            alert('Por favor, completa todos los campos.');
-            return;
-        }
+        const { courtId, time, clientName, clientPhone, isFixed, dayOfWeek, endDate } = createFormData;
 
-        const [hour, minute] = time.split(':');
-        const startTime = new Date(date);
-        startTime.setUTCHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
-        const endTime = new Date(startTime.getTime() + 30 * 60000);
-        const court = courts.find(c => c._id === courtId);
+        if (isFixed) {
+            if (!courtId || !time || !clientName || !clientPhone || !dayOfWeek || !endDate) {
+                alert('Para un turno fijo, todos los campos son obligatorios.');
+                return;
+            }
+            try {
+                await axios.post('/bookings/fixed', {
+                    court: courtId,
+                    user: { name: clientName, phone: clientPhone },
+                    dayOfWeek,
+                    time,
+                    endDate
+                });
+                setIsCreateModalOpen(false);
+                // Maybe show a success message
+            } catch (err) {
+                alert(err.response?.data?.message || "Error al crear el turno fijo.");
+            }
+        } else {
+            if (!courtId || !time || !clientName || !clientPhone) {
+                alert('Por favor, completa todos los campos.');
+                return;
+            }
 
-        try {
-            await axios.post('/bookings', {
-                court: courtId,
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-                user: { name: clientName, phone: clientPhone },
-                status: 'Confirmed',
-                price: court.pricePerHour / 2
-            });
-            setIsCreateModalOpen(false);
-        } catch (err) {
-            alert(err.response?.data?.message || 'Error al crear la reserva.');
+            const [hour, minute] = time.split(':');
+            const startTime = new Date(date);
+            startTime.setUTCHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
+            const endTime = new Date(startTime.getTime() + 30 * 60000);
+            const court = courts.find(c => c._id === courtId);
+
+            try {
+                await axios.post('/bookings', {
+                    court: courtId,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString(),
+                    user: { name: clientName, phone: clientPhone },
+                    status: 'Confirmed',
+                    price: court.pricePerHour / 2
+                });
+                setIsCreateModalOpen(false);
+            } catch (err) {
+                alert(err.response?.data?.message || 'Error al crear la reserva.');
+            }
         }
     };
 
@@ -298,15 +333,15 @@ const BookingManager = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
                                 <label htmlFor="clientName" className="text-sm text-text-secondary">Nombre del Cliente</label>
-                                <input type="text" id="clientName" value={createFormData.clientName} onChange={e => setCreateFormData(prev => ({...prev, clientName: e.target.value}))} className="w-full mt-1 p-2" required />
+                                <input type="text" id="clientName" name="clientName" value={createFormData.clientName} onChange={handleChange} className="w-full mt-1 p-2" required />
                             </div>
                             <div>
                                 <label htmlFor="clientPhone" className="text-sm text-text-secondary">Teléfono del Cliente</label>
-                                <input type="tel" id="clientPhone" value={createFormData.clientPhone} onChange={e => setCreateFormData(prev => ({...prev, clientPhone: e.target.value}))} className="w-full mt-1 p-2" required />
+                                <input type="tel" id="clientPhone" name="clientPhone" value={createFormData.clientPhone} onChange={handleChange} className="w-full mt-1 p-2" required />
                             </div>
                             <div>
                                 <label htmlFor="courtId" className="text-sm text-text-secondary">Cancha</label>
-                                <select id="courtId" value={createFormData.courtId} onChange={e => handleCourtChangeForCreate(e.target.value)} className="w-full mt-1 p-2">
+                                <select id="courtId" name="courtId" value={createFormData.courtId} onChange={e => handleCourtChangeForCreate(e.target.value)} className="w-full mt-1 p-2">
                                     {courts.map(court => (
                                         <option key={court._id} value={court._id}>{court.name}</option>
                                     ))}
@@ -314,13 +349,37 @@ const BookingManager = () => {
                             </div>
                             <div>
                                 <label htmlFor="time" className="text-sm text-text-secondary">Horario</label>
-                                <select id="time" value={createFormData.time} onChange={e => setCreateFormData(prev => ({...prev, time: e.target.value}))} className="w-full mt-1 p-2" required>
+                                <select id="time" name="time" value={createFormData.time} onChange={handleChange} className="w-full mt-1 p-2" required>
                                     <option value="" disabled>Seleccionar turno</option>
-                                    {createAvailableSlots.map(slot => (
+                                    { (createFormData.isFixed ? timeSlots : createAvailableSlots).map(slot => (
                                         <option key={slot} value={slot}>{slot}</option>
                                     ))}
                                 </select>
                             </div>
+                            <div className="md:col-span-2 flex items-center gap-2">
+                                <input type="checkbox" id="isFixed" name="isFixed" checked={createFormData.isFixed} onChange={handleChange} />
+                                <label htmlFor="isFixed" className="text-sm">Turno Fijo (semanal)</label>
+                            </div>
+                            {createFormData.isFixed && (
+                                <>
+                                    <div>
+                                        <label htmlFor="dayOfWeek">Día de la Semana</label>
+                                        <select id="dayOfWeek" name="dayOfWeek" value={createFormData.dayOfWeek} onChange={handleChange} required>
+                                            <option value="1">Lunes</option>
+                                            <option value="2">Martes</option>
+                                            <option value="3">Miércoles</option>
+                                            <option value="4">Jueves</option>
+                                            <option value="5">Viernes</option>
+                                            <option value="6">Sábado</option>
+                                            <option value="0">Domingo</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="endDate">Válido hasta (Fecha Fin)</label>
+                                        <input type="date" id="endDate" name="endDate" value={createFormData.endDate} onChange={handleChange} required />
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div className="flex gap-4 mt-6">
                             <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">

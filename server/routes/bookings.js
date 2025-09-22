@@ -130,6 +130,58 @@ router.patch('/:id/pay', logActivity('RESERVA_MODIFICADA', (req) => `Se marcó c
 });
 
 
+const Court = require('../models/Court');
+
+// POST for fixed bookings
+router.post('/fixed', logActivity('RESERVA_FIJA_CREADA', (req) => `Creación de turno fijo para ${req.body.user.name}`), async (req, res) => {
+    const { court: courtId, user, dayOfWeek, time, endDate } = req.body;
+
+    try {
+        const court = await Court.findById(courtId);
+        if (!court) {
+            return res.status(404).json({ message: "Cancha no encontrada." });
+        }
+
+        const [hour, minute] = time.split(':');
+        let startDate = new Date();
+        let realEndDate = new Date(endDate);
+        realEndDate.setUTCHours(23, 59, 59, 999);
+
+        let bookingsToCreate = [];
+        let currentDate = startDate;
+
+        while (currentDate.getDay() !== parseInt(dayOfWeek)) {
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        while (currentDate <= realEndDate) {
+            const startTime = new Date(currentDate);
+            startTime.setUTCHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
+            const endTime = new Date(startTime.getTime() + 30 * 60000);
+
+            bookingsToCreate.push({
+                court: courtId,
+                startTime,
+                endTime,
+                user,
+                status: 'Confirmed',
+                price: court.pricePerHour / 2, // Assuming 30 min booking
+            });
+            currentDate.setDate(currentDate.getDate() + 7);
+        }
+
+        const createdBookings = await BookingService.createFixedBookings(bookingsToCreate);
+
+        // Emit socket events for each created booking
+        createdBookings.forEach(b => req.io.emit('booking_update', b));
+
+        res.status(201).json({ message: `Se crearon ${createdBookings.length} reservas fijas.` });
+
+    } catch (error) {
+        res.status(409).json({ message: error.message });
+    }
+});
+
 // DELETE (Admin): Elimina una reserva por completo
 router.delete('/:id', logActivity('RESERVA_ELIMINADA', (req) => `Se eliminó la reserva con ID ${req.params.id}`), async (req, res) => {
     try {
