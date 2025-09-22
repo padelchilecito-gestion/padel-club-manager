@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import io from 'socket.io-client';
-
-const API_URL = 'http://localhost:5001';
-const socket = io(API_URL);
+import { socket } from './NotificationProvider';
 
 const BookingManager = () => {
     const [bookings, setBookings] = useState([]);
