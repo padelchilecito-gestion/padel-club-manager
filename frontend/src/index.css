@@ -1,0 +1,48 @@
+/* Importa las directivas base de Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Define los estilos base para la aplicación usando la nueva paleta de colores */
+@layer base {
+  body {
+    @apply bg-dark-primary text-text-primary font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Estilos para los inputs y selects para que coincidan con el tema oscuro */
+  input, select, textarea {
+    @apply bg-dark-primary text-text-primary border border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+}
+
+/* Estilo para un scrollbar más moderno y acorde al tema */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #1B263B; /* dark-secondary */
+}
+::-webkit-scrollbar-thumb {
+    background: #778DA9; /* text-secondary */
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #9aadc1;
+}
+
+/* Clases de utilidad para los estados de las reservas */
+.status-confirmed {
+    @apply bg-secondary text-dark-primary px-3 py-1 text-xs font-bold rounded-full;
+}
+
+.status-pending {
+    /* Usaremos un color amarillo específico para 'pending' */
+    @apply bg-yellow-500 text-dark-primary px-3 py-1 text-xs font-bold rounded-full;
+}
+
+.status-cancelled {
+    @apply bg-danger text-white px-3 py-1 text-xs font-bold rounded-full;
+}

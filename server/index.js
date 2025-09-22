@@ -1,0 +1,78 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require("socket.io");
+const cors = require('cors');
+const mongoose = require('mongoose');
+require('dotenv').config();
+const cron = require('node-cron');
+
+// --- Importar Rutas ---
+const authRoutes = require('./routes/auth');
+const courtRoutes = require('./routes/courts');
+const bookingRoutes = require('./routes/bookings');
+const productRoutes = require('./routes/products');
+const paymentRoutes = require('./routes/payments');
+const salesRoutes = require('./routes/sales');
+const dashboardRoutes = require('./routes/dashboard');
+const reportsRoutes = require('./routes/reports');
+const settingsRoutes = require('./routes/settings');
+const usersRoutes = require('./routes/users');
+const logsRoutes = require('./routes/logs');
+const cashboxRoutes = require('./routes/cashbox');
+
+const app = express();
+const server = http.createServer(app);
+
+// --- Configuración de CORS para Socket.IO ---
+const io = new Server(server, {
+    cors: {
+        origin: "http://localhost:5173",
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"] // Añadido PATCH
+    }
+});
+
+const PORT = process.env.PORT || 5001;
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
+
+// Conexión a MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Conectado a MongoDB'))
+  .catch(err => console.error('Error de conexión a MongoDB:', err));
+
+// Rutas de la API
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/courts', courtRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/logs', logsRoutes);
+app.use('/api/cashbox', cashboxRoutes);
+
+// Lógica de Socket.IO
+io.on('connection', (socket) => {
+  console.log('Un cliente se ha conectado:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('Cliente desconectado:', socket.id);
+  });
+});
+
+// TAREA PROGRAMADA (Comentada)
+// cron.schedule('*/15 * * * *', () => {
+//     // checkAndSendReminders();
+// });
+
+server.listen(PORT, () => {
+  console.log(`Servidor escuchando en el puerto ${PORT}`);
+});

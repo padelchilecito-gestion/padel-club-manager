@@ -1,0 +1,149 @@
+const express = require('express');
+const router = express.Router();
+const Booking = require('../models/Booking');
+const BookingService = require('../services/booking-service');
+const logActivity = require('../middleware/logActivity');
+
+// GET: Obtener todas las reservas para un rango de fechas (para el calendario)
+router.get('/', async (req, res) => {
+    try {
+        const { start, end } = req.query; // Fechas en formato ISO
+        const bookings = await Booking.find({
+            startTime: { $gte: new Date(start) },
+            endTime: { $lte: new Date(end) }
+        }).populate('court'); // populate para incluir datos de la cancha
+        res.json(bookings);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener las reservas.' });
+    }
+});
+
+// POST: Crear una nueva reserva
+router.post('/', logActivity('RESERVA_CREADA', (req) => `El cliente ${req.body.user.name} reservó en la cancha ID ${req.body.court}`), async (req, res) => {
+    try {
+        const newBooking = await BookingService.createBooking(req.body);
+        // Emitir evento de WebSocket para actualizar calendarios en tiempo real
+        req.io.emit('booking_update', newBooking);
+        res.status(201).json(newBooking);
+    } catch (error) {
+        // 409 Conflict es el código adecuado si el recurso ya existe o no se puede crear
+        res.status(409).json({ message: error.message });
+    }
+});
+
+// PUT: Modificar el horario de una reserva
+router.put('/:id', logActivity('RESERVA_MODIFICADA', (req) => `Se cambió la reserva ID ${req.params.id} al nuevo horario ${new Date(req.body.startTime).toLocaleString()}`), async (req, res) => {
+    try {
+        const { startTime, endTime } = req.body;
+        const bookingId = req.params.id;
+
+        if (!startTime || !endTime) {
+            return res.status(400).json({ message: "Se requiere una nueva hora de inicio y fin." });
+        }
+
+        const requestedStartTime = new Date(startTime);
+        const requestedEndTime = new Date(endTime);
+
+        const currentBooking = await Booking.findById(bookingId);
+        if (!currentBooking) {
+            return res.status(404).json({ message: "Reserva no encontrada." });
+        }
+
+        const conflictingBooking = await Booking.findOne({
+            _id: { $ne: bookingId },
+            court: currentBooking.court,
+            startTime: { $lt: requestedEndTime },
+            endTime: { $gt: requestedStartTime },
+            status: { $in: ['Confirmed', 'Pending'] }
+        });
+
+        if (conflictingBooking) {
+            return res.status(409).json({ message: "El nuevo horario no está disponible en esta cancha." });
+        }
+
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            bookingId,
+            { startTime: requestedStartTime, endTime: requestedEndTime },
+            { new: true }
+        ).populate('court');
+
+        req.io.emit('booking_update', { type: 'updated', booking: updatedBooking });
+        res.json(updatedBooking);
+
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar la reserva.", error: error.message });
+    }
+});
+
+// PATCH para modificar solo el estado de una reserva
+router.patch('/:id/status', logActivity('RESERVA_MODIFICADA', (req) => `Se cambió el estado de la reserva ID ${req.params.id} a ${req.body.status}`), async (req, res) => {
+    try {
+        const { status } = req.body;
+        const bookingId = req.params.id;
+
+        if (!status || !['Pending', 'Confirmed', 'Cancelled'].includes(status)) {
+            return res.status(400).json({ message: "Estado no válido." });
+        }
+
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            bookingId,
+            { status: status },
+            { new: true }
+        ).populate('court');
+        
+        if (!updatedBooking) {
+             return res.status(404).json({ message: "Reserva no encontrada." });
+        }
+        
+        req.io.emit('booking_update', { type: 'status_changed', booking: updatedBooking });
+        res.json(updatedBooking);
+
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar el estado de la reserva." });
+    }
+});
+
+// PATCH: Marcar una reserva como pagada
+router.patch('/:id/pay', logActivity('RESERVA_MODIFICADA', (req) => `Se marcó como pagada la reserva ID ${req.params.id} con método ${req.body.paymentMethod}`), async (req, res) => {
+    try {
+        const { paymentMethod } = req.body;
+        if (!paymentMethod || paymentMethod === 'Pendiente') {
+            return res.status(400).json({ message: "Método de pago no válido." });
+        }
+        
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            req.params.id,
+            { isPaid: true, paymentMethod: paymentMethod, status: 'Confirmed' },
+            { new: true }
+        ).populate('court');
+
+        if (!updatedBooking) {
+            return res.status(404).json({ message: "Reserva no encontrada." });
+        }
+
+        req.io.emit('booking_update', { type: 'payment_updated', booking: updatedBooking });
+        res.json(updatedBooking);
+
+    } catch (error) {
+        res.status(500).json({ message: "Error al registrar el pago de la reserva." });
+    }
+});
+
+
+// DELETE (Admin): Elimina una reserva por completo
+router.delete('/:id', logActivity('RESERVA_ELIMINADA', (req) => `Se eliminó la reserva con ID ${req.params.id}`), async (req, res) => {
+    try {
+        const deletedBooking = await Booking.findByIdAndDelete(req.params.id);
+        if (!deletedBooking) {
+            return res.status(404).json({ message: "Reserva no encontrada." });
+        }
+        
+        req.io.emit('booking_deleted', deletedBooking);
+        
+        res.json({ message: 'Reserva eliminada correctamente.' });
+    } catch (error) {
+        res.status(500).json({ message: "Error al eliminar la reserva." });
+    }
+});
+
+module.exports = router;
