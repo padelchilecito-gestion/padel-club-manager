@@ -1,7 +1,9 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import io from 'socket.io-client';
 
+console.log("Debug: VITE_SOCKET_URL from env is:", import.meta.env.VITE_SOCKET_URL);
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+console.log("Debug: Final SOCKET_URL is:", SOCKET_URL);
 const socket = io(SOCKET_URL);
 
 // 1. Creamos un contexto para las notificaciones
