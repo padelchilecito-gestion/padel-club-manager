@@ -5,7 +5,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const cron = require('node-cron');
-
+const app = express();
 // --- Importar Rutas ---
 const authRoutes = require('./routes/auth');
 const courtRoutes = require('./routes/courts');
@@ -32,6 +32,7 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 5001;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // Middlewares
 app.use(cors());
@@ -40,7 +41,10 @@ app.use((req, res, next) => {
     req.io = io;
     next();
 });
-
+// ⭐ Nueva ruta para Health Check
+app.get('/api/status', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Backend is running' });
+});
 // Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado a MongoDB'))

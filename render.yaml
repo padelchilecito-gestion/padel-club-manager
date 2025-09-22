@@ -1,0 +1,28 @@
+# render.yaml en la raíz de tu proyecto
+services:
+  # Servicio de la Base de Datos MongoDB
+  - type: database
+    name: padel-club-db # Nombre para tu base de datos en Render
+    databaseName: padelclubmanager # Nombre de la base de datos dentro de MongoDB
+    plan: free # Puedes cambiar a 'starter' o 'standard' para más robustez
+
+  # Servicio del Backend Node.js
+  - type: web
+    name: padel-club-backend # Nombre para tu servicio backend en Render
+    env: node # Tipo de entorno
+    # rootDir: server # Si tu server/ está directamente en la raíz del repo, déjalo así.
+                      # Si tu repo tiene la estructura: /mi-repo/server y /mi-repo/frontend,
+                      # entonces 'server' es la carpeta de tu backend.
+    buildCommand: 'npm install' # Comando para instalar dependencias del backend
+    startCommand: 'npm start' # Comando para iniciar el servidor
+    plan: free # Plan gratuito (se suspende por inactividad). Puedes cambiar a 'starter' si lo necesitas activo 24/7.
+    healthCheckPath: '/api/status' # Una ruta simple para que Render verifique que el backend está vivo (la crearemos luego)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5001 # El puerto que usará Render (interno)
+      # MongoDB URL se añadirá automáticamente por Render si despliegas la DB en Render.
+      # Si usas un MongoDB externo (ej. Atlas), lo añadirías aquí:
+      # - key: MONGO_URI
+      #   value: tu_uri_de_mongodb_atlas
