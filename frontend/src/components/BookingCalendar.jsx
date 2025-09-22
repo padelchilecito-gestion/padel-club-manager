@@ -184,8 +184,9 @@ const BookingCalendar = () => {
 
         try {
             const response = await axios.post('/payments/create-preference', preferenceData);
-            const { id } = response.data;
+            const { id, pending_id } = response.data;
             setPreferenceId(id);
+            localStorage.setItem('pendingPaymentId', pending_id);
         } catch (error) {
             console.log(error);
             alert('Error al crear la preferencia de pago.');

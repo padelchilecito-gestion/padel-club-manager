@@ -7,6 +7,7 @@ const SalesManager = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('Efectivo');
 
     const fetchProducts = async () => {
         try {
@@ -65,17 +66,20 @@ const SalesManager = () => {
                 quantity: item.quantity,
                 price: item.product.price
             })),
-            total: total
+            total: total,
+            paymentMethod: paymentMethod
         };
 
-        if (window.confirm(`Confirmar venta por un total de $${total}?`)) {
+        if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
+            console.log("Enviando datos de venta:", saleData);
             try {
                 await axios.post('/sales', saleData);
                 alert('¡Venta registrada con éxito!');
                 setCart([]);
                 fetchProducts(); // Recargar productos para ver el stock actualizado
             } catch (err) {
-                setError('Error al registrar la venta. El stock podría no haber sido suficiente.');
+                console.error("Error detallado:", err.response?.data || err.message);
+                setError(err.response?.data?.message || 'Error al registrar la venta. El stock podría no haber sido suficiente.');
             }
         }
     };
@@ -137,6 +141,19 @@ const SalesManager = () => {
                     <div className="flex justify-between font-bold text-2xl">
                         <span>TOTAL:</span>
                         <span>${total.toFixed(2)}</span>
+                    </div>
+                    <div>
+                        <label htmlFor="paymentMethod" className="text-sm text-text-secondary">Método de Pago</label>
+                        <select
+                            id="paymentMethod"
+                            value={paymentMethod}
+                            onChange={e => setPaymentMethod(e.target.value)}
+                            className="w-full mt-1 p-2 bg-dark-primary rounded"
+                        >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Mercado Pago">Mercado Pago</option>
+                        </select>
                     </div>
                     <button 
                         onClick={handleFinalizeSale}

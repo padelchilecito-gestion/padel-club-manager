@@ -39,11 +39,28 @@ router.post('/create-preference', async (req, res) => {
         };
 
         const response = await mercadopago.preferences.create(preference);
-        res.json({ id: response.body.id });
+        res.json({ id: response.body.id, pending_id: pendingPayment._id });
 
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: 'Error al crear la preferencia de pago.' });
+    }
+});
+
+const Settings = require('../models/Settings');
+
+router.get('/pending/:id', async (req, res) => {
+    try {
+        const pendingPayment = await PendingPayment.findById(req.params.id).populate('court');
+        if (!pendingPayment) {
+            return res.status(404).json({ message: 'Pago pendiente no encontrado.' });
+        }
+        const settings = await Settings.findOne({ configKey: "main_settings" });
+        const adminWpp = settings ? settings.whatsappNumber : '';
+
+        res.json({ ...pendingPayment.toObject(), adminWpp });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener los detalles del pago pendiente.' });
     }
 });
 
