@@ -54,7 +54,7 @@ const TimeSlotFinder = () => {
     const [mp, setMp] = useState(null);
 
     useEffect(() => {
-        const mp = new window.MercadoPago('APP_USR-3d81e92d-a83d-487a-ad35-f27ac9f863f5');
+        const mp = new window.MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
         setMp(mp);
     }, []);
 
