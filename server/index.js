@@ -20,7 +20,7 @@ const usersRoutes = require('./routes/users');
 const logsRoutes = require('./routes/logs');
 const cashboxRoutes = require('./routes/cashbox');
 
-const app = express();
+
 const server = http.createServer(app);
 
 // --- Configuración de CORS para Socket.IO ---
