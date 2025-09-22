@@ -5,15 +5,21 @@ const PendingPayment = require('../models/PendingPayment');
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const BookingService = require('../services/booking-service');
-
-mercadopago.configure({
-    access_token: process.env.MERCADOPAGO_ACCESS_TOKEN
-});
+const Settings = require('../models/Settings');
 
 router.post('/create-preference', async (req, res) => {
     const { courtId, slots, user, total, date } = req.body;
 
     try {
+        const settings = await Settings.findOne({ configKey: "main_settings" });
+        if (!settings || !settings.mercadoPagoAccessToken) {
+            return res.status(500).send("El Access Token de Mercado Pago no está configurado.");
+        }
+
+        mercadopago.configure({
+            access_token: settings.mercadoPagoAccessToken
+        });
+
         const pendingPayment = new PendingPayment({
             court: courtId,
             slots,
@@ -47,8 +53,6 @@ router.post('/create-preference', async (req, res) => {
     }
 });
 
-const Settings = require('../models/Settings');
-
 router.get('/pending/:id', async (req, res) => {
     try {
         const pendingPayment = await PendingPayment.findById(req.params.id).populate('court');
@@ -67,6 +71,15 @@ router.get('/pending/:id', async (req, res) => {
 router.post('/webhook', async (req, res) => {
     const payment = req.query;
     try {
+        const settings = await Settings.findOne({ configKey: "main_settings" });
+        if (!settings || !settings.mercadoPagoAccessToken) {
+            return res.status(500).send("El Access Token de Mercado Pago no está configurado.");
+        }
+
+        mercadopago.configure({
+            access_token: settings.mercadoPagoAccessToken
+        });
+
         if (payment.type === 'payment') {
             const data = await mercadopago.payment.findById(payment['data.id']);
             const pendingPaymentId = data.body.external_reference;
