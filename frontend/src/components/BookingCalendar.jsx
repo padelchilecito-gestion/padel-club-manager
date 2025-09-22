@@ -53,6 +53,13 @@ const BookingCalendar = () => {
     const [adminWpp, setAdminWpp] = useState('');
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [preferenceId, setPreferenceId] = useState(null);
+    const [mp, setMp] = useState(null);
+
+    useEffect(() => {
+        const mp = new window.MercadoPago('APP_USR-d33b0d94-d533-4408-bb14-b9a8fb8dcbea');
+        setMp(mp);
+    }, []);
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -106,6 +113,20 @@ const BookingCalendar = () => {
         setSelectedSlots([]);
     }, [selectedDate, selectedCourtId]);
 
+    useEffect(() => {
+        if (preferenceId && mp) {
+            mp.wallet({
+                initialization: {
+                    preferenceId: preferenceId,
+                },
+                render: {
+                    container: '#wallet_container',
+                    label: 'Pagar',
+                }
+            });
+        }
+    }, [preferenceId, mp]);
+
     const calendarDays = useMemo(() => {
         const monthStart = startOfMonth(currentMonth);
         const monthEnd = endOfMonth(currentMonth);
@@ -144,48 +165,30 @@ const BookingCalendar = () => {
         setClientData({ ...clientData, [e.target.name]: e.target.value });
     };
 
-    const handleConfirmReservations = async () => {
+    const handleCreatePreference = async () => {
         if (!clientData.name || !clientData.phone) {
             alert("Por favor, completa tu nombre y teléfono.");
             return;
         }
 
         const court = courts.find(c => c._id === selectedCourtId);
-        setLoadingSlots(true);
+        const total = selectedSlots.length * (court.pricePerHour / 2);
 
-        const promises = selectedSlots.map(slot => {
-            const startTime = new Date(selectedDate);
-            startTime.setHours(slot.hour, slot.minute, 0, 0);
-            const endTime = new Date(startTime.getTime() + 30 * 60000);
-
-            return axios.post('/bookings', {
-                court: court._id,
-                startTime,
-                endTime,
-                user: { name: clientData.name, phone: clientData.phone },
-                status: 'Confirmed'
-            });
-        });
+        const preferenceData = {
+            courtId: selectedCourtId,
+            slots: selectedSlots,
+            user: clientData,
+            total: total,
+            date: selectedDate
+        };
 
         try {
-            await Promise.all(promises);
-            
-            if (adminWpp) {
-                const turnos = selectedSlots.map(s => s.time).sort((a,b) => a.localeCompare(b, undefined, { numeric: true })).join(', ');
-                const message = `¡Nueva reserva!\n\n*Cancha:* ${court.name}\n*Día:* ${format(selectedDate, 'eeee dd/MM/yyyy', {locale: es})}\n*Horarios:* ${turnos}hs\n\n*Cliente:* ${clientData.name}\n*Teléfono:* ${clientData.phone}`;
-                const cleanPhone = adminWpp.replace(/[^0-9]/g, '');
-                const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-                window.open(whatsappUrl, '_blank');
-            }
-            alert('¡Reservas confirmadas con éxito!');
-            setIsModalOpen(false);
-            setClientData({ name: '', phone: '' });
-            setSelectedSlots([]);
+            const response = await axios.post('/payments/create-preference', preferenceData);
+            const { id } = response.data;
+            setPreferenceId(id);
         } catch (error) {
-            alert(error.response?.data?.message || 'Error al crear una o más reservas. Es posible que algún turno haya sido tomado.');
-        } finally {
-             const newDate = new Date(selectedDate);
-             setSelectedDate(newDate);
+            console.log(error);
+            alert('Error al crear la preferencia de pago.');
         }
     };
     
@@ -272,26 +275,32 @@ const BookingCalendar = () => {
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-                    <form onSubmit={(e) => { e.preventDefault(); handleConfirmReservations(); }} className="bg-dark-secondary p-8 rounded-lg max-w-sm w-full">
-                        <h3 className="text-2xl font-bold mb-4">Confirmar Reserva</h3>
-                        <p className="text-text-secondary mb-4">Por favor, déjanos tus datos para finalizar.</p>
-                        <div className="space-y-4">
-                            <div>
-                                <label htmlFor="clientName" className="text-sm text-text-secondary">Nombre Completo</label>
-                                <input type="text" id="clientName" name="name" autoComplete="name" value={clientData.name} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
-                            </div>
-                            <div>
-                                <label htmlFor="clientPhone" className="text-sm text-text-secondary">Teléfono</label>
-                                <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
-                            </div>
-                            <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
-                                Confirmar y Enviar a WhatsApp
-                            </button>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
+                    <div className="bg-dark-secondary p-8 rounded-lg max-w-sm w-full">
+                        {!preferenceId ? (
+                            <form onSubmit={(e) => { e.preventDefault(); handleCreatePreference(); }} >
+                                <h3 className="text-2xl font-bold mb-4">Confirmar Reserva</h3>
+                                <p className="text-text-secondary mb-4">Por favor, déjanos tus datos para finalizar.</p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="clientName" className="text-sm text-text-secondary">Nombre Completo</label>
+                                        <input type="text" id="clientName" name="name" autoComplete="name" value={clientData.name} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="clientPhone" className="text-sm text-text-secondary">Teléfono</label>
+                                        <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
+                                    </div>
+                                    <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
+                                        Pagar con Mercado Pago
+                                    </button>
+                                    <button type="button" onClick={() => {setIsModalOpen(false); setPreferenceId(null);}} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div id="wallet_container"></div>
+                        )}
+                    </div>
                 </div>
             )}
         </>
