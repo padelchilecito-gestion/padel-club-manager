@@ -76,7 +76,3 @@ io.on('connection', (socket) => {
 // cron.schedule('*/15 * * * *', () => {
 //     // checkAndSendReminders();
 // });
-
-server.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-});
