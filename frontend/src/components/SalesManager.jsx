@@ -151,8 +151,9 @@ const SalesManager = () => {
                             className="w-full mt-1 p-2 bg-dark-primary rounded"
                         >
                             <option value="Efectivo">Efectivo</option>
+                            <option value="MercadoPago">Mercado Pago</option>
                             <option value="Tarjeta">Tarjeta</option>
-                            <option value="Mercado Pago">Mercado Pago</option>
+                            <option value="Otro">Otro</option>
                         </select>
                     </div>
                     <button 
