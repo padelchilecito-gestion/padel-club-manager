@@ -51,9 +51,53 @@ class BookingService {
         }
     }
 
-    // ⭐ Si también tienes una función para ACTUALIZAR reservas (ej. BookingService.updateBooking),
-    // deberías asegurarte de que también actualice el campo 'expiresAt' si se cambia 'endTime'.
-    // Si no tienes una función de actualización en el servicio, no es necesario hacer nada más aquí.
+    static async createFixedBookings(bookingsData) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const createdBookings = [];
+            for (const bookingData of bookingsData) {
+                const { court, startTime, endTime, user, status, price } = bookingData;
+
+                if (price === undefined || price === null) {
+                     throw new Error('El precio es obligatorio para crear la reserva.');
+                }
+
+                const existingBooking = await Booking.findOne({
+                    court,
+                    startTime: { $lt: endTime },
+                    endTime: { $gt: startTime }
+                }).session(session);
+
+                if (existingBooking) {
+                    throw new Error(`El turno de las ${new Date(startTime).toLocaleTimeString()} del día ${new Date(startTime).toLocaleDateString()} ya no está disponible.`);
+                }
+
+                const expirationDate = addDays(new Date(endTime), 120);
+
+                const newBooking = new Booking({
+                    court,
+                    startTime,
+                    endTime,
+                    user,
+                    status,
+                    price,
+                    expiresAt: expirationDate
+                });
+                await newBooking.save({ session });
+                createdBookings.push(newBooking);
+            }
+
+            await session.commitTransaction();
+            return createdBookings;
+
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
+    }
 }
 
 module.exports = BookingService;
