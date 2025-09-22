@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import io from 'socket.io-client';
+import { socket } from './NotificationProvider';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-const API_URL = 'http://localhost:5001';
-const socket = io(API_URL);
 
 // --- Componente para una celda del calendario ---
 const CalendarCell = ({ day, onDateClick, isSelected, isCurrentMonth }) => {
