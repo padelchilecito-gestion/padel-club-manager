@@ -42,7 +42,7 @@ router.post('/create-preference', async (req, res) => {
         res.json({ id: response.body.id, pending_id: pendingPayment._id });
 
     } catch (error) {
-        console.log(error);
+        console.error("Error creating preference:", error);
         res.status(500).json({ message: 'Error al crear la preferencia de pago.' });
     }
 });
