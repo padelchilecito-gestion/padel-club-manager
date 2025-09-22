@@ -26,8 +26,8 @@ router.post('/create_preference', async (req, res) => {
                 quantity: 1,
             }],
             back_urls: {
-                success: "http://localhost:5173", // URL a la que volverá el usuario
-                failure: "http://localhost:5173",
+                success: process.env.FRONTEND_URL || "http://localhost:5173/payment-success",
+                failure: process.env.FRONTEND_URL || "http://localhost:5173",
                 pending: ""
             },
             auto_return: "approved",
