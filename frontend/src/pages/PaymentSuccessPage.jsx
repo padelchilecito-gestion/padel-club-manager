@@ -16,7 +16,7 @@ const PaymentSuccessPage = () => {
         if (pendingPaymentId && status === 'approved') {
             const fetchBookingDetails = async () => {
                 try {
-                    const res = await axios.get(`/api/payments/pending/${pendingPaymentId}`);
+                    const res = await axios.get(`/payments/pending/${pendingPaymentId}`);
                     setBookingDetails(res.data);
                     localStorage.removeItem('pendingPaymentId'); // Limpiar para futuras reservas
                 } catch (error) {
