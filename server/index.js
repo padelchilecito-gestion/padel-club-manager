@@ -58,6 +58,16 @@ app.use((req, res, next) => {
     next();
 });
 
+// =================================================================
+// ===== INICIO DE LA SOLUCIÓN: RUTA PARA EL HEALTH CHECK DE RENDER =====
+// =================================================================
+app.get('/api/status', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+// =================================================================
+// ===== FIN DE LA SOLUCIÓN =======================================
+// =================================================================
+
 // Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado a MongoDB'))
