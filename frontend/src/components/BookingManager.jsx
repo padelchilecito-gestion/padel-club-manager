@@ -88,7 +88,9 @@ const BookingManager = () => {
                 alert(res.data.message);
                 fetchBookings(date); // Refresh the view
             } catch (err) {
-                alert(err.response?.data?.message || 'Error al eliminar los turnos.');
+                console.error("Deletion failed:", err);
+                const errorInfo = err.response ? JSON.stringify(err.response.data) : err.message;
+                alert(`Error al eliminar los turnos. Detalle: ${errorInfo}`);
             }
         }
     };
