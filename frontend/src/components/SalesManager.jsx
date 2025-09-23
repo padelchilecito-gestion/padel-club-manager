@@ -208,21 +208,23 @@ const SalesManager = () => {
                             <option value="Otro">Otro</option>
                         </select>
                     </div>
-                    <button
-                        onClick={handleGenerateQR}
-                        disabled={cart.length === 0 || isWaitingForPayment}
-                        className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-                    >
-                        {isWaitingForPayment ? 'Esperando pago...' : 'Cobrar con QR de Mercado Pago'}
-                    </button>
-
-                    <button 
-                        onClick={handleFinalizeSale}
-                        disabled={cart.length === 0}
-                        className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Finalizar Venta ({paymentMethod})
-                    </button>
+                    {paymentMethod === 'MercadoPago' ? (
+                        <button
+                            onClick={handleGenerateQR}
+                            disabled={cart.length === 0 || isWaitingForPayment}
+                            className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                        >
+                            {isWaitingForPayment ? 'Esperando pago...' : 'Cobrar con QR de Mercado Pago'}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleFinalizeSale}
+                            disabled={cart.length === 0}
+                            className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Finalizar Venta ({paymentMethod})
+                        </button>
+                    )}
                 </div>
             </div>
             {isQrModalOpen && (
