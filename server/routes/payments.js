@@ -59,6 +59,11 @@ router.post('/create-preference', async (req, res) => {
 router.post('/create-pos-preference', async (req, res) => {
     const { items, total } = req.body;
 
+    if (!process.env.YOUR_BACKEND_URL) {
+        console.error("CRITICAL: YOUR_BACKEND_URL environment variable is not set.");
+        return res.status(500).send("Error de configuración del servidor: la URL de notificación no está definida.");
+    }
+
     try {
         const settings = await Settings.findOne({ configKey: "main_settings" });
         if (!settings || !settings.mercadoPagoAccessToken) {

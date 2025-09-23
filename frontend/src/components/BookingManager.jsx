@@ -46,7 +46,7 @@ const BookingManager = () => {
         endOfDay.setUTCHours(23, 59, 59, 999);
         
         try {
-            const res = await axios.get(`/bookings?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}`);
+            const res = await axios.get(`/bookings?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}&_=${new Date().getTime()}`);
             const sortedBookings = res.data.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
             setBookings(sortedBookings);
         } catch (err) {

@@ -75,6 +75,33 @@ const TimeSlotFinder = () => {
         return slots;
     }, [selectedDate]); // Se recalcula cuando cambia el día
 
+    const selectionSummary = useMemo(() => {
+        if (selectedSlots.length === 0) {
+            return null;
+        }
+
+        const firstSlot = selectedSlots[0];
+        const lastSlot = selectedSlots[selectedSlots.length - 1];
+
+        const startTime = firstSlot.time;
+
+        // Calcula la hora de finalización sumando 30 mins al último turno
+        const endTimeDate = new Date();
+        endTimeDate.setHours(lastSlot.hour, lastSlot.minute + 30, 0, 0);
+        const endTime = `${String(endTimeDate.getHours()).padStart(2, '0')}:${String(endTimeDate.getMinutes()).padStart(2, '0')}`;
+
+        const durationMinutes = selectedSlots.length * 30;
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+
+        let durationText = '';
+        if (hours > 0) durationText += `${hours} hora${hours > 1 ? 's' : ''}`;
+        if (minutes > 0) durationText += ` ${minutes} min`;
+
+        return `Turno de ${startTime} a ${endTime} (${durationText.trim()})`;
+
+    }, [selectedSlots]);
+
     const fetchDailyAvailability = useCallback(async (date) => {
         setIsLoadingSlots(true);
         setError('');
@@ -83,7 +110,7 @@ const TimeSlotFinder = () => {
             const end = endOfDay(date);
 
             const [bookingsRes, courtsRes, settingsRes] = await Promise.all([
-                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}`),
+                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`),
                 axios.get('/courts'),
                 axios.get('/settings')
             ]);
@@ -290,6 +317,13 @@ const TimeSlotFinder = () => {
                 <div>
                     <h3 className="text-xl font-bold text-white mb-4 text-center">Disponibilidad</h3>
                      <p className="text-text-secondary text-center mb-4">2. Busca y elige una cancha</p>
+                    {/* Aquí va el nuevo bloque de resumen */}
+                    {selectionSummary && (
+                        <div className="bg-dark-primary text-center p-3 rounded-lg mb-4 animate-fade-in">
+                            <p className="font-bold text-secondary">{selectionSummary}</p>
+                        </div>
+                    )}
+
                     <button 
                         onClick={handleFindCourts}
                         disabled={selectedSlots.length === 0 || loading}
