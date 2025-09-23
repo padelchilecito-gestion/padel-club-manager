@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Wallet } from '@mercadopago/sdk-react';
 
 const SalesManager = () => {
     const [products, setProducts] = useState([]);
@@ -8,6 +9,8 @@ const SalesManager = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+    const [preferenceId, setPreferenceId] = useState(null);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     const fetchProducts = async () => {
         try {
@@ -64,22 +67,37 @@ const SalesManager = () => {
             items: cart.map(item => ({
                 product: item.product._id,
                 quantity: item.quantity,
-                price: item.product.price
+                price: item.product.price,
+                name: item.product.name
             })),
             total: total,
             paymentMethod: paymentMethod
         };
 
-        if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
-            console.log("Enviando datos de venta:", saleData);
+        if (paymentMethod === 'MercadoPago') {
             try {
-                await axios.post('/sales', saleData);
-                alert('¡Venta registrada con éxito!');
-                setCart([]);
-                fetchProducts(); // Recargar productos para ver el stock actualizado
+                const response = await axios.post('/sales', saleData);
+                if (response.data.preferenceId) {
+                    setPreferenceId(response.data.preferenceId);
+                    setIsPaymentModalOpen(true);
+                }
             } catch (err) {
-                console.error("Error detallado:", err.response?.data || err.message);
-                setError(err.response?.data?.message || 'Error al registrar la venta. El stock podría no haber sido suficiente.');
+                console.error("Error creating Mercado Pago preference:", err.response?.data || err.message);
+                setError(err.response?.data?.message || 'Error al iniciar el pago con Mercado Pago.');
+            }
+        } else {
+            // Lógica para otros métodos de pago
+            if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
+                try {
+                    await axios.post('/sales', saleData);
+                    alert('¡Venta registrada con éxito!');
+                    setCart([]);
+                    setPaymentMethod('Efectivo');
+                    fetchProducts();
+                } catch (err) {
+                    console.error("Error detallado:", err.response?.data || err.message);
+                    setError(err.response?.data?.message || 'Error al registrar la venta. El stock podría no haber sido suficiente.');
+                }
             }
         }
     };
@@ -89,6 +107,7 @@ const SalesManager = () => {
     );
 
     return (
+        <>
         <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Columna de Productos */}
             <div>
@@ -166,6 +185,36 @@ const SalesManager = () => {
                 </div>
             </div>
         </div>
+
+        {isPaymentModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+                <div className="bg-dark-secondary p-8 rounded-lg max-w-sm w-full">
+                    <h3 className="text-2xl font-bold mb-4 text-center">Pagar con Mercado Pago</h3>
+                    {preferenceId ? (
+                        <Wallet
+                            initialization={{ preferenceId: preferenceId }}
+                            onReady={() => console.log('Wallet Brick is ready')}
+                            onError={(error) => console.error('Error in Wallet Brick:', error)}
+                        />
+                    ) : (
+                        <p>Generando link de pago...</p>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsPaymentModalOpen(false);
+                            setPreferenceId(null);
+                            setCart([]);
+                            fetchProducts();
+                        }}
+                        className="w-full bg-gray-600 py-2 rounded-lg mt-4"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
