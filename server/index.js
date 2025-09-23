@@ -23,19 +23,32 @@ const cashboxRoutes = require('./routes/cashbox');
 
 const server = http.createServer(app);
 
-// --- Configuración de CORS para Socket.IO ---
+// --- Configuración de CORS ---
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://padel-club-manager-xi.vercel.app'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+};
+
 const io = new Server(server, {
-    cors: {
-        origin: process.env.CORS_ALLOWED_ORIGIN || "http://localhost:5173",
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"] // Añadido PATCH
-    }
+    cors: corsOptions
 });
 
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use((req, res, next) => {
     req.io = io;

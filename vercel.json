@@ -5,5 +5,11 @@
       "use": "@vercel/static-build",
       "config": { "distDir": "frontend/dist" }
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://padel-club-backend.onrender.com/api/:path*"
+    }
   ]
 }
