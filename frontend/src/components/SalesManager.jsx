@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // 'useCallback' puede que ya esté
 import axios from 'axios';
+import QRCode from "react-qr-code";
+import { socket } from './NotificationProvider';
 
 const SalesManager = () => {
     const [products, setProducts] = useState([]);
@@ -8,8 +10,12 @@ const SalesManager = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [qrCodeValue, setQrCodeValue] = useState('');
+    const [currentPendingId, setCurrentPendingId] = useState(null);
+    const [isWaitingForPayment, setIsWaitingForPayment] = useState(false);
 
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             const res = await axios.get('/products');
             setProducts(res.data);
@@ -18,11 +24,57 @@ const SalesManager = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+    }, [fetchProducts]);
+
+    useEffect(() => {
+        const handlePaymentSuccess = ({ pendingId }) => {
+            if (pendingId === currentPendingId) {
+                alert('¡Pago recibido con éxito!');
+                setIsQrModalOpen(false);
+                setQrCodeValue('');
+                setCart([]);
+                setCurrentPendingId(null);
+                setIsWaitingForPayment(false);
+                fetchProducts(); // Para actualizar el stock visualmente
+            }
+        };
+
+        socket.on('pos_payment_success', handlePaymentSuccess);
+
+        return () => {
+            socket.off('pos_payment_success', handlePaymentSuccess);
+        };
+    }, [currentPendingId, fetchProducts]);
+
+    const handleGenerateQR = async () => {
+        if (cart.length === 0) return;
+
+        const saleData = {
+            // Pasamos el nombre para que se muestre en el checkout de MP
+            items: cart.map(item => ({
+                product: item.product._id,
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price
+            })),
+            total: total
+        };
+
+        try {
+            setIsWaitingForPayment(true);
+            const res = await axios.post('/payments/create-pos-preference', saleData);
+            setQrCodeValue(res.data.init_point);
+            setCurrentPendingId(res.data.pendingId);
+            setIsQrModalOpen(true);
+        } catch (err) {
+            setError('No se pudo generar el código QR. Inténtalo de nuevo.');
+            setIsWaitingForPayment(false);
+        }
+    };
 
     const addToCart = (product) => {
         setCart(prevCart => {
@@ -156,15 +208,44 @@ const SalesManager = () => {
                             <option value="Otro">Otro</option>
                         </select>
                     </div>
+                    <button
+                        onClick={handleGenerateQR}
+                        disabled={cart.length === 0 || isWaitingForPayment}
+                        className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                    >
+                        {isWaitingForPayment ? 'Esperando pago...' : 'Cobrar con QR de Mercado Pago'}
+                    </button>
+
                     <button 
                         onClick={handleFinalizeSale}
                         disabled={cart.length === 0}
                         className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Finalizar Venta
+                        Finalizar Venta ({paymentMethod})
                     </button>
                 </div>
             </div>
+            {isQrModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-8 rounded-lg text-center">
+                        <h3 className="text-2xl font-bold mb-4 text-dark-primary">Escanea para Pagar</h3>
+                        <div style={{ background: 'white', padding: '16px' }}>
+                            <QRCode value={qrCodeValue} />
+                        </div>
+                        <p className="text-dark-primary font-bold text-2xl mt-4">${total.toFixed(2)}</p>
+                        <button
+                            onClick={() => {
+                                setIsQrModalOpen(false);
+                                setIsWaitingForPayment(false);
+                                setCurrentPendingId(null);
+                            }}
+                            className="w-full bg-gray-600 text-white py-2 rounded-lg mt-6 hover:bg-gray-700"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
