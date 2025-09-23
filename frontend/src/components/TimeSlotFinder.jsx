@@ -82,9 +82,9 @@ const TimeSlotFinder = () => {
             const end = endOfDay(date);
 
             const [bookingsRes, courtsRes, settingsRes] = await Promise.all([
-                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}`),
-                axios.get('/courts'),
-                axios.get('/settings')
+                axios.get(`/api/bookings?start=${start.toISOString()}&end=${end.toISOString()}`),
+                axios.get('/api/courts'),
+                axios.get('/api/settings')
             ]);
             
             setDailyBookings(bookingsRes.data);
@@ -143,7 +143,7 @@ const TimeSlotFinder = () => {
                 const startTime = new Date(selectedDate);
                 startTime.setHours(slot.hour, slot.minute, 0, 0);
                 const endTime = new Date(startTime.getTime() + 30 * 60000);
-                return axios.get(`/courts/available?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`);
+                return axios.get(`/api/courts/available?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`);
             });
             const results = await Promise.all(availabilityPromises);
             const courtIdLists = results.map(res => new Set(res.data.map(court => court._id)));
@@ -214,7 +214,7 @@ const TimeSlotFinder = () => {
         const preferenceData = { courtId: bookingCourt._id, slots: selectedSlots, user: clientData, total, date: selectedDate };
 
         try {
-            const response = await axios.post('/payments/create-preference', preferenceData);
+            const response = await axios.post('/api/payments/create-preference', preferenceData);
             const { id, pending_id } = response.data;
             if (id) {
                 setPreferenceId(id);
