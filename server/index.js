@@ -15,9 +15,16 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true // Adding credentials to be safe, sometimes needed
+    origin: function (origin, callback) {
+        // Permitir peticiones sin 'origin' (como las de Postman o apps móviles) y las de la lista
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // <-- Se añade OPTIONS
+    credentials: true
 };
 
 const io = new Server(server, {
