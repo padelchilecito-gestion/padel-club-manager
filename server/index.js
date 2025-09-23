@@ -67,5 +67,11 @@ io.on('connection', (socket) => {
   });
 });
 
+// CAMBIO CLAVE: Solo escucha en un puerto si no estás en Vercel
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 5001;
+    server.listen(PORT, () => console.log(`Servidor local corriendo en el puerto ${PORT}`));
+}
+
 // Exportar la app para Vercel
 module.exports = app;
