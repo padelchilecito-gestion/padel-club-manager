@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const PendingPayment = require('../models/PendingPayment');
+const PendingSale = require('../models/PendingSale');
+const Sale = require('../models/Sale');
+const Product = require('../models/Product');
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const BookingService = require('../services/booking-service');
@@ -76,41 +80,80 @@ router.post('/webhook', async (req, res) => {
     const { query } = req;
 
     try {
-        if (query.type === 'payment') {
-            const client = await getMercadoPagoClient();
-            const payment = new Payment(client);
+        if (query.type !== 'payment') {
+            return res.status(204).send();
+        }
 
-            const paymentData = await payment.get({ id: query['data.id'] });
-            const pendingPaymentId = paymentData.external_reference;
+        const client = await getMercadoPagoClient();
+        const payment = new Payment(client);
+        const paymentData = await payment.get({ id: query['data.id'] });
 
-            if (paymentData.status === 'approved') {
-                const pendingPayment = await PendingPayment.findById(pendingPaymentId);
-                if (pendingPayment) {
-                    const court = await Court.findById(pendingPayment.court);
+        if (paymentData.status !== 'approved') {
+            return res.status(204).send();
+        }
 
-                    const bookingsToCreate = pendingPayment.slots.map(slot => {
-                        const startTime = new Date(pendingPayment.date);
-                        startTime.setHours(slot.hour, slot.minute, 0, 0);
-                        const endTime = new Date(startTime.getTime() + 30 * 60000);
+        const externalReference = paymentData.external_reference;
 
-                        return {
-                            court: pendingPayment.court,
-                            startTime,
-                            endTime,
-                            user: pendingPayment.user,
-                            status: 'Confirmed',
-                            price: court.pricePerHour / 2,
-                        };
+        // Diferenciar entre venta de POS y reserva de cancha
+        if (query.source === 'pos') {
+            const pendingSale = await PendingSale.findById(externalReference);
+            if (pendingSale) {
+                const session = await mongoose.startSession();
+                session.startTransaction();
+                try {
+                    const sale = new Sale({
+                        items: pendingSale.items,
+                        total: pendingSale.total,
+                        paymentMethod: pendingSale.paymentMethod
                     });
+                    await sale.save({ session });
 
-                    const createdBookings = await BookingService.createFixedBookings(bookingsToCreate);
-                    createdBookings.forEach(b => req.io.emit('booking_update', b));
+                    for (const item of pendingSale.items) {
+                         await Product.findByIdAndUpdate(item.product,
+                            { $inc: { stock: -item.quantity } },
+                            { session, new: true }
+                        );
+                    }
+                    await session.commitTransaction();
 
-                    await PendingPayment.findByIdAndDelete(pendingPaymentId);
+                    // Notificar al frontend si es necesario (ej. via Socket.IO)
+                    req.io.emit('pos_sale_confirmed', sale);
+
+                    await PendingSale.findByIdAndDelete(externalReference);
+
+                } catch (error) {
+                    await session.abortTransaction();
+                    throw error; // Dejar que el catch principal lo maneje
+                } finally {
+                    session.endSession();
                 }
             }
+        } else {
+            // Lógica existente para reservas de canchas
+            const pendingPayment = await PendingPayment.findById(externalReference);
+            if (pendingPayment) {
+                const court = await Court.findById(pendingPayment.court);
+                const bookingsToCreate = pendingPayment.slots.map(slot => {
+                    const startTime = new Date(pendingPayment.date);
+                    startTime.setHours(slot.hour, slot.minute, 0, 0);
+                    const endTime = new Date(startTime.getTime() + 30 * 60000);
+                    return {
+                        court: pendingPayment.court,
+                        startTime,
+                        endTime,
+                        user: pendingPayment.user,
+                        status: 'Confirmed',
+                        price: court.pricePerHour / 2,
+                    };
+                });
+                const createdBookings = await BookingService.createFixedBookings(bookingsToCreate);
+                createdBookings.forEach(b => req.io.emit('booking_update', b));
+                await PendingPayment.findByIdAndDelete(externalReference);
+            }
         }
+
         res.status(204).send();
+
     } catch (error) {
         console.error("Error processing webhook:", error);
         res.status(500).json({ error: error.message });
