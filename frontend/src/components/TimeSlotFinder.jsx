@@ -47,6 +47,7 @@ const TimeSlotFinder = () => {
     const [isLoadingSlots, setIsLoadingSlots] = useState(true);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [bookingCourt, setBookingCourt] = useState(null);
     const [clientData, setClientData] = useState({ name: '', phone: '' });
     const [adminWpp, setAdminWpp] = useState('');
@@ -236,7 +237,7 @@ const TimeSlotFinder = () => {
             alert("Por favor, completa tu nombre y teléfono.");
             return;
         }
-
+        setIsSubmitting(true);
         const total = selectedSlots.length * (bookingCourt.pricePerHour / 2);
 
         const preferenceData = {
@@ -255,6 +256,8 @@ const TimeSlotFinder = () => {
         } catch (error) {
             console.log(error);
             alert('Error al crear la preferencia de pago.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -263,7 +266,7 @@ const TimeSlotFinder = () => {
             alert("Por favor, completa tu nombre y teléfono.");
             return;
         }
-
+        setIsSubmitting(true);
         const cashBookingData = {
             courtId: bookingCourt._id,
             slots: selectedSlots,
@@ -283,6 +286,12 @@ const TimeSlotFinder = () => {
         } catch (error) {
             console.error("Error creating cash booking:", error);
             alert(error.response?.data?.message || 'Error al registrar la reserva.');
+            // ⭐ INCLUSIÓN CLAVE: Refrescamos la disponibilidad incluso si hay error
+            fetchDailyAvailability(selectedDate);
+            // Cerramos el modal para que el usuario vea el calendario actualizado
+            setIsModalOpen(false);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -373,14 +382,28 @@ const TimeSlotFinder = () => {
                                         <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
                                     </div>
                                     <div className="flex flex-col gap-2">
-                                        <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
-                                            Pagar con Mercado Pago
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark disabled:bg-gray-500"
+                                        >
+                                            {isSubmitting ? 'Procesando...' : 'Pagar con Mercado Pago'}
                                         </button>
-                                        <button type="button" onClick={handleCashBooking} className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition">
-                                            Confirmar (Pago en Efectivo)
+                                        <button
+                                            type="button"
+                                            onClick={handleCashBooking}
+                                            disabled={isSubmitting}
+                                            className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition disabled:bg-gray-500"
+                                        >
+                                            {isSubmitting ? 'Procesando...' : 'Confirmar (Pago en Efectivo)'}
                                         </button>
                                     </div>
-                                    <button type="button" onClick={() => {setIsModalOpen(false); setPreferenceId(null);}} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {setIsModalOpen(false); setPreferenceId(null);}}
+                                        disabled={isSubmitting}
+                                        className="w-full bg-gray-600 py-2 rounded-lg mt-2 disabled:opacity-50"
+                                    >
                                         Cancelar
                                     </button>
                                 </div>
