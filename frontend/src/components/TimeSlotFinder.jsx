@@ -3,7 +3,7 @@ import axios from 'axios';
 import { format, addDays, subDays, startOfDay, endOfDay, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// --- Sub-componentes (Sin cambios) ---
+// --- Sub-componentes ---
 const TimeSlot = ({ slot, onSelect, isSelected, isAvailable, isPast }) => (
     <button
         onClick={() => isAvailable && !isPast && onSelect(slot)}
@@ -12,7 +12,7 @@ const TimeSlot = ({ slot, onSelect, isSelected, isAvailable, isPast }) => (
             isSelected 
                 ? 'bg-secondary text-dark-primary ring-2 ring-white scale-105' 
                 : isPast
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed' // Estilo para turnos pasados
                     : isAvailable
                         ? 'bg-dark-secondary text-text-primary hover:bg-primary hover:text-white hover:scale-105'
                         : 'bg-danger/50 text-text-secondary cursor-not-allowed opacity-70'
@@ -49,16 +49,17 @@ const TimeSlotFinder = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [bookingCourt, setBookingCourt] = useState(null);
     const [clientData, setClientData] = useState({ name: '', phone: '' });
-    const [mp, setMp] = useState(null);
+    const [adminWpp, setAdminWpp] = useState('');
     const [preferenceId, setPreferenceId] = useState(null);
+    const [mp, setMp] = useState(null);
 
     const timeSlots = useMemo(() => {
         const slots = [];
-        const now = new Date();
+        const now = new Date(); // Obtenemos la fecha y hora actual
         
         for (let i = 9; i <= 23; i++) {
             for (let j = 0; j < 60; j += 30) {
-                if (i === 23 && j === 30) continue;
+                if (i === 23 && j === 30) continue; // No agregar 23:30 si el límite es 23:00
 
                 const slotTime = new Date(selectedDate);
                 slotTime.setHours(i, j, 0, 0);
@@ -72,7 +73,7 @@ const TimeSlotFinder = () => {
             }
         }
         return slots;
-    }, [selectedDate]);
+    }, [selectedDate]); // Se recalcula cuando cambia el día
 
     const fetchDailyAvailability = useCallback(async (date) => {
         setIsLoadingSlots(true);
@@ -89,10 +90,12 @@ const TimeSlotFinder = () => {
             
             setDailyBookings(bookingsRes.data);
             setTotalCourts(courtsRes.data.length);
-
-            if (settingsRes.data.mercadoPagoPublicKey && window.MercadoPago) {
-                const mpInstance = new window.MercadoPago(settingsRes.data.mercadoPagoPublicKey);
-                setMp(mpInstance);
+             if (settingsRes.data.whatsappNumber) {
+                setAdminWpp(settingsRes.data.whatsappNumber);
+            }
+            if (settingsRes.data.mercadoPagoPublicKey) {
+                const mp = new window.MercadoPago(settingsRes.data.mercadoPagoPublicKey);
+                setMp(mp);
             }
 
         } catch (err) {
@@ -146,15 +149,13 @@ const TimeSlotFinder = () => {
                 return axios.get(`/courts/available?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`);
             });
             const results = await Promise.all(availabilityPromises);
-            const courtIdLists = results.map(res => new Set(res.data.map(court => court._id)));
-
-            if (courtIdLists.length === 0) {
-                 setAvailableCourts([]);
-                 return;
+            if (results.some(res => res.data.length === 0)) {
+                setAvailableCourts([]);
+                return;
             }
-
-            const commonCourtIds = courtIdLists.reduce((a, b) => new Set([...a].filter(x => b.has(x))));
-            const finalAvailableCourts = results[0].data.filter(court => commonCourtIds.has(court._id));
+            const courtIdLists = results.map(res => res.data.map(court => court._id));
+            const commonCourtIds = courtIdLists.reduce((a, b) => a.filter(c => b.includes(c)));
+            const finalAvailableCourts = results[0].data.filter(court => commonCourtIds.includes(court._id));
             setAvailableCourts(finalAvailableCourts);
         } catch (err) {
             setError('Error al buscar canchas disponibles.');
@@ -164,9 +165,7 @@ const TimeSlotFinder = () => {
     };
     
     const handleDateChange = (days) => {
-        const newDate = days > 0 ? addDays(selectedDate, 1) : subDays(selectedDate, 1);
-        if (newDate < startOfDay(new Date())) return; // Prevenir ir a fechas pasadas
-        setSelectedDate(newDate);
+        setSelectedDate(current => days > 0 ? addDays(current, 1) : subDays(current, 1));
         setSelectedSlots([]);
         setAvailableCourts([]);
     };
@@ -176,33 +175,23 @@ const TimeSlotFinder = () => {
         setIsModalOpen(true);
     };
     
-    const handleClientDataChange = (e) => {
+     const handleClientDataChange = (e) => {
         setClientData({ ...clientData, [e.target.name]: e.target.value });
     };
 
-    // --- CORRECCIÓN FINAL: Lógica para renderizar el Wallet Brick ---
     useEffect(() => {
         if (preferenceId && mp) {
-            // Limpia el contenedor antes de renderizar un nuevo brick
-            const brickContainer = document.getElementById('wallet_container');
-            if (brickContainer.firstChild) {
-                 brickContainer.innerHTML = "";
-            }
-
-            const bricksBuilder = mp.bricks();
-            bricksBuilder.create("wallet", "wallet_container", {
+            mp.wallet({
                 initialization: {
                     preferenceId: preferenceId,
                 },
-                customization: {
-                    texts: {
-                        valueProp: 'smart_option',
-                    },
-                },
-            }).catch((error) => console.error("Error al renderizar el brick:", error));
+                render: {
+                    container: '#wallet_container',
+                    label: 'Pagar',
+                }
+            });
         }
     }, [preferenceId, mp]);
-
 
     const handleCreatePreference = async () => {
         if (!clientData.name || !clientData.phone) {
@@ -211,25 +200,24 @@ const TimeSlotFinder = () => {
         }
 
         const total = selectedSlots.length * (bookingCourt.pricePerHour / 2);
-        const preferenceData = { courtId: bookingCourt._id, slots: selectedSlots, user: clientData, total, date: selectedDate };
+
+        const preferenceData = {
+            courtId: bookingCourt._id,
+            slots: selectedSlots,
+            user: clientData,
+            total: total,
+            date: selectedDate
+        };
 
         try {
             const response = await axios.post('/payments/create-preference', preferenceData);
             const { id, pending_id } = response.data;
-            if (id) {
-                setPreferenceId(id);
-                localStorage.setItem('pendingPaymentId', pending_id);
-            }
+            setPreferenceId(id);
+            localStorage.setItem('pendingPaymentId', pending_id);
         } catch (error) {
-            console.error(error);
+            console.log(error);
             alert('Error al crear la preferencia de pago.');
         }
-    };
-
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setPreferenceId(null); // Reinicia el preferenceId al cerrar el modal
-        setClientData({ name: '', phone: '' });
     };
 
     return (
@@ -237,7 +225,7 @@ const TimeSlotFinder = () => {
             <main className="bg-dark-secondary p-6 rounded-xl shadow-lg mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div className="flex justify-between items-center mb-4">
-                        <button onClick={() => handleDateChange(-1)} disabled={isToday(selectedDate)} className="px-4 py-2 hover:bg-primary rounded-lg disabled:opacity-50">&lt;</button>
+                        <button onClick={() => handleDateChange(-1)} className="px-4 py-2 hover:bg-primary rounded-lg">&lt;</button>
                         <h2 className="text-xl font-bold text-white capitalize">
                             {format(selectedDate, 'eeee, dd MMMM yyyy', { locale: es })}
                         </h2>
@@ -268,7 +256,7 @@ const TimeSlotFinder = () => {
                         disabled={selectedSlots.length === 0 || loading}
                         className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark transition disabled:bg-gray-500 disabled:cursor-not-allowed mb-4"
                     >
-                        {loading ? 'Buscando...' : `Buscar Canchas para ${selectedSlots.length} Turno(s)`}
+                        {loading ? 'Buscando...' : `Buscar Canchas para ${selectedSlots.length} Turnos`}
                     </button>
                     {error && <p className="text-danger text-center">{error}</p>}
                     <div className="space-y-4">
@@ -282,7 +270,7 @@ const TimeSlotFinder = () => {
                         )}
                         {!loading && availableCourts.length === 0 && selectedSlots.length > 0 && (
                              <p className="text-center text-text-secondary p-4">
-                                Presiona "Buscar" para ver la disponibilidad. Si no aparecen canchas, significa que no hay ninguna libre para todos los horarios seleccionados a la vez.
+                                Presiona "Buscar" para ver la disponibilidad.
                              </p>
                         )}
                     </div>
@@ -301,7 +289,7 @@ const TimeSlotFinder = () => {
                          <p className="text-text-primary mb-4">
                            Horarios: <span className='font-bold text-secondary'>{selectedSlots.map(s => s.time).join(', ')}hs</span>
                         </p>
-                                <p className="text-text-secondary mb-4">Completa tus datos para continuar con el pago.</p>
+                                <p className="text-text-secondary mb-4">Por favor, déjanos tus datos para finalizar.</p>
                                 <div className="space-y-4">
                                     <div>
                                         <label htmlFor="clientName" className="text-sm text-text-secondary">Nombre Completo</label>
@@ -314,7 +302,7 @@ const TimeSlotFinder = () => {
                                     <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
                                         Pagar con Mercado Pago
                                     </button>
-                                    <button type="button" onClick={closeModal} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
+                                    <button type="button" onClick={() => {setIsModalOpen(false); setPreferenceId(null);}} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
                                         Cancelar
                                     </button>
                                 </div>

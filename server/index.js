@@ -8,17 +8,28 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para Socket.IO
-const io = new Server(server, {
-    cors: {
-        origin: process.env.CORS_ALLOWED_ORIGIN || "http://localhost:5173",
-        methods: ["GET", "POST"]
+// --- Configuración de CORS ---
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://padel-club-manager-xi.vercel.app'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
     },
-    // CAMBIO CLAVE: Especificar la ruta para que Vercel la maneje
-    path: "/api/socket.io/"
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+};
+
+const io = new Server(server, {
+    cors: corsOptions
 });
 
-// Importar todas tus rutas...
+// --- Importar Rutas ---
 const authRoutes = require('./routes/auth');
 const courtRoutes = require('./routes/courts');
 const bookingRoutes = require('./routes/bookings');
@@ -33,8 +44,15 @@ const logsRoutes = require('./routes/logs');
 const cashboxRoutes = require('./routes/cashbox');
 
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Middleware para loguear todas las peticiones entrantes
+app.use((req, res, next) => {
+    console.log(`[INCOMING REQUEST] Method: ${req.method}, URL: ${req.originalUrl}`);
+    next();
+});
+
 app.use((req, res, next) => {
     req.io = io;
     next();
@@ -45,33 +63,27 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado a MongoDB'))
   .catch(err => console.error('Error de conexión a MongoDB:', err));
 
-// Rutas de la API (sin el prefijo /api)
-app.use('/auth', authRoutes);
-app.use('/courts', courtRoutes);
-app.use('/bookings', bookingRoutes);
-app.use('/products', productRoutes);
-app.use('/payments', paymentRoutes);
-app.use('/sales', salesRoutes);
-app.use('/dashboard', dashboardRoutes);
-app.use('/reports', reportsRoutes);
-app.use('/settings', settingsRoutes);
-app.use('/users', usersRoutes);
-app.use('/logs', logsRoutes);
-app.use('/cashbox', cashboxRoutes);
+// Rutas de la API
+app.use('/api/auth', authRoutes);
+app.use('/api/courts', courtRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/logs', logsRoutes);
+app.use('/api/cashbox', cashboxRoutes);
 
 // Lógica de Socket.IO
 io.on('connection', (socket) => {
-  console.log('Cliente conectado:', socket.id);
+  console.log('Un cliente se ha conectado:', socket.id);
   socket.on('disconnect', () => {
     console.log('Cliente desconectado:', socket.id);
   });
 });
 
-// CAMBIO CLAVE: Solo escucha en un puerto si no estás en Vercel
-if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 5001;
-    server.listen(PORT, () => console.log(`Servidor local corriendo en el puerto ${PORT}`));
-}
-
-// Exportar la app para que Vercel la use
-module.exports = app;
+const PORT = process.env.PORT || 5001;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
