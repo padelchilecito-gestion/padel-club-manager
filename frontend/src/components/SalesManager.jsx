@@ -14,7 +14,7 @@ const SalesManager = () => {
 
     const fetchProducts = async () => {
         try {
-            const res = await axios.get('/products');
+            const res = await axios.get('/api/products');
             setProducts(res.data);
         } catch (err) {
             setError('No se pudieron cargar los productos.');
@@ -76,7 +76,7 @@ const SalesManager = () => {
 
         if (paymentMethod === 'MercadoPago') {
             try {
-                const response = await axios.post('/sales', saleData);
+                const response = await axios.post('/api/sales', saleData);
                 if (response.data.preferenceId) {
                     setPreferenceId(response.data.preferenceId);
                     setIsPaymentModalOpen(true);
@@ -89,7 +89,7 @@ const SalesManager = () => {
             // Lógica para otros métodos de pago
             if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
                 try {
-                    await axios.post('/sales', saleData);
+                    await axios.post('/api/sales', saleData);
                     alert('¡Venta registrada con éxito!');
                     setCart([]);
                     setPaymentMethod('Efectivo');

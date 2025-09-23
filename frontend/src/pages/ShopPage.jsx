@@ -27,7 +27,7 @@ const ShopPage = () => {
         const fetchProducts = async () => {
             try {
                 // ⭐ ¡CORRECCIÓN CLAVE! Usamos la nueva ruta pública
-                const res = await axios.get('/products/public');
+                const res = await axios.get('/api/products/public');
                 setProducts(res.data);
             } catch (err) {
                 setError('No se pudieron cargar los productos.');

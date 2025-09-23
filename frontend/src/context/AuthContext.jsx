@@ -1,8 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -22,7 +20,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const response = await axios.post('/auth/login', { username, password });
+            const response = await axios.post('/api/auth/login', { username, password });
             const { token, role } = response.data; // Obtenemos el rol desde la respuesta
             localStorage.setItem('token', token);
             localStorage.setItem('userRole', role); // Guardamos el rol
