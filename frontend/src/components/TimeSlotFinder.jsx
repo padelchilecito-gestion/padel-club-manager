@@ -110,7 +110,7 @@ const TimeSlotFinder = () => {
             const end = endOfDay(date);
 
             const [bookingsRes, courtsRes, settingsRes] = await Promise.all([
-                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}`),
+                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`),
                 axios.get('/courts'),
                 axios.get('/settings')
             ]);
