@@ -338,12 +338,14 @@ const TimeSlotFinder = () => {
                                         <label htmlFor="clientPhone" className="text-sm text-text-secondary">Teléfono</label>
                                         <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
                                     </div>
-                                    <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
-                                        Pagar con Mercado Pago
-                                    </button>
-                                    <button type="button" onClick={handleCashBooking} className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition mt-2">
-                                        Confirmar (Pago en Efectivo)
-                                    </button>
+                                    <div className="flex flex-col gap-2">
+                                        <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
+                                            Pagar con Mercado Pago
+                                        </button>
+                                        <button type="button" onClick={handleCashBooking} className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition">
+                                            Confirmar (Pago en Efectivo)
+                                        </button>
+                                    </div>
                                     <button type="button" onClick={() => {setIsModalOpen(false); setPreferenceId(null);}} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
                                         Cancelar
                                     </button>
