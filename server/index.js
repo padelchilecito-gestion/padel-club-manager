@@ -36,6 +36,7 @@ const settingsRoutes = require('./routes/settings');
 const usersRoutes = require('./routes/users');
 const logsRoutes = require('./routes/logs');
 const cashboxRoutes = require('./routes/cashbox');
+const adminTaskRoutes = require('./routes/admin-tasks');
 
 // Middlewares
 // Manejo manual de CORS para las peticiones HTTP
@@ -93,6 +94,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/cashbox', cashboxRoutes);
+app.use('/api/admin-tasks', adminTaskRoutes);
 
 // Lógica de Socket.IO
 io.on('connection', (socket) => {
