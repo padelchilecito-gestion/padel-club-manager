@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axiosInstance from '../config/axios'; // Usar la nueva instancia
 import { format, addDays, subDays, startOfDay, endOfDay, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -110,15 +110,30 @@ const TimeSlotFinder = () => {
             const start = startOfDay(date);
             const end = endOfDay(date);
 
-            const [bookingsRes, courtsRes, settingsRes] = await Promise.all([
-                axios.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`),
-                axios.get('/courts'),
-                axios.get('/settings')
-            ]);
+            console.log('🔄 Fetching data for date:', date.toISOString());
+
+            // Hacer las peticiones con manejo de errores individual
+            const promises = [
+                axiosInstance.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`).catch(err => {
+                    console.error('Error fetching bookings:', err);
+                    return { data: [] };
+                }),
+                axiosInstance.get('/courts').catch(err => {
+                    console.error('Error fetching courts:', err);
+                    return { data: [] };
+                }),
+                axiosInstance.get('/settings').catch(err => {
+                    console.error('Error fetching settings:', err);
+                    return { data: {} };
+                })
+            ];
+
+            const [bookingsRes, courtsRes, settingsRes] = await Promise.all(promises);
             
             setDailyBookings(bookingsRes.data);
             setTotalCourts(courtsRes.data.length);
-             if (settingsRes.data.whatsappNumber) {
+
+            if (settingsRes.data.whatsappNumber) {
                 setAdminWpp(settingsRes.data.whatsappNumber);
             }
             if (settingsRes.data.mercadoPagoPublicKey) {
@@ -127,7 +142,8 @@ const TimeSlotFinder = () => {
             }
 
         } catch (err) {
-            setError('Error al cargar la disponibilidad del día.');
+            console.error('Error en fetchDailyAvailability:', err);
+            setError('Error al cargar la disponibilidad del día. Verifica tu conexión.');
         } finally {
             setIsLoadingSlots(false);
         }
@@ -174,8 +190,9 @@ const TimeSlotFinder = () => {
                 const startTime = new Date(selectedDate);
                 startTime.setHours(slot.hour, slot.minute, 0, 0);
                 const endTime = new Date(startTime.getTime() + 30 * 60000);
-                return axios.get(`/courts/available?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`);
+                return axiosInstance.get(`/courts/available?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`);
             });
+
             const results = await Promise.all(availabilityPromises);
             if (results.some(res => res.data.length === 0)) {
                 setAvailableCourts([]);
@@ -186,7 +203,8 @@ const TimeSlotFinder = () => {
             const finalAvailableCourts = results[0].data.filter(court => commonCourtIds.includes(court._id));
             setAvailableCourts(finalAvailableCourts);
         } catch (err) {
-            setError('Error al buscar canchas disponibles.');
+            console.error('Error buscando canchas:', err);
+            setError('Error al buscar canchas disponibles. Verifica tu conexión.');
         } finally {
             setLoading(false);
         }
@@ -249,12 +267,13 @@ const TimeSlotFinder = () => {
         };
 
         try {
-            const response = await axios.post('/payments/create-preference', preferenceData);
+            const response = await axiosInstance.post('/payments/create-preference', preferenceData);
             const { id, pending_id } = response.data;
             setPreferenceId(id);
-            localStorage.setItem('pendingPaymentId', pending_id);
+            // No usar localStorage en artifacts
+            // localStorage.setItem('pendingPaymentId', pending_id);
         } catch (error) {
-            console.log(error);
+            console.error('Error creating preference:', error);
             alert('Error al crear la preferencia de pago.');
         } finally {
             setIsSubmitting(false);
@@ -272,11 +291,11 @@ const TimeSlotFinder = () => {
             slots: selectedSlots,
             user: clientData,
             date: selectedDate,
-            total: selectedSlots.length * (bookingCourt.pricePerHour / 2) // Although not paid, it's good to store the price
+            total: selectedSlots.length * (bookingCourt.pricePerHour / 2)
         };
 
         try {
-            await axios.post('/bookings/cash', cashBookingData);
+            await axiosInstance.post('/bookings/cash', cashBookingData);
             alert('¡Reserva registrada! Queda pendiente de pago en el local.');
             setIsModalOpen(false);
             // Refrescar la disponibilidad para mostrar el turno como ocupado
@@ -286,7 +305,7 @@ const TimeSlotFinder = () => {
         } catch (error) {
             console.error("Error creating cash booking:", error);
             alert(error.response?.data?.message || 'Error al registrar la reserva.');
-            // ⭐ INCLUSIÓN CLAVE: Refrescamos la disponibilidad incluso si hay error
+            // Refrescamos la disponibilidad incluso si hay error
             fetchDailyAvailability(selectedDate);
             // Cerramos el modal para que el usuario vea el calendario actualizado
             setIsModalOpen(false);
