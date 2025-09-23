@@ -78,6 +78,21 @@ const BookingManager = () => {
         return slots;
     }, []);
 
+    const handleDeleteFixedBooking = async () => {
+        if (window.confirm('¿Estás SEGURO de que quieres eliminar TODOS los turnos futuros de Eduardo Ricci? Esta acción no se puede deshacer.')) {
+            try {
+                const res = await axios.post('/admin-tasks/delete-user-bookings', {
+                    name: "Eduardo Ricci",
+                    phone: "3825625422"
+                });
+                alert(res.data.message);
+                fetchBookings(date); // Refresh the view
+            } catch (err) {
+                alert(err.response?.data?.message || 'Error al eliminar los turnos.');
+            }
+        }
+    };
+
     const handleConfirmPayment = async (bookingId) => {
         if (window.confirm('¿Confirmar que el pago para esta reserva ha sido recibido en efectivo?')) {
             try {
@@ -250,6 +265,13 @@ const BookingManager = () => {
 
     return (
         <div className="animate-fade-in">
+            <div className="border-2 border-danger p-4 rounded-lg mb-6">
+                <h4 className="text-danger font-bold text-lg mb-2">Acción de Uso Único</h4>
+                <p className="text-text-secondary mb-3">Este botón eliminará todos los turnos futuros del cliente "Eduardo Ricci". Úsalo solo una vez y luego avísame para que lo elimine del código.</p>
+                <button onClick={handleDeleteFixedBooking} className="bg-danger text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700">
+                    Eliminar Turnos Fijos de Eduardo Ricci
+                </button>
+            </div>
             <div className="flex justify-between items-center gap-4 mb-4">
                 <div className="flex items-center gap-4">
                     <h3 className="text-xl font-bold text-secondary">Turnos del Día</h3>
