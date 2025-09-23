@@ -8,17 +8,17 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-// --- CAMBIO CLAVE: Configuración de CORS para Socket.IO ---
-// Se debe especificar el path para que coincida con el cliente en Vercel
+// Configuración de CORS para Socket.IO
 const io = new Server(server, {
     cors: {
         origin: process.env.CORS_ALLOWED_ORIGIN || "http://localhost:5173",
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        methods: ["GET", "POST"]
     },
-    path: "/api/socket.io/" // Especificamos un path para el socket
+    // CAMBIO CLAVE: Especificar la ruta para que Vercel la maneje
+    path: "/api/socket.io/"
 });
 
-// --- Importar Rutas ---
+// Importar todas tus rutas...
 const authRoutes = require('./routes/auth');
 const courtRoutes = require('./routes/courts');
 const bookingRoutes = require('./routes/bookings');
@@ -46,22 +46,22 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('Error de conexión a MongoDB:', err));
 
 // Rutas de la API (sin el prefijo /api)
-app.use('/dashboard', dashboardRoutes);
-app.use('/reports', reportsRoutes);
 app.use('/auth', authRoutes);
 app.use('/courts', courtRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/products', productRoutes);
 app.use('/payments', paymentRoutes);
-app.use('/settings', settingsRoutes);
 app.use('/sales', salesRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/reports', reportsRoutes);
+app.use('/settings', settingsRoutes);
 app.use('/users', usersRoutes);
 app.use('/logs', logsRoutes);
 app.use('/cashbox', cashboxRoutes);
 
 // Lógica de Socket.IO
 io.on('connection', (socket) => {
-  console.log('Un cliente se ha conectado:', socket.id);
+  console.log('Cliente conectado:', socket.id);
   socket.on('disconnect', () => {
     console.log('Cliente desconectado:', socket.id);
   });
@@ -73,5 +73,5 @@ if (process.env.NODE_ENV !== 'production') {
     server.listen(PORT, () => console.log(`Servidor local corriendo en el puerto ${PORT}`));
 }
 
-// Exportar la app para Vercel
+// Exportar la app para que Vercel la use
 module.exports = app;

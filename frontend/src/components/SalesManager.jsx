@@ -14,7 +14,7 @@ const SalesManager = () => {
     // State for payment flow
     const [preferenceId, setPreferenceId] = useState(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-    const [paymentStatus, setPaymentStatus] = useState(''); // e.g., 'processing', 'success'
+    const [paymentStatus, setPaymentStatus] = useState(''); // e.g., 'generating', 'processing', 'success'
 
     const fetchProducts = async () => {
         try {
