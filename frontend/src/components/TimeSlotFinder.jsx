@@ -180,16 +180,27 @@ const TimeSlotFinder = () => {
     };
 
     useEffect(() => {
+        // Limpiamos el contenedor por si ya había un botón de pago
+        const container = document.getElementById('wallet_container');
+        if (container) {
+            container.innerHTML = '';
+        }
+
         if (preferenceId && mp) {
-            mp.wallet({
-                initialization: {
-                    preferenceId: preferenceId,
-                },
-                render: {
-                    container: '#wallet_container',
-                    label: 'Pagar',
-                }
-            });
+            const renderWallet = async () => {
+                const bricksBuilder = mp.bricks();
+                await bricksBuilder.create('wallet', 'wallet_container', {
+                    initialization: {
+                        preferenceId: preferenceId,
+                    },
+                    customization: {
+                        texts: {
+                            valueProp: 'smart_option',
+                        },
+                    },
+                });
+            };
+            renderWallet();
         }
     }, [preferenceId, mp]);
 
