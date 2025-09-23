@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format, addDays, subDays, startOfDay, endOfDay, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Wallet } from '@mercadopago/sdk-react';
 
 // --- Sub-componentes ---
 const TimeSlot = ({ slot, onSelect, isSelected, isAvailable, isPast }) => (
@@ -51,7 +52,6 @@ const TimeSlotFinder = () => {
     const [clientData, setClientData] = useState({ name: '', phone: '' });
     const [adminWpp, setAdminWpp] = useState('');
     const [preferenceId, setPreferenceId] = useState(null);
-    const [mp, setMp] = useState(null);
 
     const timeSlots = useMemo(() => {
         const slots = [];
@@ -92,10 +92,6 @@ const TimeSlotFinder = () => {
             setTotalCourts(courtsRes.data.length);
              if (settingsRes.data.whatsappNumber) {
                 setAdminWpp(settingsRes.data.whatsappNumber);
-            }
-            if (settingsRes.data.mercadoPagoPublicKey) {
-                const mp = new window.MercadoPago(settingsRes.data.mercadoPagoPublicKey);
-                setMp(mp);
             }
 
         } catch (err) {
@@ -178,20 +174,6 @@ const TimeSlotFinder = () => {
      const handleClientDataChange = (e) => {
         setClientData({ ...clientData, [e.target.name]: e.target.value });
     };
-
-    useEffect(() => {
-        if (preferenceId && mp) {
-            mp.wallet({
-                initialization: {
-                    preferenceId: preferenceId,
-                },
-                render: {
-                    container: '#wallet_container',
-                    label: 'Pagar',
-                }
-            });
-        }
-    }, [preferenceId, mp]);
 
     const handleCreatePreference = async () => {
         if (!clientData.name || !clientData.phone) {
@@ -308,7 +290,7 @@ const TimeSlotFinder = () => {
                                 </div>
                             </form>
                         ) : (
-                            <div id="wallet_container"></div>
+                            <Wallet initialization={{ preferenceId: preferenceId }} />
                         )}
                     </div>
                 </div>
