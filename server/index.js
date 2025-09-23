@@ -64,18 +64,18 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('Error de conexión a MongoDB:', err));
 
 // Rutas de la API
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/courts', courtRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/sales', salesRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/logs', logsRoutes);
-app.use('/api/cashbox', cashboxRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/reports', reportsRoutes);
+app.use('/auth', authRoutes);
+app.use('/courts', courtRoutes);
+app.use('/bookings', bookingRoutes);
+app.use('/products', productRoutes);
+app.use('/payments', paymentRoutes);
+app.use('/settings', settingsRoutes);
+app.use('/sales', salesRoutes);
+app.use('/users', usersRoutes);
+app.use('/logs', logsRoutes);
+app.use('/cashbox', cashboxRoutes);
 
 // Lógica de Socket.IO
 io.on('connection', (socket) => {
