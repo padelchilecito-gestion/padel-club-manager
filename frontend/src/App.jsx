@@ -1,7 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { initMercadoPago } from '@mercadopago/sdk-react';
-import axios from 'axios';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -25,24 +23,6 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-    useEffect(() => {
-        const fetchPublicKey = async () => {
-            try {
-                // Asegúrate de que la URL base de axios esté configurada en tu archivo principal (main.jsx o similar)
-                // axios.defaults.baseURL = 'http://localhost:3001/api';
-                const response = await axios.get('/settings');
-                const publicKey = response.data.mercadoPagoPublicKey;
-                if (publicKey) {
-                    initMercadoPago(publicKey, { locale: 'es-AR' });
-                }
-            } catch (error) {
-                console.error('Error fetching Mercado Pago public key:', error);
-            }
-        };
-
-        fetchPublicKey();
-    }, []);
-
     return (
         <AuthProvider>
             <div className="bg-dark-primary min-h-screen text-text-primary font-sans">
