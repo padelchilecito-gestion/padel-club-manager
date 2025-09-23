@@ -231,6 +231,34 @@ const TimeSlotFinder = () => {
         }
     };
 
+    const handleCashBooking = async () => {
+        if (!clientData.name || !clientData.phone) {
+            alert("Por favor, completa tu nombre y teléfono.");
+            return;
+        }
+
+        const cashBookingData = {
+            courtId: bookingCourt._id,
+            slots: selectedSlots,
+            user: clientData,
+            date: selectedDate,
+            total: selectedSlots.length * (bookingCourt.pricePerHour / 2) // Although not paid, it's good to store the price
+        };
+
+        try {
+            await axios.post('/bookings/cash', cashBookingData);
+            alert('¡Reserva registrada! Queda pendiente de pago en el local.');
+            setIsModalOpen(false);
+            // Refrescar la disponibilidad para mostrar el turno como ocupado
+            fetchDailyAvailability(selectedDate);
+            setSelectedSlots([]);
+            setAvailableCourts([]);
+        } catch (error) {
+            console.error("Error creating cash booking:", error);
+            alert(error.response?.data?.message || 'Error al registrar la reserva.');
+        }
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-8">
             <main className="bg-dark-secondary p-6 rounded-xl shadow-lg mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -312,6 +340,9 @@ const TimeSlotFinder = () => {
                                     </div>
                                     <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-primary-dark">
                                         Pagar con Mercado Pago
+                                    </button>
+                                    <button type="button" onClick={handleCashBooking} className="w-full bg-secondary text-dark-primary font-bold py-3 rounded-lg hover:opacity-80 transition mt-2">
+                                        Confirmar (Pago en Efectivo)
                                     </button>
                                     <button type="button" onClick={() => {setIsModalOpen(false); setPreferenceId(null);}} className="w-full bg-gray-600 py-2 rounded-lg mt-2">
                                         Cancelar
