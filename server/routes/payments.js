@@ -1,24 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const mercadopago = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const PendingPayment = require('../models/PendingPayment');
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const BookingService = require('../services/booking-service');
 const Settings = require('../models/Settings');
 
+// Función auxiliar para inicializar el cliente de MercadoPago
+const getMercadoPagoClient = async () => {
+    const settings = await Settings.findOne({ configKey: "main_settings" });
+    if (!settings || !settings.mercadoPagoAccessToken) {
+        throw new Error("El Access Token de Mercado Pago no está configurado.");
+    }
+    return new MercadoPagoConfig({ accessToken: settings.mercadoPagoAccessToken });
+};
+
 router.post('/create-preference', async (req, res) => {
     const { courtId, slots, user, total, date } = req.body;
 
     try {
-        const settings = await Settings.findOne({ configKey: "main_settings" });
-        if (!settings || !settings.mercadoPagoAccessToken) {
-            return res.status(500).send("El Access Token de Mercado Pago no está configurado.");
-        }
-
-        mercadopago.configure({
-            access_token: settings.mercadoPagoAccessToken
-        });
+        const client = await getMercadoPagoClient();
 
         const pendingPayment = new PendingPayment({
             court: courtId,
@@ -29,10 +31,10 @@ router.post('/create-preference', async (req, res) => {
         });
         await pendingPayment.save();
 
-        let preference = {
+        const preferenceBody = {
             items: [{
                 title: `Reserva de ${slots.length} turno(s)`,
-                unit_price: total,
+                unit_price: Number(total),
                 quantity: 1,
             }],
             back_urls: {
@@ -44,8 +46,10 @@ router.post('/create-preference', async (req, res) => {
             external_reference: pendingPayment._id.toString(),
         };
 
-        const response = await mercadopago.preferences.create(preference);
-        res.json({ id: response.body.id, pending_id: pendingPayment._id });
+        const preference = new Preference(client);
+        const result = await preference.create({ body: preferenceBody });
+
+        res.json({ id: result.id, pending_id: pendingPayment._id });
 
     } catch (error) {
         console.error("Error creating preference:", error);
@@ -69,22 +73,17 @@ router.get('/pending/:id', async (req, res) => {
 });
 
 router.post('/webhook', async (req, res) => {
-    const payment = req.query;
+    const { query } = req;
+
     try {
-        const settings = await Settings.findOne({ configKey: "main_settings" });
-        if (!settings || !settings.mercadoPagoAccessToken) {
-            return res.status(500).send("El Access Token de Mercado Pago no está configurado.");
-        }
+        if (query.type === 'payment') {
+            const client = await getMercadoPagoClient();
+            const payment = new Payment(client);
 
-        mercadopago.configure({
-            access_token: settings.mercadoPagoAccessToken
-        });
+            const paymentData = await payment.get({ id: query['data.id'] });
+            const pendingPaymentId = paymentData.external_reference;
 
-        if (payment.type === 'payment') {
-            const data = await mercadopago.payment.findById(payment['data.id']);
-            const pendingPaymentId = data.body.external_reference;
-
-            if (data.body.status === 'approved') {
+            if (paymentData.status === 'approved') {
                 const pendingPayment = await PendingPayment.findById(pendingPaymentId);
                 if (pendingPayment) {
                     const court = await Court.findById(pendingPayment.court);
@@ -113,7 +112,7 @@ router.post('/webhook', async (req, res) => {
         }
         res.status(204).send();
     } catch (error) {
-        console.log(error);
+        console.error("Error processing webhook:", error);
         res.status(500).json({ error: error.message });
     }
 });
