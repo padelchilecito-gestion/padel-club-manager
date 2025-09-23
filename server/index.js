@@ -14,21 +14,13 @@ const allowedOrigins = [
     'https://padel-club-manager-xi.vercel.app'
 ];
 
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Permitir peticiones sin 'origin' (como las de Postman o apps móviles) y las de la lista
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // <-- Se añade OPTIONS
-    credentials: true
-};
-
+// Reemplazamos la configuración de CORS de la librería por una manual más explícita
 const io = new Server(server, {
-    cors: corsOptions
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        credentials: true
+    }
 });
 
 // --- Importar Rutas ---
@@ -46,7 +38,20 @@ const logsRoutes = require('./routes/logs');
 const cashboxRoutes = require('./routes/cashbox');
 
 // Middlewares
-app.use(cors(corsOptions));
+// Manejo manual de CORS para las peticiones HTTP
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204); // Respondemos OK a las preflight requests
+    }
+    next();
+});
 app.use(express.json());
 
 // Middleware para loguear todas las peticiones entrantes
