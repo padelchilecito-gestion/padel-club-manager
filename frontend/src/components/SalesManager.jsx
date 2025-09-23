@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Wallet } from '@mercadopago/sdk-react';
-import { io } from 'socket.io-client';
-
-const socket = io();
+import { socket } from './NotificationProvider'; // Importar el socket compartido
 
 const SalesManager = () => {
     const [products, setProducts] = useState([]);
