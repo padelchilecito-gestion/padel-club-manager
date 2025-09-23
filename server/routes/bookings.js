@@ -31,6 +31,18 @@ router.post('/', logActivity('RESERVA_CREADA', (req) => `El cliente ${req.body.u
     }
 });
 
+// POST: Crear una nueva reserva para pago en efectivo
+router.post('/cash', logActivity('RESERVA_PENDIENTE_CREADA', (req) => `El cliente ${req.body.user.name} reservó para pagar en efectivo`), async (req, res) => {
+    try {
+        // La lógica de creación se moverá a BookingService en el siguiente paso
+        const newBooking = await BookingService.createCashBooking(req.body);
+        req.io.emit('booking_update', newBooking);
+        res.status(201).json(newBooking);
+    } catch (error) {
+        res.status(409).json({ message: error.message });
+    }
+});
+
 // PUT: Modificar el horario de una reserva
 router.put('/:id', logActivity('RESERVA_MODIFICADA', (req) => `Se cambió la reserva ID ${req.params.id} al nuevo horario ${new Date(req.body.startTime).toLocaleString()}`), async (req, res) => {
     try {
@@ -126,6 +138,31 @@ router.patch('/:id/pay', logActivity('RESERVA_MODIFICADA', (req) => `Se marcó c
 
     } catch (error) {
         res.status(500).json({ message: "Error al registrar el pago de la reserva." });
+    }
+});
+
+// PATCH: Confirmar un pago en efectivo que estaba pendiente
+router.patch('/:id/confirm-payment', logActivity('RESERVA_CONFIRMADA', (req) => `Se confirmó el pago en efectivo de la reserva ID ${req.params.id}`), async (req, res) => {
+    try {
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            req.params.id,
+            {
+                status: 'Confirmed',
+                isPaid: true,
+                paymentMethod: 'Efectivo' // Aseguramos el método de pago
+            },
+            { new: true }
+        ).populate('court');
+
+        if (!updatedBooking) {
+            return res.status(404).json({ message: "Reserva no encontrada." });
+        }
+
+        req.io.emit('booking_update', { type: 'payment_confirmed', booking: updatedBooking });
+        res.json(updatedBooking);
+
+    } catch (error) {
+        res.status(500).json({ message: "Error al confirmar el pago de la reserva." });
     }
 });
 

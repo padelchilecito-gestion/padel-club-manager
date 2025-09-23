@@ -98,6 +98,58 @@ class BookingService {
             session.endSession();
         }
     }
+
+    static async createCashBooking(bookingData) {
+        const { courtId, slots, user, date, total } = bookingData;
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const createdBookings = [];
+            const pricePerSlot = total / slots.length;
+
+            for (const slot of slots) {
+                const startTime = new Date(date);
+                startTime.setHours(slot.hour, slot.minute, 0, 0);
+                const endTime = new Date(startTime.getTime() + 30 * 60000);
+
+                const existingBooking = await Booking.findOne({
+                    court: courtId,
+                    startTime: { $lt: endTime },
+                    endTime: { $gt: startTime },
+                    status: { $in: ['Confirmed', 'Pending'] }
+                }).session(session);
+
+                if (existingBooking) {
+                    throw new Error(`El turno de las ${slot.time} ya no está disponible.`);
+                }
+
+                const expirationDate = addDays(new Date(endTime), 120);
+
+                const newBooking = new Booking({
+                    court: courtId,
+                    startTime,
+                    endTime,
+                    user,
+                    status: 'Pending',
+                    isPaid: false,
+                    paymentMethod: 'Efectivo',
+                    price: pricePerSlot,
+                    expiresAt: expirationDate
+                });
+                await newBooking.save({ session });
+                createdBookings.push(newBooking);
+            }
+
+            await session.commitTransaction();
+            // Devolvemos solo el primer booking para la notificación, o podríamos devolver todos
+            return createdBookings.length > 0 ? createdBookings[0] : null;
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
+    }
 }
 
 module.exports = BookingService;

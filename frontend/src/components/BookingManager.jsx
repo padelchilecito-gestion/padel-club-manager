@@ -78,6 +78,17 @@ const BookingManager = () => {
         return slots;
     }, []);
 
+    const handleConfirmPayment = async (bookingId) => {
+        if (window.confirm('¿Confirmar que el pago para esta reserva ha sido recibido en efectivo?')) {
+            try {
+                await axios.patch(`/bookings/${bookingId}/confirm-payment`);
+                // La UI se actualizará automáticamente gracias al evento de socket que emitirá el backend.
+            } catch (err) {
+                alert(err.response?.data?.message || 'Error al confirmar el pago.');
+            }
+        }
+    };
+
     // --- FUNCIÓN PARA CAMBIAR EL ESTADO ---
     const handleChangeStatus = async (bookingId, newStatus) => {
         try {
@@ -282,6 +293,9 @@ const BookingManager = () => {
                                     </select>
                                 </td>
                                 <td className="p-3 text-center">
+                                    {b.status === 'Pending' && !b.isPaid && (
+                                        <button onClick={() => handleConfirmPayment(b._id)} className="text-green-400 text-xs hover:underline mr-2">Confirmar Pago</button>
+                                    )}
                                     <button onClick={() => handleOpenEditModal(b)} className="text-blue-400 text-xs hover:underline mr-2">Editar Hora</button>
                                     <button onClick={() => handleCancelBooking(b._id)} className="text-danger text-xs hover:underline">Eliminar</button>
                                 </td>
