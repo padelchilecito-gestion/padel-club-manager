@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Wallet } from '@mercadopago/sdk-react';
-import { socket } from './NotificationProvider'; // Importar el socket compartido
 
 const SalesManager = () => {
     const [products, setProducts] = useState([]);
@@ -10,11 +8,6 @@ const SalesManager = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
-
-    // State for payment flow
-    const [preferenceId, setPreferenceId] = useState(null);
-    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-    const [paymentStatus, setPaymentStatus] = useState(''); // e.g., 'generating', 'processing', 'success'
 
     const fetchProducts = async () => {
         try {
@@ -29,31 +22,18 @@ const SalesManager = () => {
 
     useEffect(() => {
         fetchProducts();
-
-        // Listener for successful sales from the backend
-        socket.on('pos_sale_confirmed', (confirmedSale) => {
-            alert(`Venta #${confirmedSale._id} confirmada con éxito.`);
-            setCart([]);
-            setPaymentMethod('Efectivo');
-            setIsPaymentModalOpen(false);
-            setPreferenceId(null);
-            setPaymentStatus('');
-            fetchProducts(); // Refresh products to show updated stock
-        });
-
-        return () => {
-            socket.off('pos_sale_confirmed');
-        };
     }, []);
 
     const addToCart = (product) => {
         setCart(prevCart => {
             const existingItem = prevCart.find(item => item.product._id === product._id);
             if (existingItem) {
+                // Incrementar cantidad si ya está en el carrito
                 return prevCart.map(item =>
                     item.product._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             } else {
+                // Agregar nuevo item al carrito
                 return [...prevCart, { product, quantity: 1 }];
             }
         });
@@ -84,53 +64,24 @@ const SalesManager = () => {
             items: cart.map(item => ({
                 product: item.product._id,
                 quantity: item.quantity,
-                price: item.product.price,
-                name: item.product.name // <-- Name is important for preference
+                price: item.product.price
             })),
             total: total,
             paymentMethod: paymentMethod
         };
 
-        if (paymentMethod === 'MercadoPago') {
+        if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
+            console.log("Enviando datos de venta:", saleData);
             try {
-                setPaymentStatus('generating');
-                setIsPaymentModalOpen(true);
-                const response = await axios.post('/sales', saleData);
-                if (response.data.preferenceId) {
-                    setPreferenceId(response.data.preferenceId);
-                    setPaymentStatus(''); // Ready for payment
-                }
+                await axios.post('/sales', saleData);
+                alert('¡Venta registrada con éxito!');
+                setCart([]);
+                fetchProducts(); // Recargar productos para ver el stock actualizado
             } catch (err) {
-                console.error("Error creating Mercado Pago preference:", err.response?.data || err.message);
-                setError('Error al iniciar el pago con Mercado Pago.');
-                setIsPaymentModalOpen(false);
-            }
-        } else {
-            if (window.confirm(`Confirmar venta por un total de $${total} en ${paymentMethod}?`)) {
-                try {
-                    await axios.post('/sales', saleData);
-                    alert('¡Venta registrada con éxito!');
-                    setCart([]);
-                    setPaymentMethod('Efectivo');
-                    fetchProducts();
-                } catch (err) {
-                    console.error("Error detallado:", err.response?.data || err.message);
-                    setError(err.response?.data?.message || 'Error al registrar la venta.');
-                }
+                console.error("Error detallado:", err.response?.data || err.message);
+                setError(err.response?.data?.message || 'Error al registrar la venta. El stock podría no haber sido suficiente.');
             }
         }
-    };
-
-    const handlePaymentSubmit = () => {
-        // This function is called when the user submits the payment in the Wallet Brick.
-        // We show a processing message. The actual confirmation comes from the webhook via Socket.IO.
-        setPaymentStatus('processing');
-    };
-
-    const closeModal = () => {
-        setIsPaymentModalOpen(false);
-        setPreferenceId(null);
-        setPaymentStatus('');
     };
 
     const filteredProducts = products.filter(p => 
@@ -138,9 +89,8 @@ const SalesManager = () => {
     );
 
     return (
-        <>
         <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* ... (resto del JSX de la venta sin cambios) ... */}
+            {/* Columna de Productos */}
             <div>
                 <h3 className="text-xl font-bold mb-4 text-secondary">Productos Disponibles</h3>
                 <input 
@@ -165,6 +115,7 @@ const SalesManager = () => {
                 )}
             </div>
 
+            {/* Columna del Carrito de Ventas */}
             <div className="bg-dark-secondary p-6 rounded-lg">
                 <h3 className="text-xl font-bold mb-4 text-white">Carrito de Venta</h3>
                 <div className="space-y-3 min-h-[40vh]">
@@ -215,35 +166,6 @@ const SalesManager = () => {
                 </div>
             </div>
         </div>
-
-        {isPaymentModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-                <div className="bg-dark-secondary p-8 rounded-lg max-w-sm w-full text-center">
-                    <h3 className="text-2xl font-bold mb-4">Pagar con Mercado Pago</h3>
-
-                    {paymentStatus === 'generating' && <p>Generando link de pago...</p>}
-
-                    {paymentStatus === 'processing' && <p>Procesando pago, por favor espera...</p>}
-
-                    {preferenceId && paymentStatus === '' && (
-                        <Wallet
-                            initialization={{ preferenceId: preferenceId }}
-                            onSubmit={handlePaymentSubmit}
-                        />
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={closeModal}
-                        className="w-full bg-gray-600 py-2 rounded-lg mt-4"
-                        disabled={paymentStatus === 'processing'}
-                    >
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        )}
-        </>
     );
 };
 
