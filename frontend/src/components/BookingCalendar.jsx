@@ -82,7 +82,8 @@ const BookingCalendar = () => {
             const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
             try {
                 const res = await axios.get(`/bookings?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}`);
-                setBookings(res.data.filter(b => b.court._id === selectedCourtId));
+                const filteredBookings = res.data.filter(b => b.court._id === selectedCourtId && (b.status === 'Confirmed' || b.status === 'Pending'));
+                setBookings(filteredBookings);
             } catch (err) {
                 setError("Error al cargar las reservas.");
             } finally {
@@ -91,14 +92,34 @@ const BookingCalendar = () => {
         };
 
         fetchBookingsForDate(selectedDate);
+
+        const handleBookingUpdate = (data) => {
+            if (data.type === 'created' && data.booking.court === selectedCourtId) {
+                setBookings(prev => [...prev, data.booking]);
+            }
+        };
         
-        const handleBookingUpdate = () => fetchBookingsForDate(selectedDate);
+        const handleBulkUpdate = (data) => {
+             const relevantBookings = data.bookings.filter(b => b.court === selectedCourtId);
+             if (relevantBookings.length > 0) {
+                setBookings(prev => [...prev, ...relevantBookings]);
+             }
+        };
+
+        const handleBookingDeleted = (deletedBooking) => {
+            if (deletedBooking.court === selectedCourtId) {
+                setBookings(prev => prev.filter(b => b._id !== deletedBooking._id));
+            }
+        };
+
         socket.on('booking_update', handleBookingUpdate);
-        socket.on('booking_deleted', handleBookingUpdate);
-        
+        socket.on('booking_bulk_update', handleBulkUpdate);
+        socket.on('booking_deleted', handleBookingDeleted);
+
         return () => {
             socket.off('booking_update', handleBookingUpdate);
-            socket.off('booking_deleted', handleBookingUpdate);
+            socket.off('booking_bulk_update', handleBulkUpdate);
+            socket.off('booking_deleted', handleBookingDeleted);
         };
     }, [selectedDate, selectedCourtId]);
 
@@ -151,24 +172,38 @@ const BookingCalendar = () => {
         }
 
         const court = courts.find(c => c._id === selectedCourtId);
+        if (!court) {
+            alert("Cancha no encontrada. Por favor, recarga la página.");
+            return;
+        }
+
         setLoadingSlots(true);
 
-        const promises = selectedSlots.map(slot => {
+        // Preparamos el payload para el endpoint de bulk
+        const bookingsPayload = selectedSlots.map(slot => {
             const startTime = new Date(selectedDate);
             startTime.setHours(slot.hour, slot.minute, 0, 0);
             const endTime = new Date(startTime.getTime() + 30 * 60000);
-
-            return axios.post('/bookings', {
+            return {
                 court: court._id,
                 startTime,
                 endTime,
-                user: { name: clientData.name, phone: clientData.phone },
+                price: court.pricePerHour / 2, // Aseguramos el precio
                 status: 'Confirmed'
-            });
+            };
         });
 
         try {
-            await Promise.all(promises);
+            // Enviamos una ÚNICA petición al backend
+            const response = await axios.post('/bookings/bulk', {
+                bookings: bookingsPayload,
+                user: { name: clientData.name, phone: clientData.phone }
+            });
+
+            // --- Actualización Inmediata del Estado ---
+            const newBookings = response.data;
+            setBookings(prevBookings => [...prevBookings, ...newBookings]);
+            setSelectedSlots([]); // Limpiamos la selección
 
             if (adminWpp) {
                 const turnos = selectedSlots.map(s => s.time).sort((a,b) => a.localeCompare(b, undefined, { numeric: true })).join(', ');
@@ -177,15 +212,18 @@ const BookingCalendar = () => {
                 const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
             }
+
             alert('¡Reservas confirmadas con éxito!');
             setIsModalOpen(false);
             setClientData({ name: '', phone: '' });
-            setSelectedSlots([]);
+
         } catch (error) {
-            alert(error.response?.data?.message || 'Error al crear una o más reservas. Es posible que algún turno haya sido tomado.');
+            alert(error.response?.data?.message || 'Error al crear las reservas. Es posible que algún turno haya sido tomado mientras confirmabas.');
+            // Si hay un error, forzamos una recarga para sincronizar el estado
+            const newDate = new Date(selectedDate);
+            setSelectedDate(newDate);
         } finally {
-             const newDate = new Date(selectedDate);
-             setSelectedDate(newDate);
+            setLoadingSlots(false);
         }
     };
     

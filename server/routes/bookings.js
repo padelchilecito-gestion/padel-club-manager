@@ -18,15 +18,33 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST: Crear una nueva reserva
+// POST: Crear una nueva reserva (ruta ahora legacy, preferir /bulk)
 router.post('/', logActivity('RESERVA_CREADA', (req) => `El cliente ${req.body.user.name} reservó en la cancha ID ${req.body.court}`), async (req, res) => {
     try {
+        // Reutiliza la lógica de createBooking para una sola reserva
         const newBooking = await BookingService.createBooking(req.body);
-        // Emitir evento de WebSocket para actualizar calendarios en tiempo real
-        req.io.emit('booking_update', newBooking);
+        req.io.emit('booking_update', { type: 'created', booking: newBooking });
         res.status(201).json(newBooking);
     } catch (error) {
-        // 409 Conflict es el código adecuado si el recurso ya existe o no se puede crear
+        res.status(409).json({ message: error.message });
+    }
+});
+
+// POST: Crear múltiples reservas en una sola transacción
+router.post('/bulk', logActivity('RESERVA_MULTIPLE_CREADA', (req) => `El cliente ${req.body.user.name} realizó ${req.body.bookings.length} reservas.`), async (req, res) => {
+    try {
+        const { bookings, user } = req.body;
+
+        // Añadimos la info del usuario a cada reserva
+        const bookingsWithUser = bookings.map(b => ({ ...b, user }));
+
+        const createdBookings = await BookingService.createBulkBookings(bookingsWithUser);
+
+        // Emitir un solo evento con todas las reservas nuevas
+        req.io.emit('booking_bulk_update', { type: 'created_bulk', bookings: createdBookings });
+
+        res.status(201).json(createdBookings);
+    } catch (error) {
         res.status(409).json({ message: error.message });
     }
 });

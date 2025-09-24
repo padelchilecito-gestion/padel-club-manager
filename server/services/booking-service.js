@@ -150,6 +150,62 @@ class BookingService {
             session.endSession();
         }
     }
+
+    /**
+     * Crea múltiples reservas en una sola transacción para garantizar la atomicidad.
+     * @param {Array} bookingsData - Un array de objetos de reserva.
+     * @returns {Promise<Array>} - El array de reservas creadas.
+     */
+    static async createBulkBookings(bookingsData) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const createdBookings = [];
+
+            for (const bookingData of bookingsData) {
+                const { court, startTime, endTime, user, status, price } = bookingData;
+
+                if (price === undefined || price === null) {
+                    throw new Error('El precio es obligatorio para cada reserva.');
+                }
+
+                const existingBooking = await Booking.findOne({
+                    court,
+                    startTime: { $lt: endTime },
+                    endTime: { $gt: startTime },
+                    status: { $in: ['Confirmed', 'Pending'] }
+                }).session(session);
+
+                if (existingBooking) {
+                    throw new Error(`El turno de las ${new Date(startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ya no está disponible. Por favor, selecciona otro.`);
+                }
+
+                const expirationDate = addDays(new Date(endTime), 120);
+
+                const newBooking = new Booking({
+                    court,
+                    startTime,
+                    endTime,
+                    user,
+                    status,
+                    price,
+                    expiresAt: expirationDate
+                });
+
+                const savedBooking = await newBooking.save({ session });
+                createdBookings.push(savedBooking);
+            }
+
+            await session.commitTransaction();
+            return createdBookings;
+
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
+    }
 }
 
 module.exports = BookingService;
