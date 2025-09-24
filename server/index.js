@@ -15,14 +15,18 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-    origin: allowedOrigins, // Usar directamente el array de orígenes
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // OPTIONS se maneja implícitamente
+    origin: (origin, callback) => {
+        // Permite orígenes en la lista y peticiones sin origen (ej: Postman)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-    credentials: true
+    credentials: true,
 };
-
-// Habilitar CORS para todas las rutas HTTP antes de cualquier otra ruta
-app.use(cors(corsOptions));
 
 const io = new Server(server, {
     cors: corsOptions
@@ -44,6 +48,11 @@ const cashboxRoutes = require('./routes/cashbox');
 const adminTaskRoutes = require('./routes/admin-tasks');
 
 // Middlewares
+// Habilitar CORS para todas las rutas y peticiones pre-vuelo (OPTIONS)
+// ESTA ES LA UBICACIÓN CORRECTA: Antes de definir las rutas.
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Middleware para loguear todas las peticiones entrantes
@@ -67,19 +76,10 @@ app.get('/api/status', (req, res) => {
 // ===== FIN DE LA SOLUCIÓN =======================================
 // =================================================================
 
-// --- Verificación de Variables de Entorno Críticas ---
-if (!process.env.MONGODB_URI) {
-    console.error("FATAL ERROR: MONGODB_URI is not defined in .env file.");
-    process.exit(1); // Detiene la aplicación si la variable no está definida
-}
-
 // Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('Conectado a MongoDB'))
-    .catch(err => {
-        console.error('Error de conexión a MongoDB:', err);
-        process.exit(1); // También detiene la aplicación si la conexión falla
-    });
+  .then(() => console.log('Conectado a MongoDB'))
+  .catch(err => console.error('Error de conexión a MongoDB:', err));
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
