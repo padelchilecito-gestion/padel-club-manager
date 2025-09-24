@@ -8,6 +8,9 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
+// Confiar en el primer proxy (ej. Render, Heroku). Esencial para que CORS funcione correctamente.
+app.set('trust proxy', 1);
+
 // --- Configuración de CORS ---
 const allowedOrigins = [
     'http://localhost:5173',
