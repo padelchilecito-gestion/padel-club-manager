@@ -84,10 +84,11 @@ class PaymentService {
                 };
             });
 
-            // Usamos el BookingService que ya maneja transacciones
-            const createdBookings = await BookingService.createFixedBookings(bookingsToCreate);
+            // Usamos el BookingService que ya maneja transacciones atómicas
+            const createdBookings = await BookingService.createBulkBookings(bookingsToCreate);
 
-            createdBookings.forEach(b => io.emit('booking_update', b));
+            // Emitimos un solo evento bulk para notificar al frontend
+            io.emit('booking_bulk_update', { type: 'created_bulk', bookings: createdBookings });
 
             await PendingPayment.findByIdAndDelete(externalReference);
 
