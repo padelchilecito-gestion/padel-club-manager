@@ -74,10 +74,19 @@ app.get('/api/status', (req, res) => {
 // ===== FIN DE LA SOLUCIÓN =======================================
 // =================================================================
 
+// --- Verificación de Variables de Entorno Críticas ---
+if (!process.env.MONGODB_URI) {
+    console.error("FATAL ERROR: MONGODB_URI is not defined in .env file.");
+    process.exit(1); // Detiene la aplicación si la variable no está definida
+}
+
 // Conexión a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado a MongoDB'))
-  .catch(err => console.error('Error de conexión a MongoDB:', err));
+    .then(() => console.log('Conectado a MongoDB'))
+    .catch(err => {
+        console.error('Error de conexión a MongoDB:', err);
+        process.exit(1); // También detiene la aplicación si la conexión falla
+    });
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
