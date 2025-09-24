@@ -15,18 +15,14 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-    origin: (origin, callback) => {
-        // Permite orígenes en la lista y peticiones sin origen (ej: Postman)
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    origin: allowedOrigins, // Usar directamente el array de orígenes
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // OPTIONS se maneja implícitamente
     allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-    credentials: true,
+    credentials: true
 };
+
+// Habilitar CORS para todas las rutas HTTP antes de cualquier otra ruta
+app.use(cors(corsOptions));
 
 const io = new Server(server, {
     cors: corsOptions
@@ -48,9 +44,6 @@ const cashboxRoutes = require('./routes/cashbox');
 const adminTaskRoutes = require('./routes/admin-tasks');
 
 // Middlewares
-// Habilitar CORS para todas las rutas y peticiones pre-vuelo (OPTIONS)
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // <-- Esta línea es clave para las pre-flight requests
 app.use(express.json());
 
 // Middleware para loguear todas las peticiones entrantes
