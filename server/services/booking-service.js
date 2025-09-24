@@ -299,7 +299,9 @@ class BookingService {
             // Crear reserva para cada slot
             for (const [index, slot] of slots.entries()) {
                 const startTime = new Date(bookingDate);
-                startTime.setHours(slot.hour, slot.minute, 0, 0);
+                // *** CORRECCIÓN CLAVE ***
+                // Usamos setUTCHours para evitar problemas de zona horaria en el servidor
+                startTime.setUTCHours(slot.hour, slot.minute, 0, 0);
                 const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 minutos
 
                 // Verificar conflictos
