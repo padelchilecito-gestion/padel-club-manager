@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import axiosInstance from '../config/axios'; // Usar la nueva instancia
+import axiosInstance from '../config/axios';
 import { format, addDays, subDays, startOfDay, endOfDay, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -12,11 +12,16 @@ const TimeSlot = ({ slot, onSelect, isSelected, isAvailable, isPast }) => (
             isSelected 
                 ? 'bg-secondary text-dark-primary ring-2 ring-white scale-105' 
                 : isPast
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed' // Estilo para turnos pasados
+                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
                     : isAvailable
                         ? 'bg-dark-secondary text-text-primary hover:bg-primary hover:text-white hover:scale-105'
                         : 'bg-danger/50 text-text-secondary cursor-not-allowed opacity-70'
         }`}
+        title={
+            !isAvailable ? 'Turno no disponible' :
+            isPast ? 'Turno ya pasado' :
+            'Turno disponible'
+        }
     >
         {slot.time}
     </button>
@@ -54,13 +59,16 @@ const TimeSlotFinder = () => {
     const [preferenceId, setPreferenceId] = useState(null);
     const [mp, setMp] = useState(null);
 
+    // Estado para manejar actualizaciones en tiempo real
+    const [lastBookingUpdate, setLastBookingUpdate] = useState(Date.now());
+
     const timeSlots = useMemo(() => {
         const slots = [];
-        const now = new Date(); // Obtenemos la fecha y hora actual
+        const now = new Date();
         
         for (let i = 9; i <= 23; i++) {
             for (let j = 0; j < 60; j += 30) {
-                if (i === 23 && j === 30) continue; // No agregar 23:30 si el límite es 23:00
+                if (i === 23 && j === 30) continue;
 
                 const slotTime = new Date(selectedDate);
                 slotTime.setHours(i, j, 0, 0);
@@ -74,7 +82,7 @@ const TimeSlotFinder = () => {
             }
         }
         return slots;
-    }, [selectedDate]); // Se recalcula cuando cambia el día
+    }, [selectedDate]);
 
     const selectionSummary = useMemo(() => {
         if (selectedSlots.length === 0) {
@@ -86,7 +94,6 @@ const TimeSlotFinder = () => {
 
         const startTime = firstSlot.time;
 
-        // Calcula la hora de finalización sumando 30 mins al último turno
         const endTimeDate = new Date();
         endTimeDate.setHours(lastSlot.hour, lastSlot.minute + 30, 0, 0);
         const endTime = `${String(endTimeDate.getHours()).padStart(2, '0')}:${String(endTimeDate.getMinutes()).padStart(2, '0')}`;
@@ -103,16 +110,19 @@ const TimeSlotFinder = () => {
 
     }, [selectedSlots]);
 
-    const fetchDailyAvailability = useCallback(async (date) => {
-        setIsLoadingSlots(true);
+    const fetchDailyAvailability = useCallback(async (date, forceRefresh = false) => {
+        // Solo mostrar loading si no es un refresh automático
+        if (!forceRefresh) {
+            setIsLoadingSlots(true);
+        }
         setError('');
+
         try {
             const start = startOfDay(date);
             const end = endOfDay(date);
 
             console.log('🔄 Fetching data for date:', date.toISOString());
 
-            // Hacer las peticiones con manejo de errores individual
             const promises = [
                 axiosInstance.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`).catch(err => {
                     console.error('Error fetching bookings:', err);
@@ -136,18 +146,25 @@ const TimeSlotFinder = () => {
             if (settingsRes.data.whatsappNumber) {
                 setAdminWpp(settingsRes.data.whatsappNumber);
             }
-            if (settingsRes.data.mercadoPagoPublicKey) {
-                const mp = new window.MercadoPago(settingsRes.data.mercadoPagoPublicKey);
-                setMp(mp);
+            if (settingsRes.data.mercadoPagoPublicKey && !mp) {
+                const mercadoPago = new window.MercadoPago(settingsRes.data.mercadoPagoPublicKey);
+                setMp(mercadoPago);
             }
+
+            // Actualizar timestamp para forzar recálculo de disponibilidad
+            setLastBookingUpdate(Date.now());
 
         } catch (err) {
             console.error('Error en fetchDailyAvailability:', err);
-            setError('Error al cargar la disponibilidad del día. Verifica tu conexión.');
+            if (!forceRefresh) {
+                setError('Error al cargar la disponibilidad del día. Verifica tu conexión.');
+            }
         } finally {
-            setIsLoadingSlots(false);
+            if (!forceRefresh) {
+                setIsLoadingSlots(false);
+            }
         }
-    }, []);
+    }, [mp]);
 
     useEffect(() => {
         fetchDailyAvailability(selectedDate);
@@ -166,10 +183,12 @@ const TimeSlotFinder = () => {
             availability[slot.time] = bookingsInSlot < totalCourts;
         });
         return availability;
-    }, [dailyBookings, totalCourts, timeSlots, selectedDate]);
+    }, [dailyBookings, totalCourts, timeSlots, selectedDate, lastBookingUpdate]);
     
     const handleSelectSlot = (slot) => {
         setAvailableCourts([]); 
+        setError(''); // Limpiar errores previos
+
         setSelectedSlots(prevSlots => {
             const isSelected = prevSlots.some(s => s.time === slot.time);
             if (isSelected) {
@@ -182,9 +201,24 @@ const TimeSlotFinder = () => {
     
     const handleFindCourts = async () => {
         if (selectedSlots.length === 0) return;
+
+        // Verificar disponibilidad actual antes de buscar
+        await fetchDailyAvailability(selectedDate, true);
+
+        // Verificar si algún slot seleccionado ya no está disponible
+        const unavailableSlots = selectedSlots.filter(slot => !slotAvailability[slot.time]);
+
+        if (unavailableSlots.length > 0) {
+            setError(`Los siguientes horarios ya no están disponibles: ${unavailableSlots.map(s => s.time).join(', ')}`);
+            // Remover slots no disponibles de la selección
+            setSelectedSlots(prevSlots => prevSlots.filter(slot => slotAvailability[slot.time]));
+            return;
+        }
+
         setLoading(true);
         setError('');
         setAvailableCourts([]);
+
         try {
             const availabilityPromises = selectedSlots.map(slot => {
                 const startTime = new Date(selectedDate);
@@ -194,14 +228,23 @@ const TimeSlotFinder = () => {
             });
 
             const results = await Promise.all(availabilityPromises);
+
             if (results.some(res => res.data.length === 0)) {
+                setError('No hay canchas disponibles para todos los horarios seleccionados');
                 setAvailableCourts([]);
                 return;
             }
+
             const courtIdLists = results.map(res => res.data.map(court => court._id));
             const commonCourtIds = courtIdLists.reduce((a, b) => a.filter(c => b.includes(c)));
             const finalAvailableCourts = results[0].data.filter(court => commonCourtIds.includes(court._id));
+
             setAvailableCourts(finalAvailableCourts);
+
+            if (finalAvailableCourts.length === 0) {
+                setError('No hay canchas disponibles para todos los horarios seleccionados');
+            }
+
         } catch (err) {
             console.error('Error buscando canchas:', err);
             setError('Error al buscar canchas disponibles. Verifica tu conexión.');
@@ -214,19 +257,20 @@ const TimeSlotFinder = () => {
         setSelectedDate(current => days > 0 ? addDays(current, 1) : subDays(current, 1));
         setSelectedSlots([]);
         setAvailableCourts([]);
+        setError('');
     };
     
     const handleOpenBookingModal = (court) => {
         setBookingCourt(court);
         setIsModalOpen(true);
+        setError('');
     };
     
-     const handleClientDataChange = (e) => {
+    const handleClientDataChange = (e) => {
         setClientData({ ...clientData, [e.target.name]: e.target.value });
     };
 
     useEffect(() => {
-        // Limpiamos el contenedor por si ya había un botón de pago
         const container = document.getElementById('wallet_container');
         if (container) {
             container.innerHTML = '';
@@ -234,17 +278,21 @@ const TimeSlotFinder = () => {
 
         if (preferenceId && mp) {
             const renderWallet = async () => {
-                const bricksBuilder = mp.bricks();
-                await bricksBuilder.create('wallet', 'wallet_container', {
-                    initialization: {
-                        preferenceId: preferenceId,
-                    },
-                    customization: {
-                        texts: {
-                            valueProp: 'smart_option',
+                try {
+                    const bricksBuilder = mp.bricks();
+                    await bricksBuilder.create('wallet', 'wallet_container', {
+                        initialization: {
+                            preferenceId: preferenceId,
                         },
-                    },
-                });
+                        customization: {
+                            texts: {
+                                valueProp: 'smart_option',
+                            },
+                        },
+                    });
+                } catch (error) {
+                    console.error('Error rendering Mercado Pago wallet:', error);
+                }
             };
             renderWallet();
         }
@@ -255,6 +303,7 @@ const TimeSlotFinder = () => {
             alert("Por favor, completa tu nombre y teléfono.");
             return;
         }
+
         setIsSubmitting(true);
         const total = selectedSlots.length * (bookingCourt.pricePerHour / 2);
 
@@ -270,11 +319,19 @@ const TimeSlotFinder = () => {
             const response = await axiosInstance.post('/payments/create-preference', preferenceData);
             const { id, pending_id } = response.data;
             setPreferenceId(id);
-            // No usar localStorage en artifacts
-            // localStorage.setItem('pendingPaymentId', pending_id);
         } catch (error) {
             console.error('Error creating preference:', error);
-            alert('Error al crear la preferencia de pago.');
+
+            if (error.response?.status === 409) {
+                alert('Conflicto: Uno o más horarios ya fueron reservados por otro usuario. Actualizando disponibilidad...');
+                // Refrescar la disponibilidad
+                await fetchDailyAvailability(selectedDate, true);
+                setIsModalOpen(false);
+                setSelectedSlots([]);
+                setAvailableCourts([]);
+            } else {
+                alert('Error al crear la preferencia de pago.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -285,6 +342,7 @@ const TimeSlotFinder = () => {
             alert("Por favor, completa tu nombre y teléfono.");
             return;
         }
+
         setIsSubmitting(true);
         const cashBookingData = {
             courtId: bookingCourt._id,
@@ -296,22 +354,45 @@ const TimeSlotFinder = () => {
 
         try {
             await axiosInstance.post('/bookings/cash', cashBookingData);
-            alert('¡Reserva registrada! Queda pendiente de pago en el local.');
+            alert('¡Reserva registrada exitosamente! Queda pendiente de pago en el local.');
+
+            // Cerrar modal y limpiar estado
             setIsModalOpen(false);
-            // Refrescar la disponibilidad para mostrar el turno como ocupado
-            fetchDailyAvailability(selectedDate);
             setSelectedSlots([]);
             setAvailableCourts([]);
+            setClientData({ name: '', phone: '' });
+
+            // Refrescar disponibilidad
+            await fetchDailyAvailability(selectedDate, true);
+
         } catch (error) {
             console.error("Error creating cash booking:", error);
-            alert(error.response?.data?.message || 'Error al registrar la reserva.');
-            // Refrescamos la disponibilidad incluso si hay error
-            fetchDailyAvailability(selectedDate);
-            // Cerramos el modal para que el usuario vea el calendario actualizado
-            setIsModalOpen(false);
+
+            if (error.response?.status === 409) {
+                const message = error.response?.data?.message || 'Conflicto: Uno o más horarios ya fueron reservados.';
+                alert(`${message}\n\nActualizando disponibilidad...`);
+
+                // Refrescar disponibilidad para mostrar el estado actual
+                await fetchDailyAvailability(selectedDate, true);
+
+                // Cerrar modal y limpiar selección
+                setIsModalOpen(false);
+                setSelectedSlots([]);
+                setAvailableCourts([]);
+
+            } else {
+                alert(error.response?.data?.message || 'Error al registrar la reserva.');
+            }
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setPreferenceId(null);
+        setClientData({ name: '', phone: '' });
+        setError('');
     };
 
     return (
@@ -340,12 +421,23 @@ const TimeSlotFinder = () => {
                             ))}
                         </div>
                     )}
+
+                    {/* Botón para refrescar manualmente */}
+                    <div className="text-center mt-4">
+                        <button
+                            onClick={() => fetchDailyAvailability(selectedDate, true)}
+                            className="text-text-secondary hover:text-white text-sm px-3 py-1 rounded transition"
+                            disabled={isLoadingSlots}
+                        >
+                            🔄 Actualizar disponibilidad
+                        </button>
+                    </div>
                 </div>
 
                 <div>
                     <h3 className="text-xl font-bold text-white mb-4 text-center">Disponibilidad</h3>
-                     <p className="text-text-secondary text-center mb-4">2. Busca y elige una cancha</p>
-                    {/* Aquí va el nuevo bloque de resumen */}
+                    <p className="text-text-secondary text-center mb-4">2. Busca y elige una cancha</p>
+
                     {selectionSummary && (
                         <div className="bg-dark-primary text-center p-3 rounded-lg mb-4 animate-fade-in">
                             <p className="font-bold text-secondary">{selectionSummary}</p>
@@ -359,7 +451,9 @@ const TimeSlotFinder = () => {
                     >
                         {loading ? 'Buscando...' : `Buscar Canchas para ${selectedSlots.length} Turnos`}
                     </button>
-                    {error && <p className="text-danger text-center">{error}</p>}
+
+                    {error && <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-4">{error}</div>}
+
                     <div className="space-y-4">
                         {availableCourts.length > 0 && (
                             <div className='animate-fade-in'>
@@ -369,7 +463,7 @@ const TimeSlotFinder = () => {
                                 ))}
                             </div>
                         )}
-                        {!loading && availableCourts.length === 0 && selectedSlots.length > 0 && (
+                        {!loading && availableCourts.length === 0 && selectedSlots.length > 0 && !error && (
                              <p className="text-center text-text-secondary p-4">
                                 Presiona "Buscar" para ver la disponibilidad.
                              </p>
@@ -378,27 +472,27 @@ const TimeSlotFinder = () => {
                 </div>
             </main>
 
-             {isModalOpen && (
+            {isModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
                     <div className="bg-dark-secondary p-8 rounded-lg max-w-sm w-full">
                         {!preferenceId ? (
                             <form onSubmit={(e) => { e.preventDefault(); handleCreatePreference(); }} >
                                 <h3 className="text-2xl font-bold mb-2">Confirmar Reserva</h3>
-                                 <p className="text-text-primary mb-2">
-                           Cancha: <span className='font-bold text-secondary'>{bookingCourt?.name}</span>
-                        </p>
-                         <p className="text-text-primary mb-4">
-                           Horarios: <span className='font-bold text-secondary'>{selectedSlots.map(s => s.time).join(', ')}hs</span>
-                        </p>
+                                <p className="text-text-primary mb-2">
+                                    Cancha: <span className='font-bold text-secondary'>{bookingCourt?.name}</span>
+                                </p>
+                                <p className="text-text-primary mb-4">
+                                    Horarios: <span className='font-bold text-secondary'>{selectedSlots.map(s => s.time).join(', ')}hs</span>
+                                </p>
                                 <p className="text-text-secondary mb-4">Por favor, déjanos tus datos para finalizar.</p>
                                 <div className="space-y-4">
                                     <div>
                                         <label htmlFor="clientName" className="text-sm text-text-secondary">Nombre Completo</label>
-                                        <input type="text" id="clientName" name="name" autoComplete="name" value={clientData.name} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
+                                        <input type="text" id="clientName" name="name" autoComplete="name" value={clientData.name} onChange={handleClientDataChange} className="w-full mt-1 p-2 text-black" required />
                                     </div>
                                     <div>
                                         <label htmlFor="clientPhone" className="text-sm text-text-secondary">Teléfono</label>
-                                        <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2" required />
+                                        <input type="tel" id="clientPhone" name="phone" autoComplete="tel" value={clientData.phone} onChange={handleClientDataChange} className="w-full mt-1 p-2 text-black" required />
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         <button
@@ -419,7 +513,7 @@ const TimeSlotFinder = () => {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => {setIsModalOpen(false); setPreferenceId(null);}}
+                                        onClick={closeModal}
                                         disabled={isSubmitting}
                                         className="w-full bg-gray-600 py-2 rounded-lg mt-2 disabled:opacity-50"
                                     >
