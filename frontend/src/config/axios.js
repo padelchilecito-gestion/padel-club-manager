@@ -5,7 +5,7 @@ const baseURL = import.meta.env.VITE_API_URL || 'https://padel-club-backend.onre
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
-  timeout: 10000, // 10 segundos de timeout
+  timeout: 30000, // 10 segundos de timeout
   headers: {
     'Content-Type': 'application/json'
   }
