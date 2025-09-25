@@ -26,9 +26,7 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-    credentials: true,
+    credentials: true
 };
 
 const io = new Server(server, {
@@ -51,12 +49,11 @@ const cashboxRoutes = require('./routes/cashbox');
 const adminTaskRoutes = require('./routes/admin-tasks');
 
 // Middlewares
-// Habilitar CORS para todas las rutas y peticiones pre-vuelo (OPTIONS)
-// ESTA ES LA UBICACIÓN CORRECTA: Antes de definir las rutas.
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
 app.use(express.json());
+
+// Habilitar CORS para todas las rutas.
+// Esta es la ubicación correcta: Antes de definir las rutas de la API.
+app.use(cors(corsOptions));
 
 // Middleware para loguear todas las peticiones entrantes
 app.use((req, res, next) => {
