@@ -141,28 +141,16 @@ const TimeSlotFinder = () => {
             const start = startOfDay(date);
             const end = endOfDay(date);
 
-            console.log('🔄 Fetching data for date:', date.toISOString());
+            console.log('🔄 Fetching data sequentially for date:', date.toISOString());
 
-            const promises = [
-                axiosInstance.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`).catch(err => {
-                    console.error('Error fetching bookings:', err);
-                    return { data: [] };
-                }),
-                axiosInstance.get('/courts').catch(err => {
-                    console.error('Error fetching courts:', err);
-                    return { data: [] };
-                }),
-                axiosInstance.get('/settings').catch(err => {
-                    console.error('Error fetching settings:', err);
-                    return { data: {} };
-                })
-            ];
-
-            const [bookingsRes, courtsRes, settingsRes] = await Promise.all(promises);
-
+            // Hacemos las peticiones una por una para no sobrecargar el servidor de Render
+            const bookingsRes = await axiosInstance.get(`/bookings?start=${start.toISOString()}&end=${end.toISOString()}&_=${new Date().getTime()}`);
             setDailyBookings(bookingsRes.data);
+
+            const courtsRes = await axiosInstance.get('/courts');
             setTotalCourts(courtsRes.data.length);
 
+            const settingsRes = await axiosInstance.get('/settings');
             if (settingsRes.data.whatsappNumber) {
                 setAdminWpp(settingsRes.data.whatsappNumber);
             }
