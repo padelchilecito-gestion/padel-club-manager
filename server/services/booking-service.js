@@ -1,9 +1,69 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
-const { addDays, isValid } = require('date-fns');
+const { addDays, isValid, format } = require('date-fns');
+const NotificationService = require('./notification-service');
 
 class BookingService {
+    /**
+     * Envía notificaciones relacionadas con una reserva.
+     * Método privado para uso interno del servicio.
+     * @param {Object} booking - El objeto de la reserva, populado con la cancha.
+     * @param {string} type - El tipo de notificación ('new-pending', 'new-confirmed', 'confirmed', 'cancelled').
+     */
+    static async _sendBookingNotification(booking, type) {
+        if (!booking) return;
+
+        // Asegurarse de que la cancha está populada
+        const populatedBooking = await Booking.findById(booking._id).populate('court');
+        if (!populatedBooking || !populatedBooking.court) {
+            console.error(`No se pudo enviar notificación: la reserva o la cancha no se encontraron. ID: ${booking._id}`);
+            return;
+        }
+
+        const { user, startTime, court } = populatedBooking;
+        const date = format(new Date(startTime), 'dd/MM/yyyy');
+        const time = format(new Date(startTime), 'HH:mm');
+        const courtName = court.name;
+
+        let message;
+        let recipient;
+
+        switch (type) {
+            case 'new-pending':
+                recipient = user.phone;
+                message = `Hola ${user.name}, tu reserva para la cancha "${courtName}" el día ${date} a las ${time} hs está pendiente de pago. Por favor, aboná la seña para confirmarla.`;
+                break;
+
+            case 'new-confirmed':
+                recipient = user.phone;
+                message = `¡Hola ${user.name}! Tu reserva para la cancha "${courtName}" el día ${date} a las ${time} hs fue confirmada exitosamente. ¡Te esperamos!`;
+                break;
+
+            case 'confirmed':
+                recipient = user.phone;
+                message = `¡Buenas noticias, ${user.name}! El pago de tu reserva para la cancha "${courtName}" (${date} a las ${time} hs) fue recibido y tu turno está confirmado. ¡Gracias!`;
+                break;
+
+            case 'cancelled':
+                recipient = await NotificationService.getAdminWppNumber();
+                if (!recipient) {
+                    console.log("No se envió notificación de cancelación: número de admin no configurado.");
+                    return; // No hay a quién notificar
+                }
+                const reason = populatedBooking.cancellationReason || 'No especificada';
+                message = `ALERTA: Se canceló una reserva. Cliente: ${user.name}, Cancha: ${courtName}, Horario: ${date} a las ${time}. Motivo: ${reason}.`;
+                break;
+
+            default:
+                console.warn(`Tipo de notificación desconocido: ${type}`);
+                return;
+        }
+
+        if (recipient && message) {
+            await NotificationService.sendWhatsAppMessage(recipient, message);
+        }
+    }
     /**
      * Valida los datos de entrada para crear una reserva
      * @param {Object} bookingData - Datos de la reserva
@@ -143,8 +203,19 @@ class BookingService {
 
             const savedBooking = await newBooking.save({ session });
             await session.commitTransaction();
+            session.endSession(); // Terminar la sesión antes de enviar la notificación
 
             console.log(`Reserva creada exitosamente: ${savedBooking._id} para ${user.name}`);
+
+            // Disparar notificación después de que la transacción se haya completado
+            try {
+                const notificationType = savedBooking.status === 'Confirmed' ? 'new-confirmed' : 'new-pending';
+                await this._sendBookingNotification(savedBooking, notificationType);
+            } catch (notificationError) {
+                // Si la notificación falla, no se debe revertir la reserva. Solo registrar el error.
+                console.error(`Error al enviar la notificación para la reserva ${savedBooking._id}:`, notificationError);
+            }
+
             return savedBooking;
 
         } catch (error) {
@@ -228,7 +299,20 @@ class BookingService {
             }
 
             await session.commitTransaction();
+            session.endSession();
+
             console.log(`${createdBookings.length} reservas creadas exitosamente`);
+
+            // Enviar notificaciones para cada reserva creada
+            for (const booking of createdBookings) {
+                try {
+                    const notificationType = booking.status === 'Confirmed' ? 'new-confirmed' : 'new-pending';
+                    await this._sendBookingNotification(booking, notificationType);
+                } catch (notificationError) {
+                    console.error(`Error al enviar notificación para la reserva en bulk ${booking._id}:`, notificationError);
+                }
+            }
+
             return createdBookings;
 
         } catch (error) {
@@ -330,7 +414,20 @@ class BookingService {
             }
 
             await session.commitTransaction();
+            session.endSession();
+
             console.log(`${createdBookings.length} reservas en efectivo creadas para ${user.name}`);
+
+            // Enviar notificaciones para cada reserva creada
+            for (const booking of createdBookings) {
+                try {
+                    // Las reservas en efectivo siempre nacen como pendientes
+                    await this._sendBookingNotification(booking, 'new-pending');
+                } catch (notificationError) {
+                    console.error(`Error al enviar notificación para la reserva en efectivo ${booking._id}:`, notificationError);
+                }
+            }
+
             return createdBookings;
 
         } catch (error) {
@@ -361,6 +458,7 @@ class BookingService {
             if (!booking) {
                 throw new Error('Reserva no encontrada.');
             }
+            const originalStatus = booking.status;
 
             // Si se está actualizando el horario, verificar conflictos
             if (updateData.startTime || updateData.endTime) {
@@ -379,13 +477,11 @@ class BookingService {
                     throw new Error('El nuevo horario genera un conflicto con otra reserva.');
                 }
 
-                // Actualizar fecha de expiración si cambia el endTime
                 if (updateData.endTime) {
                     updateData.expiresAt = this.calculateExpirationDate(endTime);
                 }
             }
 
-            // Actualizar la reserva
             const updatedBooking = await Booking.findByIdAndUpdate(
                 bookingId,
                 { $set: updateData },
@@ -394,6 +490,26 @@ class BookingService {
 
             await session.commitTransaction();
             console.log(`Reserva ${bookingId} actualizada exitosamente`);
+
+            // Lógica de Notificación
+            if (updatedBooking.status !== originalStatus) {
+                let notificationType = null;
+                if (updatedBooking.status === 'Confirmed') {
+                    notificationType = 'confirmed';
+                } else if (updatedBooking.status === 'Cancelled') {
+                    notificationType = 'cancelled';
+                }
+
+                if (notificationType) {
+                    try {
+                        // Notificar después de que la transacción se complete
+                        await this._sendBookingNotification(updatedBooking, notificationType);
+                    } catch (notificationError) {
+                        console.error(`Error al enviar notificación de tipo '${notificationType}' para la reserva ${updatedBooking._id}:`, notificationError);
+                    }
+                }
+            }
+
             return updatedBooking;
 
         } catch (error) {
