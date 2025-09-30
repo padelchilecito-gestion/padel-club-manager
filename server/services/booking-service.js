@@ -528,7 +528,7 @@ class BookingService {
      * @returns {Promise<Booking>} Reserva cancelada
      */
     static async cancelBooking(bookingId, reason = 'Cancelado por el usuario') {
-        return await this.updateBooking(bookingId, {
+        return this.updateBooking(bookingId, {
             status: 'Cancelled',
             cancelledAt: new Date(),
             cancellationReason: reason
@@ -554,7 +554,7 @@ class BookingService {
             updateData.paymentId = paymentId;
         }
 
-        return await this.updateBooking(bookingId, updateData);
+        return this.updateBooking(bookingId, updateData);
     }
 
     /**
