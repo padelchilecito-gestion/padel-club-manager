@@ -1,0 +1,16 @@
+version = 1
+
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+  [analyzers.meta]
+  environment = ["nodejs", "browser"]
+  dependency_file_paths = [
+    "server/package.json",
+    "frontend/package.json"
+  ]
+
+[[analyzers]]
+name = "test-coverage"
+enabled = false
