@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import axiosInstance from '../config/axios';
 import { format, addDays, subDays, startOfDay, endOfDay, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { socket } from './NotificationProvider';
 
 // --- Sub-componentes ---
 const TimeSlot = ({ slot, onSelect, isSelected, availability }) => {
@@ -188,6 +189,28 @@ const TimeSlotFinder = () => {
     useEffect(() => {
         fetchDailyAvailability(selectedDate);
     }, [selectedDate, fetchDailyAvailability]);
+
+    // Hook para escuchar actualizaciones de Socket.IO en tiempo real
+    useEffect(() => {
+        const handleBookingUpdate = () => {
+            console.log('Socket event received, refreshing availability...');
+            // Llama a la función existente para recargar los datos del día.
+            // El 'true' fuerza un refresco en segundo plano sin mostrar el spinner de carga.
+            fetchDailyAvailability(selectedDate, true);
+        };
+
+        // Suscribirse a los eventos clave cuando el componente se monta.
+        socket.on('booking_update', handleBookingUpdate);
+        socket.on('booking_deleted', handleBookingUpdate);
+        socket.on('booking_bulk_update', handleBookingUpdate);
+
+        // Limpiar los listeners cuando el componente se desmonte para evitar fugas de memoria.
+        return () => {
+            socket.off('booking_update', handleBookingUpdate);
+            socket.off('booking_deleted', handleBookingUpdate);
+            socket.off('booking_bulk_update', handleBookingUpdate);
+        };
+    }, [selectedDate, fetchDailyAvailability]); // Depender de estas asegura que el listener use siempre la versión más reciente.
 
     const slotAvailability = useMemo(() => {
         const availability = {};
@@ -446,16 +469,6 @@ const TimeSlotFinder = () => {
                         </div>
                     )}
 
-                    {/* Botón para refrescar manualmente */}
-                    <div className="text-center mt-4">
-                        <button
-                            onClick={() => fetchDailyAvailability(selectedDate, true)}
-                            className="text-text-secondary hover:text-white text-sm px-3 py-1 rounded transition"
-                            disabled={isLoadingSlots}
-                        >
-                            🔄 Actualizar disponibilidad
-                        </button>
-                    </div>
                 </div>
 
                 <div>
