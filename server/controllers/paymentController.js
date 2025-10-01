@@ -1,4 +1,4 @@
-const mercadopago = require('../config/mercadopago');
+const mercadopago = require('./config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
