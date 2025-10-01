@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { logActivity } = require('../utils/logActivity');
 require('dotenv').config();
 
 const generateToken = (id, role, username) => {
@@ -18,6 +19,9 @@ const authUser = async (req, res) => {
     const user = await User.findOne({ username });
 
     if (user && (await user.matchPassword(password))) {
+      // Log the activity
+      await logActivity(user, 'USER_LOGIN', `User '${user.username}' logged in.`);
+
       res.json({
         _id: user._id,
         username: user.username,
