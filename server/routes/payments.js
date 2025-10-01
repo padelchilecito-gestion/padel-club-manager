@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
-// --- CAMBIO 1: Importar los constructores específicos del SDK v2 ---
+const path = require('path'); // <-- Añadir esta línea
+
+// --- CAMBIO CLAVE: Rutas absolutas para los módulos locales ---
 const { MercadoPagoConfig, Preference } = require('mercadopago');
-const PendingPayment = require('../models/PendingPayment.js');
-const PendingSale = require('../models/PendingSale.js');
-const Settings = require('../models/Settings.js');
-const PaymentService = require('../services/payment-service.js');
+const PendingPayment = require(path.join(__dirname, '..', 'models', 'PendingPayment.js'));
+const PendingSale = require(path.join(__dirname, '..', 'models', 'PendingSale.js'));
+const Settings = require(path.join(__dirname, '..', 'models', 'Settings.js'));
+const PaymentService = require(path.join(__dirname, '..', 'services', 'payment-service.js'));
+
+// (El resto del código del archivo permanece igual, aquí se omite por brevedad,
+// pero asegúrate de que tu archivo completo siga a continuación de estas importaciones)
 
 // Ruta para crear preferencia de pago para reservas
 router.post('/create-preference', async (req, res) => {
@@ -13,13 +18,12 @@ router.post('/create-preference', async (req, res) => {
 
     try {
         const settings = await Settings.findOne({ configKey: "main_settings" });
-        if (!settings || !settings.mercadoPagoAccessToken) {
+        if (!settings || !settings.mercadopagoAccessToken) {
             return res.status(500).send("El Access Token de Mercado Pago no está configurado.");
         }
 
-        // --- CAMBIO 2: Crear un cliente de Mercado Pago ---
         const client = new MercadoPagoConfig({
-            accessToken: settings.mercadoPagoAccessToken
+            accessToken: settings.mercadopagoAccessToken
         });
 
         const pendingPayment = new PendingPayment({
@@ -31,7 +35,6 @@ router.post('/create-preference', async (req, res) => {
         });
         await pendingPayment.save();
 
-        // --- CAMBIO 3: Crear una instancia de Preference y usar el método create ---
         const preference = new Preference(client);
         const response = await preference.create({
             body: {
@@ -49,7 +52,7 @@ router.post('/create-preference', async (req, res) => {
                 external_reference: pendingPayment._id.toString(),
             }
         });
-        
+
         res.json({ id: response.id, pending_id: pendingPayment._id });
 
     } catch (error) {
@@ -73,13 +76,12 @@ router.post('/create-pos-preference', async (req, res) => {
 
     try {
         const settings = await Settings.findOne({ configKey: "main_settings" });
-        if (!settings || !settings.mercadoPagoAccessToken) {
+        if (!settings || !settings.mercadopagoAccessToken) {
             return res.status(500).send("Error de configuración: El Access Token de Mercado Pago no está configurado.");
         }
 
-        // --- Repetir los cambios para la nueva sintaxis ---
         const client = new MercadoPagoConfig({
-            accessToken: settings.mercadoPagoAccessToken
+            accessToken: settings.mercadopagoAccessToken
         });
 
         const pendingSale = new PendingSale({ items, total });
@@ -112,7 +114,6 @@ router.post('/create-pos-preference', async (req, res) => {
 
 // Ruta para obtener detalles de un pago pendiente
 router.get('/pending/:id', async (req, res) => {
-    // ... (esta ruta no necesita cambios)
     try {
         const pendingPayment = await PendingPayment.findById(req.params.id).populate('court');
         if (!pendingPayment) {
@@ -129,26 +130,25 @@ router.get('/pending/:id', async (req, res) => {
 
 // Webhook para notificaciones de pago
 router.post('/webhook', async (req, res) => {
-    const payment = req.query;
-    console.log("Notificación de Webhook recibida:", payment);
+    const paymentQuery = req.query;
+    console.log("Notificación de Webhook recibida:", paymentQuery);
 
     try {
-        if (payment.type !== 'payment') {
+        if (paymentQuery.type !== 'payment') {
             return res.status(204).send();
         }
 
         const settings = await Settings.findOne({ configKey: "main_settings" });
-        if (!settings || !settings.mercadoPagoAccessToken) {
+        if (!settings || !settings.mercadopagoAccessToken) {
             return res.status(500).send("Access Token no configurado.");
         }
 
-        // --- CAMBIO 4: Se debe usar una instancia de Payment para buscar el pago ---
         const { Payment } = require('mercadopago');
-        const client = new MercadoPagoConfig({ accessToken: settings.mercadoPagoAccessToken });
+        const client = new MercadoPagoConfig({ accessToken: settings.mercadopagoAccessToken });
         const paymentClient = new Payment(client);
-        
-        const data = await paymentClient.get({ id: payment['data.id'] });
-        
+
+        const data = await paymentClient.get({ id: paymentQuery['data.id'] });
+
         if (data && data.external_reference && data.status === 'approved') {
             const externalReference = data.external_reference;
             console.log(`Pago aprobado para la referencia: ${externalReference}`);
@@ -164,7 +164,7 @@ router.post('/webhook', async (req, res) => {
                 console.log(`Referencia ${externalReference} procesada como reserva.`);
                 return res.status(200).send();
             }
-            
+
             console.warn(`Referencia ${externalReference} no corresponde a ninguna venta o reserva.`);
         }
 
