@@ -65,7 +65,7 @@ const getRevenueLast30Days = async (req, res) => {
             { $sort: { _id: 1 } },
         ]);
         
-        // A more complete report would also include paid bookings revenue
+        // This report could be enhanced to include paid bookings as well.
         res.json(sales);
     } catch (error) {
         console.error(error);
@@ -102,7 +102,6 @@ const getTopSellingProducts = async (req, res) => {
 // @access  Admin
 const getCourtOccupancy = async (req, res) => {
     try {
-        // Default to last 30 days if no range provided
         const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
         const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date();
 
@@ -119,7 +118,7 @@ const getCourtOccupancy = async (req, res) => {
                 },
             },
             {
-                $lookup: { // Join with courts collection to get court name
+                $lookup: {
                     from: 'courts',
                     localField: '_id',
                     foreignField: '_id',
