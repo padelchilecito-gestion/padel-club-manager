@@ -14,6 +14,8 @@ const reportRoutes = require('./reports');
 const logRoutes = require('./logs');
 const settingRoutes = require('./settings');
 
+console.log('[Routes] Index router loaded.');
+
 // Mount all routes onto the main router
 router.use('/users', userRoutes);
 router.use('/auth', authRoutes);

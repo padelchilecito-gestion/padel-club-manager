@@ -19,6 +19,7 @@ router.post('/', createBooking);
 // @desc    Get availability for a specific date
 // @access  Public
 router.get('/availability', getBookingAvailability);
+console.log('[Routes] Booking route /availability registered.');
 
 // @route   GET api/bookings
 // @desc    Get all bookings
