@@ -1,5 +1,5 @@
 import React from 'react';
-import TimeSlotFinder from '/src/components/TimeSlotFinder.jsx';
+import TimeSlotFinder from '../components/TimeSlotFinder.jsx';
 
 const HomePage = () => {
   return (
