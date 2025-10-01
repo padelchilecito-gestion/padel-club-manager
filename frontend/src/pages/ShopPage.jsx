@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { productService } from '../services/productService';
-//import ProductCard from '../components/ProductCard';//
+import ProductCard from '../components/ProductCard';
 
 const ShopPage = () => {
   const [products, setProducts] = useState([]);
