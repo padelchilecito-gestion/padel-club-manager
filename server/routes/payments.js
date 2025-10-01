@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 // --- CAMBIO 1: Importar los constructores específicos del SDK v2 ---
 const { MercadoPagoConfig, Preference } = require('mercadopago');
-const PendingPayment = require('../models/PendingPayment');
-const PendingSale = require('../models/PendingSale');
-const Settings = require('../models/Settings');
-const PaymentService = require('../services/payment-service');
+const PendingPayment = require('../models/PendingPayment.js');
+const PendingSale = require('../models/PendingSale.js');
+const Settings = require('../models/Settings.js');
+const PaymentService = require('../services/payment-service.js');
 
 // Ruta para crear preferencia de pago para reservas
 router.post('/create-preference', async (req, res) => {
