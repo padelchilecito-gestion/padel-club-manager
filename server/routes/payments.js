@@ -6,7 +6,7 @@ const path = require('path'); // <-- Añadir esta línea
 const { MercadoPagoConfig, Preference } = require('mercadopago');
 const PendingPayment = require(path.join(__dirname, '..', 'models', 'PendingPayment.js'));
 const PendingSale = require(path.join(__dirname, '..', 'models', 'PendingSale.js'));
-const Settings = require(path.join(__dirname, '..', 'models', 'Settings.js'));
+const Settings = require(path.join(__dirname, '..', 'models', 'Setting.js'));
 const PaymentService = require(path.join(__dirname, '..', 'services', 'payment-service.js'));
 
 // (El resto del código del archivo permanece igual, aquí se omite por brevedad,
