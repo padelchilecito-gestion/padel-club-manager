@@ -1,6 +1,7 @@
 const CashboxSession = require('../models/CashboxSession');
 const Sale = require('../models/Sale');
 const Booking = require('../models/Booking');
+const { logActivity } = require('../utils/logActivity');
 
 // @desc    Start a new cashbox session
 // @route   POST /api/cashbox/start
@@ -20,6 +21,10 @@ const startCashboxSession = async (req, res) => {
     });
 
     const createdSession = await session.save();
+    
+    const logDetails = `Cashbox session started with ${startAmount.toFixed(2)} ARS by user '${req.user.username}'.`;
+    await logActivity(req.user, 'CASHBOX_OPENED', logDetails);
+
     res.status(201).json(createdSession);
   } catch (error) {
     console.error(error);
@@ -53,7 +58,7 @@ const closeCashboxSession = async (req, res) => {
         totalSales += sale.total;
         if (sale.paymentMethod === 'Efectivo') {
             totalCashSales += sale.total;
-        } else { // Mercado Pago, Tarjeta, etc.
+        } else {
             totalCardSales += sale.total;
         }
     });
@@ -62,8 +67,6 @@ const closeCashboxSession = async (req, res) => {
     const cashBookings = await Booking.find({
         isPaid: true,
         paymentMethod: 'Efectivo',
-        // This logic assumes payment time is close to booking creation/update.
-        // A more robust system would have a `paymentTimestamp`.
         updatedAt: { $gte: session.startTime, $lte: endTime },
     });
     const totalCashBookings = cashBookings.reduce((acc, booking) => acc + booking.price, 0);
@@ -89,6 +92,10 @@ const closeCashboxSession = async (req, res) => {
     };
 
     const closedSession = await session.save();
+
+    const logDetails = `Cashbox session closed with a final count of ${endAmount.toFixed(2)} ARS by user '${req.user.username}'. Difference: ${difference.toFixed(2)} ARS.`;
+    await logActivity(req.user, 'CASHBOX_CLOSED', logDetails);
+
     res.json(closedSession);
 
   } catch (error) {
@@ -103,10 +110,6 @@ const closeCashboxSession = async (req, res) => {
 const getCurrentCashboxSession = async (req, res) => {
   try {
     const session = await CashboxSession.findOne({ status: 'Open' });
-    if (!session) {
-        // Return a specific status or object to indicate no open session
-        return res.status(200).json(null);
-    }
     res.json(session);
   } catch (error) {
     console.error(error);
