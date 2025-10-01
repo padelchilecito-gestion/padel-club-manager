@@ -8,7 +8,7 @@ const {
   cancelBooking,
   getBookingAvailability,
 } = require('../controllers/bookingController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
 // @route   POST api/bookings
 // @desc    Create a new booking
@@ -19,6 +19,7 @@ router.post('/', createBooking);
 // @desc    Get availability for a specific date
 // @access  Public
 router.get('/availability', getBookingAvailability);
+console.log('[Routes] Booking route /availability registered.');
 
 // @route   GET api/bookings
 // @desc    Get all bookings
