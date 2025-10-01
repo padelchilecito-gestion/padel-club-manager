@@ -9,7 +9,18 @@ const apiClient = axios.create({
   },
 });
 
-// You can add an interceptor here to automatically add the auth token to requests
-// apiClient.interceptors.request.use(...)
+// Add a request interceptor to include the token on every request
+apiClient.interceptors.request.use(
+  (config) => {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+    if (userInfo && userInfo.token) {
+      config.headers['Authorization'] = `Bearer ${userInfo.token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;
