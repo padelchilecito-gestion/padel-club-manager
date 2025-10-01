@@ -40,11 +40,9 @@ const BookingSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+}, { timestamps: true });
 
 // Index to prevent double booking on the same court at the same time
-BookingSchema.index({ court: 1, startTime: 1 }, { unique: true });
-BookingSchema.index({ court: 1, endTime: 1 }, { unique: true });
-
+BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
 
 module.exports = mongoose.model('Booking', BookingSchema);
