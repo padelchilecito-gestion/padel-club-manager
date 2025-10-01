@@ -1,4 +1,5 @@
 const Court = require('../models/Court');
+const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new court
 // @route   POST /api/courts
@@ -15,6 +16,7 @@ const createCourt = async (req, res) => {
     });
 
     const createdCourt = await court.save();
+    await logActivity(req.user, 'COURT_CREATED', `Court '${createdCourt.name}' was created.`);
     res.status(201).json(createdCourt);
   } catch (error) {
     console.error(error);
@@ -30,7 +32,7 @@ const createCourt = async (req, res) => {
 // @access  Public
 const getAllCourts = async (req, res) => {
   try {
-    const courts = await Court.find({});
+    const courts = await Court.find({}).sort({ name: 1 });
     res.json(courts);
   } catch (error) {
     console.error(error);
@@ -68,10 +70,11 @@ const updateCourt = async (req, res) => {
     if (court) {
       court.name = name || court.name;
       court.courtType = courtType || court.courtType;
-      court.pricePerHour = pricePerHour || court.pricePerHour;
+      court.pricePerHour = pricePerHour !== undefined ? pricePerHour : court.pricePerHour;
       court.isActive = isActive !== undefined ? isActive : court.isActive;
 
       const updatedCourt = await court.save();
+      await logActivity(req.user, 'COURT_UPDATED', `Court '${updatedCourt.name}' was updated.`);
       res.json(updatedCourt);
     } else {
       res.status(404).json({ message: 'Court not found' });
@@ -93,7 +96,9 @@ const deleteCourt = async (req, res) => {
     const court = await Court.findById(req.params.id);
 
     if (court) {
+      const courtName = court.name;
       await court.remove();
+      await logActivity(req.user, 'COURT_DELETED', `Court '${courtName}' was deleted.`);
       res.json({ message: 'Court removed' });
     } else {
       res.status(404).json({ message: 'Court not found' });
