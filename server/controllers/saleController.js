@@ -1,15 +1,15 @@
 const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
+const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new sale
 // @route   POST /api/sales
 // @access  Operator/Admin
 const createSale = async (req, res) => {
   const { items, total, paymentMethod } = req.body;
-  const user = req.user.id;
+  const user = req.user;
 
-  // Validate input
   if (!items || items.length === 0) {
     return res.status(400).json({ message: 'Sale must include at least one item.' });
   }
@@ -18,7 +18,6 @@ const createSale = async (req, res) => {
   session.startTransaction();
 
   try {
-    // Process all stock updates
     for (const item of items) {
       const product = await Product.findById(item.productId).session(session);
       if (!product) {
@@ -33,7 +32,6 @@ const createSale = async (req, res) => {
       await product.save({ session });
     }
 
-    // Create the sale record
     const sale = new Sale({
       items: items.map(item => ({
           product: item.productId,
@@ -43,12 +41,16 @@ const createSale = async (req, res) => {
       })),
       total,
       paymentMethod,
-      user,
+      user: user.id,
     });
 
     const createdSale = await sale.save({ session });
 
     await session.commitTransaction();
+    
+    const logDetails = `Sale of ${total.toFixed(2)} ARS registered by user '${user.username}'.`;
+    await logActivity(user, 'SALE_REGISTERED', logDetails);
+    
     session.endSession();
 
     res.status(201).json(createdSale);
