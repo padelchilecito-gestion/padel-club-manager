@@ -5,6 +5,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const apiRoutes = require('./routes');
 
 // Connect to Database
 connectDB();
@@ -24,29 +25,20 @@ const io = new Server(server, {
   }
 });
 
-// Global variable for io
+// Make io accessible to our router
 app.set('socketio', io);
 
 io.on('connection', (socket) => {
-  console.log('a user connected');
+  console.log('A user connected via WebSocket');
   socket.on('disconnect', () => {
-    console.log('user disconnected');
+    console.log('User disconnected');
   });
 });
 
 app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
 // Define Routes
-app.use('/api/users', require('./routes/users'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/courts', require('./routes/courts'));
-app.use('/api/bookings', require('./routes/bookings'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/sales', require('./routes/sales'));
-app.use('/api/cashbox', require('./routes/cashbox'));
-app.use('/api/payments', require('./routes/payments'));
-// app.use('/api/reports', require('./routes/reports'));
-// app.use('/api/logs', require('./routes/logs'));
+app.use('/api', apiRoutes);
 
 const PORT = process.env.PORT || 5000;
 
