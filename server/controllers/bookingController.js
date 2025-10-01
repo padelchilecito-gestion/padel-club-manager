@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
-const ActivityLog = require('../models/ActivityLog'); // Se usará más adelante
+const { sendWhatsAppMessage } = require('../utils/notificationService');
+const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
@@ -56,13 +57,20 @@ const createBooking = async (req, res) => {
     // Emit real-time event
     const io = req.app.get('socketio');
     io.emit('booking_update', createdBooking);
+    
+    // Log the activity
+    const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
+    await logActivity(req.user, 'BOOKING_CREATED', logDetails); // req.user might be null if public
+
+    // Send WhatsApp notification (placeholder)
+    if (createdBooking.user.phone) {
+        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${start.toLocaleString()} ha sido confirmada. ¡Te esperamos!`;
+        await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
+    }
 
     res.status(201).json(createdBooking);
   } catch (error) {
     console.error(error);
-    if (error.code === 11000) {
-        return res.status(409).json({ message: 'This exact booking slot already exists.' });
-    }
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -142,6 +150,9 @@ const updateBookingStatus = async (req, res) => {
       const io = req.app.get('socketio');
       io.emit('booking_update', updatedBooking);
       
+      const logDetails = `Booking ID ${updatedBooking._id} status changed to '${updatedBooking.status}'.`;
+      await logActivity(req.user, 'BOOKING_UPDATED', logDetails);
+
       res.json(updatedBooking);
     } else {
       res.status(404).json({ message: 'Booking not found' });
@@ -163,7 +174,10 @@ const cancelBooking = async (req, res) => {
             const updatedBooking = await booking.save();
 
             const io = req.app.get('socketio');
-            io.emit('booking_deleted', { id: req.params.id }); // Or use booking_update
+            io.emit('booking_deleted', { id: req.params.id });
+            
+            const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
+            await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
 
             res.json({ message: 'Booking cancelled successfully' });
         } else {
