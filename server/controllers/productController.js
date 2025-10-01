@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const { cloudinary } = require('../config/cloudinary');
+const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new product
 // @route   POST /api/products
@@ -22,6 +23,7 @@ const createProduct = async (req, res) => {
     }
 
     const createdProduct = await product.save();
+    await logActivity(req.user, 'PRODUCT_CREATED', `Product '${createdProduct.name}' was created.`);
     res.status(201).json(createdProduct);
   } catch (error) {
     console.error(error);
@@ -75,13 +77,12 @@ const updateProduct = async (req, res) => {
     if (product) {
       product.name = name || product.name;
       product.category = category || product.category;
-      product.price = price || product.price;
+      product.price = price !== undefined ? price : product.price;
       product.stock = stock !== undefined ? stock : product.stock;
       product.trackStockAlert = trackStockAlert !== undefined ? trackStockAlert : product.trackStockAlert;
-      product.lowStockThreshold = lowStockThreshold || product.lowStockThreshold;
+      product.lowStockThreshold = lowStockThreshold !== undefined ? lowStockThreshold : product.lowStockThreshold;
 
       if (req.file) {
-        // Optional: Delete old image from Cloudinary
         if (product.imageUrl) {
           const publicId = product.imageUrl.split('/').pop().split('.')[0];
           await cloudinary.uploader.destroy(publicId);
@@ -90,6 +91,7 @@ const updateProduct = async (req, res) => {
       }
 
       const updatedProduct = await product.save();
+      await logActivity(req.user, 'PRODUCT_UPDATED', `Product '${updatedProduct.name}' was updated.`);
       res.json(updatedProduct);
     } else {
       res.status(404).json({ message: 'Product not found' });
@@ -111,12 +113,13 @@ const deleteProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
-      // Optional: Delete image from Cloudinary
       if (product.imageUrl) {
         const publicId = product.imageUrl.split('/').pop().split('.')[0];
         await cloudinary.uploader.destroy(publicId);
       }
+      const productName = product.name;
       await product.remove();
+      await logActivity(req.user, 'PRODUCT_DELETED', `Product '${productName}' was deleted.`);
       res.json({ message: 'Product removed' });
     } else {
       res.status(404).json({ message: 'Product not found' });
