@@ -15,8 +15,6 @@ const AdminRoute = ({ children }) => {
   }
 
   if (!isAdmin) {
-    // User is logged in but not an admin.
-    // Redirect them to a safe page, like the main dashboard.
     return <Navigate to="/admin" replace />;
   }
 
