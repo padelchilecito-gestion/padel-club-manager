@@ -2,8 +2,10 @@ import apiClient from './api';
 
 const getAvailability = async (courtId, date) => {
   try {
+    // Extrae solo la parte de la fecha (YYYY-MM-DD)
+    const formattedDate = date.split('T')[0];
     const response = await apiClient.get('/bookings/availability', {
-      params: { courtId, date },
+      params: { courtId, date: formattedDate },
     });
     return response.data;
   } catch (error) {
