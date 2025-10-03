@@ -4,11 +4,10 @@ const {
   createPaymentPreference,
   receiveWebhook,
 } = require('../controllers/paymentController');
-const { protect } = require('../middlewares/authMiddleware');
 
 // @route   POST api/payments/create-preference
 // @desc    Create a Mercado Pago payment preference
-// @access  Public (for bookings) or Operator/Admin (for POS)
+// @access  Public / Operator
 router.post('/create-preference', createPaymentPreference);
 
 // @route   POST api/payments/webhook

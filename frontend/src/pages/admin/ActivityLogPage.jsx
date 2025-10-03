@@ -66,6 +66,7 @@ const ActivityLogPage = () => {
         </table>
       </div>
 
+      {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4">
         <button
           onClick={handlePrevPage}
