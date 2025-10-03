@@ -45,7 +45,7 @@ router.put('/:id/cancel', protect, cancelBooking);
 // @route   GET api/bookings/availability-all
 // @desc    Get availability for all courts on a specific date
 // @access  Public
-router.get('/availability-all', getAllCourtsAvailability); // <-- AÑADE ESTA LÍNEA
+router.get('/availability-all', getAllCourtsAvailability);
 
 
 module.exports = router;

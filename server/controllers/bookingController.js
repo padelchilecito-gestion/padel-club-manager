@@ -244,5 +244,5 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
-  getAllCourtsAvailability, // <-- AÑADE ESTO
+  getAllCourtsAvailability,
 };
