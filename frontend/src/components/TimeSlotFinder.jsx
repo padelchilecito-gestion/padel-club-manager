@@ -32,7 +32,8 @@ const TimeSlotFinder = () => {
                 setAllCourts(data.courts || []);
                 setAllBookings(data.bookings || []);
             } catch (err) {
-                setError('No se pudo cargar la disponibilidad.');
+                const errorMsg = err.response ? `${err.response.status} - ${JSON.stringify(err.response.data)}` : err.message;
+                setError(`Error al cargar disponibilidad: ${errorMsg}`);
             } finally {
                 setLoading(false);
             }

@@ -2,10 +2,8 @@ import apiClient from './api';
 
 const getAvailability = async (courtId, date) => {
   try {
-    // Extrae solo la parte de la fecha (YYYY-MM-DD)
-    const formattedDate = date.split('T')[0];
     const response = await apiClient.get('/bookings/availability', {
-      params: { courtId, date: formattedDate },
+      params: { courtId, date },
     });
     return response.data;
   } catch (error) {
@@ -84,5 +82,5 @@ export const bookingService = {
   getAllBookings,
   updateBookingStatus,
   cancelBooking,
-  getAllCourtsAvailability, // <-- AÑADE ESTO
+  getAllCourtsAvailability,
 };

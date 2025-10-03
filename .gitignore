@@ -1,15 +1,13 @@
 # Dependencies
-/node_modules
-/server/node_modules
+node_modules/
+frontend/node_modules/
+server/node_modules/
 
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
-/backend.log
-/frontend.log
+lerna-debug.log*
 
 # Environment variables
 .env
@@ -17,12 +15,14 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
-/server/.env
+server/.env
 
-# Build outputs
-/dist
-/build
+# Build output
+dist/
+build/
 
-# OS-specific
+# Misc
 .DS_Store
-Thumbs.db
+.idea/
+.vscode/
+jules-scratch/
