@@ -1,65 +1,45 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+require('dotenv').config();
+
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
 
-const startServer = async () => {
-  // Connect to Database first
-  await connectDB();
+// Connect to Database
+connectDB();
 
-  const app = express();
-  const server = http.createServer(app);
+const app = express();
 
-  // CORS configuration
-  const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:5173',
-    'https://padel-club-manager-xi.vercel.app',
-  ];
+// Init Middleware
+app.use(cors());
+app.use(express.json({ extended: false }));
 
-  const corsOptions = {
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    }
-  };
+// Socket.IO setup
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173", // URL del cliente
+    methods: ["GET", "POST"]
+  }
+});
 
-  app.use(cors(corsOptions));
-  app.use(express.json({ extended: false }));
+// Make io accessible to our router
+app.set('socketio', io);
 
-  // Socket.IO setup
-  const io = new Server(server, {
-    cors: {
-      origin: allowedOrigins,
-      methods: ["GET", "POST", "PUT", "DELETE"],
-    },
+io.on('connection', (socket) => {
+  console.log('A user connected via WebSocket');
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
   });
+});
 
-  app.set('socketio', io);
+app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
-  io.on('connection', (socket) => {
-    console.log('A user connected via WebSocket');
-    socket.on('disconnect', () => {
-      console.log('User disconnected');
-    });
-  });
+// Define Routes
+app.use('/api', apiRoutes);
 
-  app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
+const PORT = process.env.PORT || 5000;
 
-  // Define Routes
-  app.use('/api', apiRoutes);
-
-  const PORT = process.env.PORT || 5000;
-
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on port ${PORT}`);
-  });
-};
-
-startServer();
+server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
