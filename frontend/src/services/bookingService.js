@@ -62,19 +62,6 @@ const cancelBooking = async (id) => {
     }
 }
 
-const getAllCourtsAvailability = async (date) => {
-  try {
-    const response = await apiClient.get('/bookings/availability-all', {
-      params: { date },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching all courts availability:', error);
-    throw error;
-  }
-};
-
-
 export const bookingService = {
   getAvailability,
   createBooking,
@@ -82,5 +69,4 @@ export const bookingService = {
   getAllBookings,
   updateBookingStatus,
   cancelBooking,
-  getAllCourtsAvailability,
 };
