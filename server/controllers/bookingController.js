@@ -9,6 +9,18 @@ const { logActivity } = require('../utils/logActivity');
 const createBooking = async (req, res) => {
   const { courtId, user, startTime, endTime, paymentMethod, isPaid } = req.body;
 
+  // --- LÓGICA PARA EL NÚMERO DE TELÉFONO ---
+  let formattedPhone = user.phone.replace(/\s+/g, ''); // Limpiar espacios
+  if (!formattedPhone.startsWith('54')) {
+    if (formattedPhone.length === 10) { // Formato típico de Argentina sin +54
+      formattedPhone = `549${formattedPhone}`;
+    } else {
+      formattedPhone = `54${formattedPhone}`;
+    }
+  }
+  const sanitizedUser = { ...user, phone: formattedPhone };
+  // --- FIN DE LA LÓGICA ---
+
   try {
     const court = await Court.findById(courtId);
     if (!court) {
@@ -37,13 +49,13 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ message: 'The selected time slot is already booked.' });
     }
     
-    // Calculate price
-    const durationHours = (end - start) / (1000 * 60 * 60);
+    // Calcula el precio para 30 minutos
+    const durationHours = 0.5;
     const price = durationHours * court.pricePerHour;
 
     const booking = new Booking({
       court: courtId,
-      user,
+      user: sanitizedUser, // Usar el usuario con el teléfono formateado
       startTime: start,
       endTime: end,
       price,
@@ -190,6 +202,41 @@ const cancelBooking = async (req, res) => {
 };
 
 
+// @desc    Get availability for all courts on a specific date
+// @route   GET /api/bookings/availability-all
+// @access  Public
+const getAllCourtsAvailability = async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date is required.' });
+    }
+
+    try {
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+
+        const activeCourts = await Court.find({ isActive: true }).select('_id name');
+        const courtIds = activeCourts.map(c => c._id);
+
+        const bookings = await Booking.find({
+            court: { $in: courtIds },
+            status: { $ne: 'Cancelled' },
+            startTime: { $gte: startOfDay, $lte: endOfDay },
+        }).select('court startTime endTime');
+
+        res.json({
+            courts: activeCourts,
+            bookings: bookings,
+        });
+    } catch (error) {
+        console.error('Error fetching all courts availability:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
   createBooking,
   getBookings,
@@ -197,4 +244,5 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
+  getAllCourtsAvailability, // <-- AÑADE ESTO
 };
