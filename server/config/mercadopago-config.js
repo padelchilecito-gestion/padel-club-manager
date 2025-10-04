@@ -1,9 +1,9 @@
-const { MercadoPagoConfig } = require('mercadopago');
+const mercadopago = require('mercadopago');
 require('dotenv').config();
 
-// Initialize Mercado Pago SDK v2
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+// Configure Mercado Pago SDK
+mercadopago.configure({
+  access_token: process.env.MERCADOPAGO_ACCESS_TOKEN,
 });
 
-module.exports = client;
+module.exports = mercadopago;

@@ -1,5 +1,4 @@
-const { Preference, Payment } = require('mercadopago');
-const client = require('../config/mercadopago-config');
+const mercadopago = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
@@ -14,11 +13,11 @@ const createPaymentPreference = async (req, res) => {
   // Base URL should come from .env
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
-  const preferenceData = {
+  const preference = {
     items: items.map(item => ({
       title: item.title,
-      unit_price: Number(item.unit_price),
-      quantity: Number(item.quantity),
+      unit_price: item.unit_price,
+      quantity: item.quantity,
       currency_id: 'ARS', // Assuming Argentinian Pesos
     })),
     payer: {
@@ -36,9 +35,8 @@ const createPaymentPreference = async (req, res) => {
   };
 
   try {
-    const preference = new Preference(client);
-    const response = await preference.create({ body: preferenceData });
-    res.json({ id: response.id, init_point: response.init_point });
+    const response = await mercadopago.preferences.create(preference);
+    res.json({ id: response.body.id, init_point: response.body.init_point });
   } catch (error) {
     console.error('Error creating Mercado Pago preference:', error);
     res.status(500).json({ message: 'Failed to create payment preference.' });
@@ -53,14 +51,13 @@ const receiveWebhook = async (req, res) => {
 
   if (type === 'payment') {
     try {
-      const paymentClient = new Payment(client);
-      const payment = await paymentClient.get({ id: data.id });
+      const payment = await mercadopago.payment.findById(data.id);
+      const metadata = payment.body.metadata;
 
-      if (payment && payment.status === 'approved') {
-        const metadata = payment.metadata;
+      if (payment.body.status === 'approved') {
 
         // Check if it's a booking payment
-        if (metadata && metadata.booking_id) {
+        if (metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
           if (booking) {
             booking.isPaid = true;
@@ -76,12 +73,12 @@ const receiveWebhook = async (req, res) => {
         }
 
         // Check if it's a POS sale payment
-        if (metadata && metadata.sale_items) {
+        if (metadata.sale_items) {
           // This is a simplified flow. A real-world scenario might pre-create the sale as 'Pending'.
           // Here, we create the sale and update stock upon payment confirmation.
           const saleData = {
             items: metadata.sale_items,
-            total: payment.transaction_amount,
+            total: payment.body.transaction_amount,
             paymentMethod: 'Mercado Pago',
             user: metadata.user_id, // We must pass the operator's ID in metadata
           };
@@ -119,6 +116,7 @@ const receiveWebhook = async (req, res) => {
     res.status(200).send('Event type not "payment", ignored.');
   }
 };
+
 
 module.exports = {
   createPaymentPreference,
