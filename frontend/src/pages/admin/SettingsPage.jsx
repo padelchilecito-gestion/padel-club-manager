@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { settingService } from '../../services/settingService';
+import { debugService } from '../../services/debugService'; // Importar el nuevo servicio
 
 const SettingsPage = () => {
+  // ... (estados existentes)
   const [settings, setSettings] = useState({
     MERCADOPAGO_ACCESS_TOKEN: '',
     WHATSAPP_SENDER_NUMBER: '',
@@ -11,6 +13,7 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -50,12 +53,26 @@ const SettingsPage = () => {
     }
   };
 
-  if (loading) return <div className="text-center p-8">Cargando configuración...</div>;
+  // ... (useEffect y handleChange existentes)
+
+  const handleResetDatabase = async () => {
+    if (window.confirm('¿ESTÁS SEGURO? Esta acción borrará todos los datos de reservas, ventas, productos, etc. y no se puede deshacer.')) {
+      setResetting(true);
+      try {
+        const result = await debugService.resetDatabase();
+        alert(result.message);
+      } catch (err) {
+        alert(err.message || 'Error al blanquear la base de datos.');
+      } finally {
+        setResetting(false);
+      }
+    }
+  };
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Configuración del Sistema</h1>
-      
+
       <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg max-w-2xl mx-auto">
         <div className="space-y-6">
           <fieldset className="border border-gray-700 p-4 rounded-lg">
@@ -96,6 +113,22 @@ const SettingsPage = () => {
           </button>
         </div>
       </form>
+
+      {/* AÑADIR ESTO */}
+      <div className="bg-dark-secondary p-8 rounded-lg shadow-lg max-w-2xl mx-auto mt-8 border border-danger">
+        <h2 className="text-xl font-bold text-danger mb-4">Zona de Peligro</h2>
+        <p className="text-text-secondary mb-4">
+          Esta acción eliminará todos los datos de la aplicación (excepto las cuentas de usuario). Esta acción no se puede deshacer.
+        </p>
+        <button
+          type="button"
+          onClick={handleResetDatabase}
+          disabled={resetting}
+          className="px-6 py-3 bg-danger hover:bg-red-700 text-white font-bold rounded-md transition-colors disabled:opacity-50"
+        >
+          {resetting ? 'Blanqueando...' : 'Blanquear Base de Datos'}
+        </button>
+      </div>
     </div>
   );
 };
