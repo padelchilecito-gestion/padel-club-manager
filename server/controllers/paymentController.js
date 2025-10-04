@@ -57,12 +57,8 @@ const receiveWebhook = async (req, res) => {
       if (payment.body.status === 'approved') {
 
         if (metadata.booking_id_placeholder) {
-          // This flow is for when the booking doesn't exist yet.
-          // It creates the booking upon successful payment.
           const bookingData = metadata.booking_id_placeholder;
 
-          // First, re-check for conflicts in case the slot was taken
-          // while the user was on the Mercado Pago page.
           const conflictingBooking = await Booking.findOne({
             court: bookingData.courtId,
             status: { $ne: 'Cancelled' },
@@ -73,7 +69,6 @@ const receiveWebhook = async (req, res) => {
 
           if (conflictingBooking) {
             console.warn(`Webhook: Conflicting booking found for a paid reservation. Payment ID: ${data.id}. Needs manual refund.`);
-            // In a real app, you would flag this for manual intervention or trigger an automatic refund.
             return res.status(200).send('Webhook received, conflict detected.');
           }
 
