@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
-import { format, addHours, setHours, setMinutes, startOfDay } from 'date-fns';
+import { settingService } from '../services/settingService'; // Importar servicio
+import { format, addHours, setHours, setMinutes, startOfDay, getDay } from 'date-fns';
 
 // Helper to generate time slots for a day
-const generateTimeSlots = (date, bookedSlots) => {
+const generateTimeSlots = (date, bookedSlots, openingHour, closingHour) => {
     const slots = [];
     const now = new Date();
     const dayStart = startOfDay(date);
 
-    for (let i = 8; i < 23; i++) { // From 8:00 to 22:00
+    // Usar horarios dinámicos en lugar de fijos
+    for (let i = openingHour; i < closingHour; i++) {
         const slotStart = setMinutes(setHours(dayStart, i), 0);
-
-        // Skip past slots
         if (slotStart < now) continue;
 
         const slotEnd = addHours(slotStart, 1);
@@ -32,6 +32,7 @@ const generateTimeSlots = (date, bookedSlots) => {
 
 const TimeSlotFinder = () => {
     const [courts, setCourts] = useState([]);
+    const [clubSettings, setClubSettings] = useState(null); // Estado para settings
     const [selectedCourt, setSelectedCourt] = useState('');
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [bookedSlots, setBookedSlots] = useState([]);
@@ -42,21 +43,26 @@ const TimeSlotFinder = () => {
     const [bookingError, setBookingError] = useState('');
 
     useEffect(() => {
-        const fetchCourts = async () => {
+        const fetchInitialData = async () => {
             try {
                 setLoading(true);
-                const data = await courtService.getAllCourts();
-                setCourts(data.filter(c => c.isActive));
-                if (data.length > 0) {
-                    setSelectedCourt(data[0]._id);
+                const [courtsData, settingsData] = await Promise.all([
+                    courtService.getAllCourts(),
+                    settingService.getSettings()
+                ]);
+
+                setCourts(courtsData.filter(c => c.isActive));
+                if (courtsData.length > 0) {
+                    setSelectedCourt(courtsData[0]._id);
                 }
+                setClubSettings(settingsData);
             } catch (err) {
-                setError('No se pudieron cargar las canchas.');
+                setError('No se pudieron cargar los datos iniciales.');
             } finally {
                 setLoading(false);
             }
         };
-        fetchCourts();
+        fetchInitialData();
     }, []);
 
     useEffect(() => {
@@ -79,10 +85,19 @@ const TimeSlotFinder = () => {
     }, [selectedCourt, selectedDate]);
 
     useEffect(() => {
-        const slots = generateTimeSlots(new Date(selectedDate), bookedSlots);
+        if (!clubSettings) return;
+
+        const date = new Date(selectedDate);
+        const dayOfWeek = getDay(date); // Domingo = 0, Sábado = 6
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10) || 8;
+        const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10) || 23;
+
+        const slots = generateTimeSlots(date, bookedSlots, openingHour, closingHour);
         setAvailableSlots(slots);
-        setSelectedSlots([]); // Reset selection when availability changes
-    }, [bookedSlots, selectedDate]);
+        setSelectedSlots([]); // Reset selection
+    }, [bookedSlots, selectedDate, clubSettings]);
 
     const handleSlotClick = (slot) => {
         setSelectedSlots(prev =>
