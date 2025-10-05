@@ -12,6 +12,7 @@ const startServer = async () => {
   await connectDB();
 
   const app = express();
+  app.set('trust proxy', 1); // <--- AÑADE ESTA LÍNEA
   const server = http.createServer(app);
 
   // CORS configuration
