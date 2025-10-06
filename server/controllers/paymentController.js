@@ -1,5 +1,10 @@
+
 const { Preference, Payment } = require('mercadopago');
 const client = require('../config/mercadopago-config');
+
+const mercadopagoClient = require('../config/mercadopago-config');
+const { Preference, Payment } = require('mercadopago');
+
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
@@ -9,17 +14,24 @@ const mongoose = require('mongoose');
 // @route   POST /api/payments/create-preference
 // @access  Public / Operator
 const createPaymentPreference = async (req, res) => {
-  const { items, payer, metadata } = req.body; // metadata can contain bookingId or sale details
+  const { items, payer, metadata } = req.body;
 
-  // Base URL should come from .env
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
+
   const preferenceData = {
+
+  const preferenceBody = {
+
     items: items.map(item => ({
       title: item.title,
       unit_price: Number(item.unit_price),
       quantity: Number(item.quantity),
+
       currency_id: 'ARS', // Assuming Argentinian Pesos
+
+      currency_id: 'ARS',
+
     })),
     payer: {
       name: payer.name,
@@ -32,13 +44,19 @@ const createPaymentPreference = async (req, res) => {
     },
     auto_return: 'approved',
     notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
-    metadata: metadata, // Pass our internal IDs here
+    metadata: metadata,
   };
 
   try {
+
     const preference = new Preference(client);
     const response = await preference.create({ body: preferenceData });
     res.json({ id: response.id, init_point: response.init_point });
+
+    const preference = new Preference(mercadopagoClient);
+    const result = await preference.create({ body: preferenceBody });
+    res.json({ id: result.id, init_point: result.init_point });
+
   } catch (error) {
     console.error('Error creating Mercado Pago preference:', error);
     res.status(500).json({ message: 'Failed to create payment preference.' });
@@ -53,11 +71,16 @@ const receiveWebhook = async (req, res) => {
 
   if (type === 'payment') {
     try {
+
       const paymentClient = new Payment(client);
+
+      const paymentClient = new Payment(mercadopagoClient);
+
       const payment = await paymentClient.get({ id: data.id });
 
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
+
 
         // Check if it's a booking payment
         if (metadata && metadata.booking_id) {
@@ -108,6 +131,14 @@ const receiveWebhook = async (req, res) => {
           } finally {
             session.endSession();
           }
+
+        if (metadata.booking_id) {
+          // ... lógica para booking
+        }
+
+        if (metadata.sale_items) {
+          // ... lógica para sale
+
         }
       }
       res.status(200).send('Webhook received');

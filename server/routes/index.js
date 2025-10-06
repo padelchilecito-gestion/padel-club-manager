@@ -13,6 +13,7 @@ const paymentRoutes = require('./payments');
 const reportRoutes = require('./reports');
 const logRoutes = require('./logs');
 const settingRoutes = require('./settings');
+const debugRoutes = require('./debug');
 
 console.log('[Routes] Index router loaded.');
 
@@ -28,5 +29,6 @@ router.use('/payments', paymentRoutes);
 router.use('/reports', reportRoutes);
 router.use('/logs', logRoutes);
 router.use('/settings', settingRoutes);
+router.use('/debug', debugRoutes);
 
 module.exports = router;
