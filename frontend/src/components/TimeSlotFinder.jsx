@@ -78,9 +78,10 @@ const TimeSlotFinder = () => {
     }, [selectedCourt, selectedDate]);
 
     useEffect(() => {
-        const slots = generateTimeSlots(new Date(selectedDate), bookedSlots);
+        const dateForSlots = new Date(selectedDate + 'T00:00:00');
+        const slots = generateTimeSlots(dateForSlots, bookedSlots);
         setAvailableSlots(slots);
-        setSelectedSlots([]); // Reset selection when availability changes
+        setSelectedSlots([]);
     }, [bookedSlots, selectedDate]);
 
     const handleSlotClick = (slot) => {
