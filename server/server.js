@@ -6,11 +6,12 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
-const Setting = require('./models/Setting');
 
 const startServer = async () => {
   // Connect to Database first
   await connectDB();
+
+ fix/cors-mercadopago-and-add-reset-db
 
   // Set timezone from database
   try {
@@ -27,8 +28,8 @@ const startServer = async () => {
     console.error('Could not set timezone from DB', error);
   }
 
+ main
   const app = express();
-  app.set('trust proxy', 1);
   const server = http.createServer(app);
 
   // CORS configuration
