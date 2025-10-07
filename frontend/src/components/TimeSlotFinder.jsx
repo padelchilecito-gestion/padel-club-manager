@@ -1,36 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
-import { settingService } from '../services/settingService';
-// NOTA: Se añade 'addMinutes' para manejar los nuevos intervalos de 30 minutos.
-import { format, addMinutes, setHours, setMinutes, startOfDay, getDay } from 'date-fns';
+import { format, addHours, setHours, setMinutes, startOfDay } from 'date-fns';
 
-// Función auxiliar para generar los turnos del día.
-const generateTimeSlots = (date, bookedSlots, openingHour, closingHour) => {
+// Helper to generate time slots for a day
+const generateTimeSlots = (date, bookedSlots) => {
     const slots = [];
     const now = new Date();
     const dayStart = startOfDay(date);
 
-    // Itera por cada hora y crea dos turnos de 30 minutos (a los :00 y a los :30)
-    for (let hour = openingHour; hour < closingHour; hour++) {
-        for (const minute of [0, 30]) {
-            const slotStart = setMinutes(setHours(dayStart, hour), minute);
+    for (let i = 8; i < 23; i++) { // From 8:00 to 22:00
+        const slotStart = setMinutes(setHours(dayStart, i), 0);
 
-            // No muestra turnos que ya pasaron en el día actual.
-            if (slotStart < now) continue;
+        // Skip past slots
+        if (slotStart < now) continue;
 
-            const slotEnd = addMinutes(slotStart, 30); // Cada turno dura 30 minutos.
+        const slotEnd = addHours(slotStart, 1);
+        const isBooked = bookedSlots.some(booked => {
+            const bookedStart = new Date(booked.startTime);
+            const bookedEnd = new Date(booked.endTime);
+            return (slotStart < bookedEnd && slotEnd > bookedStart);
+        });
 
-            const isBooked = bookedSlots.some(booked => {
-                const bookedStart = new Date(booked.startTime);
-                const bookedEnd = new Date(booked.endTime);
-                // Revisa si el turno de 30 minutos se superpone con una reserva existente.
-                return (slotStart < bookedEnd && slotEnd > bookedStart);
-            });
-
-            if (!isBooked) {
-                slots.push(slotStart);
-            }
+        if (!isBooked) {
+            slots.push(slotStart);
         }
     }
     return slots;
@@ -39,7 +32,6 @@ const generateTimeSlots = (date, bookedSlots, openingHour, closingHour) => {
 
 const TimeSlotFinder = () => {
     const [courts, setCourts] = useState([]);
-    const [clubSettings, setClubSettings] = useState(null);
     const [selectedCourt, setSelectedCourt] = useState('');
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [bookedSlots, setBookedSlots] = useState([]);
@@ -50,26 +42,21 @@ const TimeSlotFinder = () => {
     const [bookingError, setBookingError] = useState('');
 
     useEffect(() => {
-        const fetchInitialData = async () => {
+        const fetchCourts = async () => {
             try {
                 setLoading(true);
-                const [courtsData, settingsData] = await Promise.all([
-                    courtService.getAllCourts(),
-                    settingService.getSettings()
-                ]);
-
-                setCourts(courtsData.filter(c => c.isActive));
-                if (courtsData.length > 0) {
-                    setSelectedCourt(courtsData[0]._id);
+                const data = await courtService.getAllCourts();
+                setCourts(data.filter(c => c.isActive));
+                if (data.length > 0) {
+                    setSelectedCourt(data[0]._id);
                 }
-                setClubSettings(settingsData);
             } catch (err) {
-                setError('No se pudieron cargar los datos iniciales.');
+                setError('No se pudieron cargar las canchas.');
             } finally {
                 setLoading(false);
             }
         };
-        fetchInitialData();
+        fetchCourts();
     }, []);
 
     useEffect(() => {
@@ -79,9 +66,7 @@ const TimeSlotFinder = () => {
             try {
                 setLoading(true);
                 setError('');
-                // CORRECCIÓN: Se asegura que la fecha se interprete en la zona horaria local del navegador
-                // para evitar que se cambie al día anterior por conversiones a UTC.
-                const date = new Date(selectedDate + 'T00:00:00');
+                const date = new Date(selectedDate);
                 const data = await bookingService.getAvailability(selectedCourt, date.toISOString());
                 setBookedSlots(data);
             } catch (err) {
@@ -94,20 +79,10 @@ const TimeSlotFinder = () => {
     }, [selectedCourt, selectedDate]);
 
     useEffect(() => {
-        if (!clubSettings) return;
-
-        // CORRECCIÓN: Se utiliza la misma lógica para la fecha.
-        const date = new Date(selectedDate + 'T00:00:00');
-        const dayOfWeek = getDay(date); // Domingo = 0, Sábado = 6
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-        const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10) || 8;
-        const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10) || 23;
-
-        const slots = generateTimeSlots(date, bookedSlots, openingHour, closingHour);
+        const slots = generateTimeSlots(new Date(selectedDate), bookedSlots);
         setAvailableSlots(slots);
-        setSelectedSlots([]); // Reset selection
-    }, [bookedSlots, selectedDate, clubSettings]);
+        setSelectedSlots([]); // Reset selection when availability changes
+    }, [bookedSlots, selectedDate]);
 
     const handleSlotClick = (slot) => {
         setSelectedSlots(prev =>
@@ -117,8 +92,7 @@ const TimeSlotFinder = () => {
 
     const totalPrice = useMemo(() => {
         const court = courts.find(c => c._id === selectedCourt);
-        // CORRECCIÓN: El precio se calcula por cada turno de 30 minutos (precio por hora / 2).
-        return court ? selectedSlots.length * (court.pricePerHour / 2) : 0;
+        return court ? selectedSlots.length * court.pricePerHour : 0;
     }, [selectedSlots, selectedCourt, courts]);
 
     const handleBooking = async (paymentMethod) => {
@@ -130,6 +104,7 @@ const TimeSlotFinder = () => {
         setBookingError('');
         setLoading(true);
 
+        // This is a simplified user data collection. A real form would be better.
         const userData = {
             name: prompt("Por favor, ingresa tu nombre:"),
             phone: prompt("Por favor, ingresa tu número de teléfono (con código de país):")
@@ -145,8 +120,7 @@ const TimeSlotFinder = () => {
             courtId: selectedCourt,
             user: userData,
             startTime: selectedSlots[0],
-            // CORRECCIÓN: La hora de fin es 30 minutos después del inicio del último turno seleccionado.
-            endTime: addMinutes(selectedSlots[selectedSlots.length - 1], 30),
+            endTime: addHours(selectedSlots[selectedSlots.length - 1], 1),
             paymentMethod,
             isPaid: paymentMethod !== 'Efectivo',
         };
@@ -160,17 +134,16 @@ const TimeSlotFinder = () => {
                         unit_price: totalPrice,
                         quantity: 1,
                     }],
-                    payer: { name: userData.name, email: "test_user@test.com" }, // Se debería recolectar el email
-                    metadata: { bookingData }
+                    payer: { name: userData.name, email: "test_user@test.com" }, // Email should be collected
+                    metadata: { bookingData } // We send booking data to be processed by webhook
                 };
                 const preference = await bookingService.createPaymentPreference(paymentData);
-                window.location.href = preference.init_point;
+                window.location.href = preference.init_point; // Redirect to Mercado Pago
             } else {
                 const newBooking = await bookingService.createBooking(bookingData);
                 alert(`¡Reserva confirmada! Tu reserva para el ${format(newBooking.startTime, 'dd/MM/yyyy HH:mm')} ha sido creada.`);
-
-                // CORRECCIÓN: Se utiliza la misma lógica para la fecha al recargar la disponibilidad.
-                const date = new Date(selectedDate + 'T00:00:00');
+                // Refetch availability
+                const date = new Date(selectedDate);
                 const data = await bookingService.getAvailability(selectedCourt, date.toISOString());
                 setBookedSlots(data);
             }

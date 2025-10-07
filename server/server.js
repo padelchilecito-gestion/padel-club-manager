@@ -6,25 +6,12 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
-const Setting = require('./models/Setting');
 
 const startServer = async () => {
   // Connect to Database first
   await connectDB();
 
-  // Set timezone from database
-  try {
-    const timezoneSetting = await Setting.findOne({ key: 'TIMEZONE' });
-    if (timezoneSetting) {
-      process.env.TZ = timezoneSetting.value;
-      console.log(`Timezone set to: ${process.env.TZ}`);
-    }
-  } catch (error) {
-    console.error('Could not set timezone from DB', error);
-  }
-
   const app = express();
-  app.set('trust proxy', 1);
   const server = http.createServer(app);
 
   // CORS configuration

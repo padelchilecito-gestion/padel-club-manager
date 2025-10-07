@@ -59,11 +59,48 @@ const receiveWebhook = async (req, res) => {
         const metadata = payment.metadata;
 
         if (metadata.booking_id) {
-          // ... lógica para booking
+          const booking = await Booking.findById(metadata.booking_id);
+          if (booking && !booking.isPaid) { // Process only if not already paid
+            booking.isPaid = true;
+            booking.status = 'Confirmed';
+            booking.paymentMethod = 'Mercado Pago';
+            await booking.save();
+            console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
+
+            const io = req.app.get('socketio');
+            io.emit('booking_update', booking);
+          }
         }
 
         if (metadata.sale_items) {
-          // ... lógica para sale
+          const saleData = {
+            items: metadata.sale_items,
+            total: payment.transaction_amount,
+            paymentMethod: 'Mercado Pago',
+            user: metadata.user_id,
+          };
+
+          const session = await mongoose.startSession();
+          session.startTransaction();
+          try {
+            for (const item of saleData.items) {
+              const product = await Product.findById(item.productId).session(session);
+              if (!product || product.stock < item.quantity) {
+                throw new Error(`Stock issue for product ${item.productId}`);
+              }
+              product.stock -= item.quantity;
+              await product.save({ session });
+            }
+            const sale = new Sale(saleData);
+            await sale.save({ session });
+            await session.commitTransaction();
+            console.log(`Sale created and stock updated for payment ${data.id}.`);
+          } catch (saleError) {
+            await session.abortTransaction();
+            console.error('Webhook sale creation failed:', saleError.message);
+          } finally {
+            session.endSession();
+          }
         }
       }
       res.status(200).send('Webhook received');
