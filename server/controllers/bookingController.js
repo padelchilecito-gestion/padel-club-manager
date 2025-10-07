@@ -5,9 +5,9 @@ const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
-// @access  Public
+// @access  Public or Admin
 const createBooking = async (req, res) => {
-  const { courtId, user, startTime, endTime, paymentMethod, isPaid } = req.body;
+  const { courtId, user, startTime, endTime, paymentMethod, isPaid, price } = req.body;
 
   try {
     const court = await Court.findById(courtId);
@@ -15,17 +15,15 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Court not found' });
     }
 
-    // Validate booking times
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
       return res.status(400).json({ message: 'End time must be after start time.' });
     }
 
-    // Check for conflicting bookings
     const conflictingBooking = await Booking.findOne({
       court: courtId,
-      status: { $ne: 'Cancelled' }, // Don't conflict with cancelled bookings
+      status: { $ne: 'Cancelled' },
       $or: [
         { startTime: { $lt: end, $gte: start } },
         { endTime: { $gt: start, $lte: end } },
@@ -37,34 +35,34 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ message: 'The selected time slot is already booked.' });
     }
     
-    // Calculate price
-    const durationHours = (end - start) / (1000 * 60 * 60);
-    const price = durationHours * court.pricePerHour;
+    // Si el precio no viene (desde el admin), se calcula.
+    let finalPrice = price;
+    if (finalPrice === undefined) {
+      const durationHours = (end - start) / (1000 * 60 * 60);
+      finalPrice = durationHours * court.pricePerHour;
+    }
 
     const booking = new Booking({
       court: courtId,
       user,
       startTime: start,
       endTime: end,
-      price,
+      price: finalPrice,
       paymentMethod,
       isPaid: isPaid || false,
-      status: 'Confirmed', // Or 'Pending' if payment is required
+      status: 'Confirmed',
     });
 
     const createdBooking = await booking.save();
     
-    // Emit real-time event
     const io = req.app.get('socketio');
     io.emit('booking_update', createdBooking);
     
-    // Log the activity
     const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
-    await logActivity(req.user, 'BOOKING_CREATED', logDetails); // req.user might be null if public
+    await logActivity(req.user, 'BOOKING_CREATED', logDetails);
 
-    // Send WhatsApp notification (placeholder)
     if (createdBooking.user.phone) {
-        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${start.toLocaleString()} ha sido confirmada. ¡Te esperamos!`;
+        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
         await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
     }
 
@@ -85,11 +83,9 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
         const bookings = await Booking.find({
             court: courtId,
@@ -110,7 +106,17 @@ const getBookingAvailability = async (req, res) => {
 // @access  Operator/Admin
 const getBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({}).populate('court', 'name courtType').sort({ startTime: -1 });
+    // NOTA: Se añade un filtro para no mostrar los turnos cancelados de hace más de 2 días.
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+    const bookings = await Booking.find({
+      $or: [
+        { status: { $ne: 'Cancelled' } },
+        { status: 'Cancelled', updatedAt: { $gte: twoDaysAgo } }
+      ]
+    }).populate('court', 'name courtType').sort({ startTime: -1 });
+
     res.json(bookings);
   } catch (error) {
     console.error(error);
@@ -118,24 +124,45 @@ const getBookings = async (req, res) => {
   }
 };
 
-// @desc    Get a single booking by ID
-// @route   GET /api/bookings/:id
+// @desc    Update a booking completely
+// @route   PUT /api/bookings/:id
 // @access  Operator/Admin
-const getBookingById = async (req, res) => {
+const updateBooking = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate('court');
-    if (booking) {
-      res.json(booking);
-    } else {
-      res.status(404).json({ message: 'Booking not found' });
+    const { courtId, user, startTime, endTime, price, status, isPaid, paymentMethod } = req.body;
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
     }
+
+    booking.court = courtId || booking.court;
+    booking.user = user || booking.user;
+    booking.startTime = startTime || booking.startTime;
+    booking.endTime = endTime || booking.endTime;
+    booking.price = price !== undefined ? price : booking.price;
+    booking.status = status || booking.status;
+    booking.isPaid = isPaid !== undefined ? isPaid : booking.isPaid;
+    booking.paymentMethod = paymentMethod || booking.paymentMethod;
+
+    const updatedBooking = await booking.save();
+
+    const io = req.app.get('socketio');
+    io.emit('booking_update', updatedBooking);
+
+    const logDetails = `Booking ID ${updatedBooking._id} was updated.`;
+    await logActivity(req.user, 'BOOKING_UPDATED', logDetails);
+
+    res.json(updatedBooking);
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Update booking status
+
+// @desc    Update booking status and payment
 // @route   PUT /api/bookings/:id/status
 // @access  Operator/Admin
 const updateBookingStatus = async (req, res) => {
@@ -144,6 +171,8 @@ const updateBookingStatus = async (req, res) => {
     if (booking) {
       booking.status = req.body.status || booking.status;
       booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
+      // NOTA: Se actualiza también el método de pago si se envía.
+      booking.paymentMethod = req.body.paymentMethod || booking.paymentMethod;
       
       const updatedBooking = await booking.save();
       
@@ -174,7 +203,7 @@ const cancelBooking = async (req, res) => {
             const updatedBooking = await booking.save();
 
             const io = req.app.get('socketio');
-            io.emit('booking_deleted', { id: req.params.id });
+            io.emit('booking_update', updatedBooking); // Usamos 'update' para que se vea el cambio a cancelado
             
             const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
             await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
@@ -193,7 +222,7 @@ const cancelBooking = async (req, res) => {
 module.exports = {
   createBooking,
   getBookings,
-  getBookingById,
+  updateBooking,
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
