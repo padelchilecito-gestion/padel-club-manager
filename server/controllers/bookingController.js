@@ -85,11 +85,10 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        // CORRECCIÓN: Se procesa la fecha para que siempre represente el inicio del día en la zona horaria del servidor.
+        const requestedDate = new Date(date);
+        const startOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate(), 0, 0, 0);
+        const endOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate(), 23, 59, 59, 999);
 
         const bookings = await Booking.find({
             court: courtId,
