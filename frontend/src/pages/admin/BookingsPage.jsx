@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
 // NOTA: Se importa una función extra para manejar la zona horaria.
-import { format, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
+import { format } from 'date-fns';
+import { utcToZonedTime } from 'date-fns-tz';
 import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 
 const BookingsPage = () => {
