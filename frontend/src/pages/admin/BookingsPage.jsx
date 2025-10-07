@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
-import { format } from 'date-fns';
+// NOTA: Se importa una función extra para manejar la zona horaria.
+import { format, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
 import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // NOTA IMPORTANTE: Esta es la zona horaria de Argentina.
+  const timeZone = 'America/Argentina/Buenos_Aires';
 
   useEffect(() => {
     socket.connect();
@@ -93,42 +97,49 @@ const BookingsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {bookings.map((booking) => (
-              <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                <td className="px-6 py-4 font-medium text-text-primary">{booking.user.name}</td>
-                <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
-                <td className="px-6 py-4">
-                    {format(new Date(booking.startTime), 'dd/MM/yyyy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
-                </td>
-                <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
-                        booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
-                    }`}>
-                        {booking.status}
-                    </span>
-                </td>
-                <td className="px-6 py-4">
-                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-500 text-white'
-                    }`}>
-                        {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
-                    </span>
-                </td>
-                <td className="px-6 py-4 flex items-center gap-2">
-                    {!booking.isPaid && booking.status === 'Confirmed' && (
-                         <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-secondary hover:text-green-400" title="Marcar como Pagado">
-                            <CurrencyDollarIcon className="h-5 w-5" />
-                        </button>
-                    )}
-                    {booking.status === 'Confirmed' && (
-                         <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
-                            <XCircleIcon className="h-5 w-5" />
-                        </button>
-                    )}
-                </td>
-              </tr>
-            ))}
+            {bookings.map((booking) => {
+              // CORRECCIÓN DE ZONA HORARIA PARA VISUALIZACIÓN
+              const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
+              const zonedEndTime = utcToZonedTime(new Date(booking.endTime), timeZone);
+
+              return (
+                <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
+                  <td className="px-6 py-4 font-medium text-text-primary">{booking.user.name}</td>
+                  <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
+                  <td className="px-6 py-4">
+                      {/* Se usa el nuevo objeto de fecha para mostrar la hora correcta */}
+                      {format(zonedStartTime, 'dd/MM/yyyy HH:mm')} - {format(zonedEndTime, 'HH:mm')}
+                  </td>
+                  <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
+                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
+                      }`}>
+                          {booking.status}
+                      </span>
+                  </td>
+                  <td className="px-6 py-4">
+                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-500 text-white'
+                      }`}>
+                          {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
+                      </span>
+                  </td>
+                  <td className="px-6 py-4 flex items-center gap-2">
+                      {!booking.isPaid && booking.status === 'Confirmed' && (
+                           <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-secondary hover:text-green-400" title="Marcar como Pagado">
+                              <CurrencyDollarIcon className="h-5 w-5" />
+                          </button>
+                      )}
+                      {booking.status === 'Confirmed' && (
+                           <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
+                              <XCircleIcon className="h-5 w-5" />
+                          </button>
+                      )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
