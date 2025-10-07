@@ -11,24 +11,6 @@ const startServer = async () => {
   // Connect to Database first
   await connectDB();
 
- fix/cors-mercadopago-and-add-reset-db
-
-  // Set timezone from database
-  try {
-    const timezoneSetting = await Setting.findOne({ key: 'TIMEZONE' });
-    if (timezoneSetting) {
-      process.env.TZ = timezoneSetting.value;
-      console.log(`Timezone set to: ${process.env.TZ}`);
-    } else {
-      // NOTA: Si no hay configuración en la base de datos, se establece una por defecto.
-      process.env.TZ = 'America/Argentina/Buenos_Aires';
-      console.log(`Default timezone set to: ${process.env.TZ}`);
-    }
-  } catch (error) {
-    console.error('Could not set timezone from DB', error);
-  }
-
- main
   const app = express();
   const server = http.createServer(app);
 
@@ -46,7 +28,6 @@ const startServer = async () => {
         callback(new Error('Not allowed by CORS'));
       }
     },
-    // NOTA: Esta opción es clave para solucionar el error de credenciales.
     credentials: true
   };
 
@@ -55,7 +36,11 @@ const startServer = async () => {
 
   // Socket.IO setup
   const io = new Server(server, {
-    cors: corsOptions, // NOTA: Se usan las mismas opciones de CORS aquí.
+    cors: {
+      origin: allowedOrigins,
+      methods: ["GET", "POST", "PUT", "DELETE"],
+      credentials: true
+    },
   });
 
   app.set('socketio', io);
