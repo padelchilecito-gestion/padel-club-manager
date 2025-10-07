@@ -1,5 +1,5 @@
-const mercadopagoClient = require('../config/mercadopago-config');
 const { Preference, Payment } = require('mercadopago');
+const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
@@ -35,7 +35,7 @@ const createPaymentPreference = async (req, res) => {
   };
 
   try {
-    const preference = new Preference(mercadopagoClient);
+    const preference = new Preference(client);
     const result = await preference.create({ body: preferenceBody });
     res.json({ id: result.id, init_point: result.init_point });
   } catch (error) {
@@ -52,34 +52,60 @@ const receiveWebhook = async (req, res) => {
 
   if (type === 'payment') {
     try {
-      const paymentClient = new Payment(mercadopagoClient);
+      const paymentClient = new Payment(client);
       const payment = await paymentClient.get({ id: data.id });
 
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
 
+fix/cors-mercadopago-and-add-reset-db
         if (metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
           if (booking && !booking.isPaid) { // Process only if not already paid
+
+        // Check if it's a booking payment
+        if (metadata && metadata.booking_id) {
+          const booking = await Booking.findById(metadata.booking_id);
+          if (booking) {
+ main
             booking.isPaid = true;
             booking.status = 'Confirmed';
             booking.paymentMethod = 'Mercado Pago';
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
+fix/cors-mercadopago-and-add-reset-db
 
+
+            
+            // Emit a real-time event
+ main
             const io = req.app.get('socketio');
             io.emit('booking_update', booking);
           }
         }
 
+ fix/cors-mercadopago-and-add-reset-db
         if (metadata.sale_items) {
+
+        // Check if it's a POS sale payment
+        if (metadata && metadata.sale_items) {
+          // This is a simplified flow. A real-world scenario might pre-create the sale as 'Pending'.
+          // Here, we create the sale and update stock upon payment confirmation.
+ main
           const saleData = {
             items: metadata.sale_items,
             total: payment.transaction_amount,
             paymentMethod: 'Mercado Pago',
+fix/cors-mercadopago-and-add-reset-db
             user: metadata.user_id,
           };
 
+
+            user: metadata.user_id, // We must pass the operator's ID in metadata
+          };
+          
+          // Using the same atomic transaction logic as in saleController
+ main
           const session = await mongoose.startSession();
           session.startTransaction();
           try {
@@ -112,7 +138,6 @@ const receiveWebhook = async (req, res) => {
     res.status(200).send('Event type not "payment", ignored.');
   }
 };
-
 
 module.exports = {
   createPaymentPreference,
