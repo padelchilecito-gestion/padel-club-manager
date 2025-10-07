@@ -1,5 +1,5 @@
-const mercadopagoClient = require('../config/mercadopago-config');
 const { Preference, Payment } = require('mercadopago');
+const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
@@ -35,7 +35,7 @@ const createPaymentPreference = async (req, res) => {
   };
 
   try {
-    const preference = new Preference(mercadopagoClient);
+    const preference = new Preference(client);
     const result = await preference.create({ body: preferenceBody });
     res.json({ id: result.id, init_point: result.init_point });
   } catch (error) {
@@ -52,7 +52,7 @@ const receiveWebhook = async (req, res) => {
 
   if (type === 'payment') {
     try {
-      const paymentClient = new Payment(mercadopagoClient);
+      const paymentClient = new Payment(client);
       const payment = await paymentClient.get({ id: data.id });
 
       if (payment && payment.status === 'approved') {
@@ -114,7 +114,6 @@ const receiveWebhook = async (req, res) => {
     res.status(200).send('Event type not "payment", ignored.');
   }
 };
-
 
 module.exports = {
   createPaymentPreference,
