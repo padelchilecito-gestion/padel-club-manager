@@ -83,9 +83,11 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        const [year, month, day] = date.split('T')[0].split('-').map(Number);
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
 
         const bookings = await Booking.find({
             court: courtId,

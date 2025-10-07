@@ -66,8 +66,7 @@ const TimeSlotFinder = () => {
             try {
                 setLoading(true);
                 setError('');
-                const date = new Date(selectedDate);
-                const data = await bookingService.getAvailability(selectedCourt, date.toISOString());
+                const data = await bookingService.getAvailability(selectedCourt, selectedDate);
                 setBookedSlots(data);
             } catch (err) {
                 setError('No se pudo cargar la disponibilidad.');
