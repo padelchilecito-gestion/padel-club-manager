@@ -210,7 +210,7 @@ const cancelBooking = async (req, res) => {
             const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
             await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
 
-            res.json({ message: 'Booking cancelled successfully' });
+            res.json(updatedBooking);
         } else {
             res.status(404).json({ message: 'Booking not found' });
         }
