@@ -9,13 +9,13 @@ const generateTimeSlots = (date, bookedSlots) => {
     const now = new Date();
     const dayStart = startOfDay(date);
 
-    for (let i = 8; i < 23; i++) { // From 8:00 to 22:00
-        const slotStart = setMinutes(setHours(dayStart, i), 0);
+    for (let i = 8 * 60; i < 23 * 60; i += 30) { // De 8:00 a 22:30, en intervalos de 30 min
+        const slotStart = setMinutes(setHours(dayStart, 0), i);
 
         // Skip past slots
         if (slotStart < now) continue;
 
-        const slotEnd = addHours(slotStart, 1);
+        const slotEnd = new Date(slotStart.getTime() + 30 * 60000);
         const isBooked = bookedSlots.some(booked => {
             const bookedStart = new Date(booked.startTime);
             const bookedEnd = new Date(booked.endTime);
@@ -120,7 +120,9 @@ const TimeSlotFinder = () => {
             courtId: selectedCourt,
             user: userData,
             startTime: selectedSlots[0],
-            endTime: addHours(selectedSlots[selectedSlots.length - 1], 1),
+            // --- Línea corregida ---
+            endTime: new Date(selectedSlots[selectedSlots.length - 1].getTime() + 30 * 60000),
+            // --------------------
             paymentMethod,
             isPaid: paymentMethod !== 'Efectivo',
         };
