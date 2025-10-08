@@ -83,11 +83,9 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
+        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
         const bookings = await Booking.find({
             court: courtId,
@@ -210,7 +208,7 @@ const cancelBooking = async (req, res) => {
             const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
             await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
 
-            res.json(updatedBooking);
+            res.json({ message: 'Booking cancelled successfully' });
         } else {
             res.status(404).json({ message: 'Booking not found' });
         }
