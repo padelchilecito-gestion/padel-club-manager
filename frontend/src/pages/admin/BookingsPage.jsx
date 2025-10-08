@@ -108,11 +108,7 @@ const BookingsPage = () => {
 
   const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
     try {
-        const updatedBooking = await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
-        // Actualizamos el estado localmente
-        setBookings(prevBookings =>
-            prevBookings.map(b => b._id === id ? updatedBooking : b)
-        );
+        await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
     } catch (err) {
         alert('Error al actualizar la reserva.');
     }
@@ -121,11 +117,7 @@ const BookingsPage = () => {
   const handleCancel = async (id) => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
           try {
-              const updatedBooking = await bookingService.cancelBooking(id);
-              // Actualizamos el estado localmente
-              setBookings(prevBookings =>
-                  prevBookings.map(b => b._id === id ? updatedBooking : b)
-              );
+              await bookingService.cancelBooking(id);
           } catch (err) {
               alert('Error al cancelar la reserva.');
           }

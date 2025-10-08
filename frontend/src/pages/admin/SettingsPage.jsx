@@ -6,12 +6,6 @@ const SettingsPage = () => {
     MERCADOPAGO_ACCESS_TOKEN: '',
     WHATSAPP_SENDER_NUMBER: '',
     WHATSAPP_API_TOKEN: '',
-    // --- Añadir estas líneas ---
-    WEEKDAY_OPENING_HOUR: '08:00',
-    WEEKDAY_CLOSING_HOUR: '23:00',
-    WEEKEND_OPENING_HOUR: '09:00',
-    WEEKEND_CLOSING_HOUR: '22:00',
-    // -------------------------
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -87,30 +81,6 @@ const SettingsPage = () => {
               </div>
             </div>
           </fieldset>
-
-          {/* --- PEGAR ESTE NUEVO FIELDSET AQUÍ --- */}
-          <fieldset className="border border-gray-700 p-4 rounded-lg">
-            <legend className="px-2 text-lg font-semibold text-green-400">Horarios de Apertura</legend>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div>
-                <label htmlFor="WEEKDAY_OPENING_HOUR" className="block text-sm font-medium text-text-secondary">Apertura (Lunes a Viernes)</label>
-                <input type="time" name="WEEKDAY_OPENING_HOUR" value={settings.WEEKDAY_OPENING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
-              </div>
-              <div>
-                <label htmlFor="WEEKDAY_CLOSING_HOUR" className="block text-sm font-medium text-text-secondary">Cierre (Lunes a Viernes)</label>
-                <input type="time" name="WEEKDAY_CLOSING_HOUR" value={settings.WEEKDAY_CLOSING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
-              </div>
-              <div>
-                <label htmlFor="WEEKEND_OPENING_HOUR" className="block text-sm font-medium text-text-secondary">Apertura (Fin de Semana)</label>
-                <input type="time" name="WEEKEND_OPENING_HOUR" value={settings.WEEKEND_OPENING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
-              </div>
-              <div>
-                <label htmlFor="WEEKEND_CLOSING_HOUR" className="block text-sm font-medium text-text-secondary">Cierre (Fin de Semana)</label>
-                <input type="time" name="WEEKEND_CLOSING_HOUR" value={settings.WEEKEND_CLOSING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
-              </div>
-            </div>
-          </fieldset>
-          {/* -------------------------------------- */}
         </div>
 
         {error && <p className="text-danger text-center text-sm mt-4">{error}</p>}

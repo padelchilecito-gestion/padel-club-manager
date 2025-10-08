@@ -9,13 +9,13 @@ const generateTimeSlots = (date, bookedSlots) => {
     const now = new Date();
     const dayStart = startOfDay(date);
 
-    for (let i = 8 * 60; i < 23 * 60; i += 30) { // De 8:00 a 22:30, en intervalos de 30 min
-        const slotStart = setMinutes(setHours(dayStart, 0), i);
+    for (let i = 8; i < 23; i++) { // From 8:00 to 22:00
+        const slotStart = setMinutes(setHours(dayStart, i), 0);
 
         // Skip past slots
         if (slotStart < now) continue;
 
-        const slotEnd = new Date(slotStart.getTime() + 30 * 60000);
+        const slotEnd = addHours(slotStart, 1);
         const isBooked = bookedSlots.some(booked => {
             const bookedStart = new Date(booked.startTime);
             const bookedEnd = new Date(booked.endTime);
@@ -66,7 +66,8 @@ const TimeSlotFinder = () => {
             try {
                 setLoading(true);
                 setError('');
-                const data = await bookingService.getAvailability(selectedCourt, selectedDate);
+                const date = new Date(selectedDate);
+                const data = await bookingService.getAvailability(selectedCourt, date.toISOString());
                 setBookedSlots(data);
             } catch (err) {
                 setError('No se pudo cargar la disponibilidad.');
@@ -78,10 +79,9 @@ const TimeSlotFinder = () => {
     }, [selectedCourt, selectedDate]);
 
     useEffect(() => {
-        const dateForSlots = new Date(selectedDate + 'T00:00:00');
-        const slots = generateTimeSlots(dateForSlots, bookedSlots);
+        const slots = generateTimeSlots(new Date(selectedDate), bookedSlots);
         setAvailableSlots(slots);
-        setSelectedSlots([]);
+        setSelectedSlots([]); // Reset selection when availability changes
     }, [bookedSlots, selectedDate]);
 
     const handleSlotClick = (slot) => {
@@ -120,9 +120,7 @@ const TimeSlotFinder = () => {
             courtId: selectedCourt,
             user: userData,
             startTime: selectedSlots[0],
-            // --- Línea corregida ---
-            endTime: new Date(selectedSlots[selectedSlots.length - 1].getTime() + 30 * 60000),
-            // --------------------
+            endTime: addHours(selectedSlots[selectedSlots.length - 1], 1),
             paymentMethod,
             isPaid: paymentMethod !== 'Efectivo',
         };

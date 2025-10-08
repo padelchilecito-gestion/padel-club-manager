@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeftOnRectangleIcon } from '@heroicons/react/24/solid';
+import { ArrowLeftOnRectangleIcon, Bars3Icon } from '@heroicons/react/24/solid';
 
-const AdminHeader = () => {
+const AdminHeader = ({ toggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -14,8 +14,13 @@ const AdminHeader = () => {
 
   return (
     <header className="bg-dark-secondary shadow-md p-4 flex justify-between items-center z-10">
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">Panel de Administración</h1>
+      <div className="flex items-center">
+        <button onClick={toggleSidebar} className="text-white md:hidden mr-4">
+          <Bars3Icon className="h-6 w-6" />
+        </button>
+        <h1 className="text-xl font-semibold text-text-primary hidden sm:block">
+          Panel de Administración
+        </h1>
       </div>
       <div className="flex items-center">
         <span className="text-text-secondary mr-4">
