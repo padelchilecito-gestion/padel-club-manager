@@ -6,15 +6,16 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
+const setupBookingReminders = require('./tasks/bookingReminders');
+const { configureCloudinary } = require('./config/cloudinaryConfig');
 
 const startServer = async () => {
-  // Connect to Database first
   await connectDB();
+  await configureCloudinary();
 
   const app = express();
   const server = http.createServer(app);
 
-  // CORS configuration
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app',
@@ -34,7 +35,6 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // Socket.IO setup
   const io = new Server(server, {
     cors: {
       origin: allowedOrigins,
@@ -53,15 +53,11 @@ const startServer = async () => {
   });
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
-
-  // Define Routes
   app.use('/api', apiRoutes);
 
-  const PORT = process.env.PORT || 5000;
+  setupBookingReminders();
 
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on port ${PORT}`);
-  });
+  return server;
 };
 
-startServer();
+module.exports = startServer;

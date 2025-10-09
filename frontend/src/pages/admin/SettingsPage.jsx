@@ -6,6 +6,12 @@ const SettingsPage = () => {
     MERCADOPAGO_ACCESS_TOKEN: '',
     WHATSAPP_SENDER_NUMBER: '',
     WHATSAPP_API_TOKEN: '',
+    WEEKDAY_OPENING_HOUR: '08:00',
+    WEEKDAY_CLOSING_HOUR: '23:00',
+    WEEKEND_OPENING_HOUR: '09:00',
+    WEEKEND_CLOSING_HOUR: '22:00',
+    CANCELLATION_POLICY_HOURS: '24',
+    CANCELLATION_PENALTY_PERCENTAGE: '0',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,6 +70,44 @@ const SettingsPage = () => {
               <div>
                 <label htmlFor="MERCADOPAGO_ACCESS_TOKEN" className="block text-sm font-medium text-text-secondary">Access Token</label>
                 <input type="password" name="MERCADOPAGO_ACCESS_TOKEN" value={settings.MERCADOPAGO_ACCESS_TOKEN} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="border border-gray-700 p-4 rounded-lg">
+            <legend className="px-2 text-lg font-semibold text-green-400">Horarios de Apertura</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label htmlFor="WEEKDAY_OPENING_HOUR" className="block text-sm font-medium text-text-secondary">Apertura (Lunes a Viernes)</label>
+                <input type="time" name="WEEKDAY_OPENING_HOUR" value={settings.WEEKDAY_OPENING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+              <div>
+                <label htmlFor="WEEKDAY_CLOSING_HOUR" className="block text-sm font-medium text-text-secondary">Cierre (Lunes a Viernes)</label>
+                <input type="time" name="WEEKDAY_CLOSING_HOUR" value={settings.WEEKDAY_CLOSING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+              <div>
+                <label htmlFor="WEEKEND_OPENING_HOUR" className="block text-sm font-medium text-text-secondary">Apertura (Fin de Semana)</label>
+                <input type="time" name="WEEKEND_OPENING_HOUR" value={settings.WEEKEND_OPENING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+              <div>
+                <label htmlFor="WEEKEND_CLOSING_HOUR" className="block text-sm font-medium text-text-secondary">Cierre (Fin de Semana)</label>
+                <input type="time" name="WEEKEND_CLOSING_HOUR" value={settings.WEEKEND_CLOSING_HOUR} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="border border-gray-700 p-4 rounded-lg">
+            <legend className="px-2 text-lg font-semibold text-green-400">Políticas de Cancelación</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label htmlFor="CANCELLATION_POLICY_HOURS" className="block text-sm font-medium text-text-secondary">Horas para cancelar sin cargo</label>
+                <input type="number" name="CANCELLATION_POLICY_HOURS" value={settings.CANCELLATION_POLICY_HOURS} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <p className="text-xs text-gray-400 mt-1">Número de horas antes del turno para cancelar sin penalización.</p>
+              </div>
+              <div>
+                <label htmlFor="CANCELLATION_PENALTY_PERCENTAGE" className="block text-sm font-medium text-text-secondary">Porcentaje de penalización (%)</label>
+                <input type="number" name="CANCELLATION_PENALTY_PERCENTAGE" value={settings.CANCELLATION_PENALTY_PERCENTAGE} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <p className="text-xs text-gray-400 mt-1">Porcentaje del total de la reserva a penalizar si se cancela fuera de plazo.</p>
               </div>
             </div>
           </fieldset>

@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
+const Setting = require('../models/Setting');
+const { isBefore, subHours, startOfDay, endOfDay } = require('date-fns');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
 
@@ -70,6 +72,37 @@ const createBooking = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+const getAllBookingsAdmin = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, courtId, date } = req.query;
+    const query = {};
+
+    if (status) query.status = status;
+    if (courtId) query.court = courtId;
+
+    if (date) {
+      const selectedDate = new Date(date);
+      query.startTime = {
+        $gte: startOfDay(selectedDate),
+        $lte: endOfDay(selectedDate)
+      };
+    }
+
+    const options = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      populate: 'court',
+      sort: { startTime: -1 },
+    };
+
+    const bookings = await Booking.paginate(query, options);
+    res.json(bookings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -196,32 +229,61 @@ const updateBookingStatus = async (req, res) => {
 // @route   PUT /api/bookings/:id/cancel
 // @access  Operator/Admin
 const cancelBooking = async (req, res) => {
-    try {
-        const booking = await Booking.findById(req.params.id);
-        if (booking) {
-            booking.status = 'Cancelled';
-            const updatedBooking = await booking.save();
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
 
-            const io = req.app.get('socketio');
-            io.emit('booking_update', updatedBooking); // Usamos 'update' para que se vea el cambio a cancelado
-            
-            const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
-            await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
-
-            res.json({ message: 'Booking cancelled successfully' });
-        } else {
-            res.status(404).json({ message: 'Booking not found' });
-        }
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+    const booking = await Booking.findById(id).populate('user');
+    if (!booking) {
+      return res.status(404).json({ message: 'Reserva no encontrada.' });
     }
+
+    const isOwner = booking.user && booking.user._id.toString() === userId.toString();
+    const isAdminOrOperator = req.user.role === 'Admin' || req.user.role === 'Operator';
+
+    if (!isOwner && !isAdminOrOperator) {
+      return res.status(403).json({ message: 'No tienes permiso para cancelar esta reserva.' });
+    }
+
+    if (new Date(booking.startTime) < new Date()) {
+      return res.status(400).json({ message: 'No se puede cancelar una reserva que ya ha pasado.' });
+    }
+
+    const policyHoursSetting = await Setting.findOne({ key: 'CANCELLATION_POLICY_HOURS' });
+    const penaltyPercentageSetting = await Setting.findOne({ key: 'CANCELLATION_PENALTY_PERCENTAGE' });
+
+    const cancellationHours = parseInt(policyHoursSetting?.value || '24', 10);
+    const penaltyPercentage = parseInt(penaltyPercentageSetting?.value || '0', 10);
+
+    const cancellationDeadline = subHours(new Date(booking.startTime), cancellationHours);
+    let finalPenalty = 0;
+
+    if (isBefore(new Date(), cancellationDeadline) || isAdminOrOperator) {
+        booking.status = 'Cancelled';
+        booking.cancellationReason = req.body.reason || 'Cancelación sin penalización.';
+    } else {
+        booking.status = 'Cancelled with Penalty';
+        finalPenalty = (booking.price * penaltyPercentage) / 100;
+        booking.penaltyAmount = finalPenalty;
+        booking.cancellationReason = req.body.reason || `Cancelación fuera de plazo. Penalización: $${finalPenalty}.`;
+    }
+
+    const updatedBooking = await booking.save();
+    const logDetails = `Booking ID ${updatedBooking._id} cancelled. Status: ${updatedBooking.status}. Penalty: ${finalPenalty}.`;
+    await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
+
+    res.json(updatedBooking);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
 };
 
 
 module.exports = {
   createBooking,
   getBookings,
+  getAllBookingsAdmin,
   updateBooking,
   updateBookingStatus,
   cancelBooking,

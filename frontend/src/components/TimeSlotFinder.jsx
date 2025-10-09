@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { toast } from 'react-toastify';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
 import { format, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
@@ -150,7 +151,7 @@ const TimeSlotFinder = () => {
                 window.location.href = preference.init_point;
             } else {
                 const newBooking = await bookingService.createBooking(bookingData);
-                alert(`¡Reserva confirmada! Tu turno para el ${format(new Date(newBooking.startTime), 'dd/MM/yyyy HH:mm')} ha sido creado.`);
+                toast.success(`¡Reserva confirmada! Tu turno para el ${format(new Date(newBooking.startTime), 'dd/MM/yyyy HH:mm')} ha sido creado.`);
 
                 // Limpiar y recargar
                 setShowUserForm(false);
@@ -160,7 +161,8 @@ const TimeSlotFinder = () => {
                 setBookedSlots(data);
             }
         } catch (err) {
-            setBookingError(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
+            toast.error(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
+            setBookingError(''); // Clear any old errors
         } finally {
             setLoading(false);
         }
@@ -230,6 +232,12 @@ const TimeSlotFinder = () => {
 
                     {/* Muestra el rango de horas */}
                     <p className="text-text-primary mt-2">
+                        Cancha: <span className="font-semibold">{courts.find(c => c._id === selectedCourt)?.name}</span>
+                    </p>
+                    <p className="text-text-primary mt-1">
+                        Fecha: <span className="font-semibold">{format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                    </p>
+                    <p className="text-text-primary mt-1">
                         Horario: <span className="font-semibold">{format(startTime, 'HH:mm')} a {format(endTime, 'HH:mm')}</span>
                     </p>
 
