@@ -15,7 +15,7 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Court not found' });
     }
 
-    // Validate booking times
+    // Las fechas ya vienen en formato ISO desde el frontend, se usan directamente.
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
@@ -25,7 +25,7 @@ const createBooking = async (req, res) => {
     // Check for conflicting bookings
     const conflictingBooking = await Booking.findOne({
       court: courtId,
-      status: { $ne: 'Cancelled' }, // Don't conflict with cancelled bookings
+      status: { $ne: 'Cancelled' },
       $or: [
         { startTime: { $lt: end, $gte: start } },
         { endTime: { $gt: start, $lte: end } },
@@ -37,7 +37,6 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ message: 'The selected time slot is already booked.' });
     }
     
-    // Calculate price
     const durationHours = (end - start) / (1000 * 60 * 60);
     const price = durationHours * court.pricePerHour;
 
@@ -49,20 +48,17 @@ const createBooking = async (req, res) => {
       price,
       paymentMethod,
       isPaid: isPaid || false,
-      status: 'Confirmed', // Or 'Pending' if payment is required
+      status: 'Confirmed',
     });
 
     const createdBooking = await booking.save();
     
-    // Emit real-time event
     const io = req.app.get('socketio');
     io.emit('booking_update', createdBooking);
     
-    // Log the activity
     const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
-    await logActivity(req.user, 'BOOKING_CREATED', logDetails); // req.user might be null if public
+    await logActivity(req.user, 'BOOKING_CREATED', logDetails);
 
-    // Send WhatsApp notification (placeholder)
     if (createdBooking.user.phone) {
         const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${start.toLocaleString()} ha sido confirmada. ¡Te esperamos!`;
         await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
@@ -85,10 +81,14 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        // CORRECCIÓN: Se procesa la fecha para que siempre represente el inicio del día en la zona horaria del servidor.
-        const requestedDate = new Date(date);
-        const startOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate(), 0, 0, 0);
-        const endOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate(), 23, 59, 59, 999);
+        // CORRECCIÓN DEFINITIVA: Se construye la fecha de inicio y fin del día
+        // manualmente para evitar cualquier interpretación incorrecta de la zona horaria.
+        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+
+        // Se crea el inicio del día en la zona horaria del servidor (que ya forzamos a ser la de Argentina).
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        // Se crea el final del día.
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
         const bookings = await Booking.find({
             court: courtId,
@@ -102,7 +102,6 @@ const getBookingAvailability = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
-
 
 // @desc    Get all bookings
 // @route   GET /api/bookings

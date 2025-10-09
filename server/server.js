@@ -9,30 +9,19 @@ const apiRoutes = require('./routes');
 const Setting = require('./models/Setting');
 
 const startServer = async () => {
-  // Connect to Database first
+  // Conectar a la base de datos primero
   await connectDB();
 
-  // Set timezone from database
-  try {
-    const timezoneSetting = await Setting.findOne({ key: 'TIMEZONE' });
-    if (timezoneSetting) {
-      process.env.TZ = timezoneSetting.value;
-      console.log(`Timezone set to: ${process.env.TZ}`);
-    } else {
-      // NOTA: Si no hay configuración en la base de datos, se establece una por defecto.
-      process.env.TZ = 'America/Argentina/Buenos_Aires';
-      console.log(`Default timezone set to: ${process.env.TZ}`);
-    }
-  } catch (error) {
-    console.error('Could not set timezone from DB', error);
-  }
-
+  // NOTA IMPORTANTE: Se establece la zona horaria de Argentina como principal.
+  // Esto es crucial para que todas las operaciones con fechas funcionen correctamente.
+  process.env.TZ = 'America/Argentina/Buenos_Aires';
+  console.log(`Timezone forced to: ${process.env.TZ}`);
 
   const app = express();
   app.set('trust proxy', 1);
   const server = http.createServer(app);
 
-  // CORS configuration
+  // Configuración de CORS
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app',
@@ -46,16 +35,15 @@ const startServer = async () => {
         callback(new Error('Not allowed by CORS'));
       }
     },
-    // NOTA: Esta opción es clave para solucionar el error de credenciales.
-    credentials: true
+    credentials: true,
   };
 
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // Socket.IO setup
+  // Configuración de Socket.IO
   const io = new Server(server, {
-    cors: corsOptions, // NOTA: Se usan las mismas opciones de CORS aquí.
+    cors: corsOptions,
   });
 
   app.set('socketio', io);
@@ -69,7 +57,7 @@ const startServer = async () => {
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
-  // Define Routes
+  // Definir Rutas
   app.use('/api', apiRoutes);
 
   const PORT = process.env.PORT || 5000;
