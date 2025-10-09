@@ -11,7 +11,6 @@ import UsersPage from './UsersPage';
 import ReportsPage from './ReportsPage';
 import ActivityLogPage from './ActivityLogPage';
 import SettingsPage from './SettingsPage';
-import GalleryAdminPage from './GalleryAdminPage';
 
 // Import route protectors
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
@@ -41,7 +40,6 @@ const AdminLayout = () => {
             <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
             <Route path="logs" element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
             <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
-            <Route path="gallery" element={<AdminRoute><GalleryAdminPage /></AdminRoute>} />
 
             {/* Fallback for any other admin route */}
             <Route path="*" element={<h1 className="text-white">Página no encontrada en el panel</h1>} />

@@ -1,15 +1,13 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
-const Setting = require('../models/Setting');
-const { isBefore, subHours, startOfDay, endOfDay } = require('date-fns');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
-// @access  Public or Admin
+// @access  Public
 const createBooking = async (req, res) => {
-  const { courtId, user, startTime, endTime, paymentMethod, isPaid, price } = req.body;
+  const { courtId, user, startTime, endTime, paymentMethod, isPaid } = req.body;
 
   try {
     const court = await Court.findById(courtId);
@@ -17,16 +15,14 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Court not found' });
     }
 
-//<<<<<<< fix/backend-syntax-errors//
     // Las fechas ya vienen en formato ISO desde el frontend, se usan directamente.
-//=======//
-//>>>>>>> main//
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
       return res.status(400).json({ message: 'End time must be after start time.' });
     }
 
+    // Check for conflicting bookings
     const conflictingBooking = await Booking.findOne({
       court: courtId,
       status: { $ne: 'Cancelled' },
@@ -41,24 +37,15 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ message: 'The selected time slot is already booked.' });
     }
     
-//<<<<<<< fix/backend-syntax-errors//
     const durationHours = (end - start) / (1000 * 60 * 60);
     const price = durationHours * court.pricePerHour;
-//=======//
-    // Si el precio no viene (desde el admin), se calcula.
-    let finalPrice = price;
-    if (finalPrice === undefined) {
-      const durationHours = (end - start) / (1000 * 60 * 60);
-      finalPrice = durationHours * court.pricePerHour;
-    }
-//>>>>>>> main//
 
     const booking = new Booking({
       court: courtId,
       user,
       startTime: start,
       endTime: end,
-      price: finalPrice,
+      price,
       paymentMethod,
       isPaid: isPaid || false,
       status: 'Confirmed',
@@ -73,7 +60,7 @@ const createBooking = async (req, res) => {
     await logActivity(req.user, 'BOOKING_CREATED', logDetails);
 
     if (createdBooking.user.phone) {
-        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
+        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${start.toLocaleString()} ha sido confirmada. ¡Te esperamos!`;
         await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
     }
 
@@ -81,37 +68,6 @@ const createBooking = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-const getAllBookingsAdmin = async (req, res) => {
-  try {
-    const { page = 1, limit = 10, status, courtId, date } = req.query;
-    const query = {};
-
-    if (status) query.status = status;
-    if (courtId) query.court = courtId;
-
-    if (date) {
-      const selectedDate = new Date(date);
-      query.startTime = {
-        $gte: startOfDay(selectedDate),
-        $lte: endOfDay(selectedDate)
-      };
-    }
-
-    const options = {
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      populate: 'court',
-      sort: { startTime: -1 },
-    };
-
-    const bookings = await Booking.paginate(query, options);
-    res.json(bookings);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
   }
 };
 
@@ -125,7 +81,6 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-//<<<<<<< fix/backend-syntax-errors//
         // CORRECCIÓN DEFINITIVA: Se construye la fecha de inicio y fin del día
         // manualmente para evitar cualquier interpretación incorrecta de la zona horaria.
         const [year, month, day] = date.split('T')[0].split('-').map(Number);
@@ -133,10 +88,6 @@ const getBookingAvailability = async (req, res) => {
         // Se crea el inicio del día en la zona horaria del servidor (que ya forzamos a ser la de Argentina).
         const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
         // Se crea el final del día.
-//=======//
-        const [year, month, day] = date.split('T')[0].split('-').map(Number);
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-//>>>>>>> main//
         const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
         const bookings = await Booking.find({
@@ -157,17 +108,7 @@ const getBookingAvailability = async (req, res) => {
 // @access  Operator/Admin
 const getBookings = async (req, res) => {
   try {
-    // NOTA: Se añade un filtro para no mostrar los turnos cancelados de hace más de 2 días.
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-
-    const bookings = await Booking.find({
-      $or: [
-        { status: { $ne: 'Cancelled' } },
-        { status: 'Cancelled', updatedAt: { $gte: twoDaysAgo } }
-      ]
-    }).populate('court', 'name courtType').sort({ startTime: -1 });
-
+    const bookings = await Booking.find({}).populate('court', 'name courtType').sort({ startTime: -1 });
     res.json(bookings);
   } catch (error) {
     console.error(error);
@@ -175,45 +116,24 @@ const getBookings = async (req, res) => {
   }
 };
 
-// @desc    Update a booking completely
-// @route   PUT /api/bookings/:id
+// @desc    Get a single booking by ID
+// @route   GET /api/bookings/:id
 // @access  Operator/Admin
-const updateBooking = async (req, res) => {
+const getBookingById = async (req, res) => {
   try {
-    const { courtId, user, startTime, endTime, price, status, isPaid, paymentMethod } = req.body;
-    const booking = await Booking.findById(req.params.id);
-
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
+    const booking = await Booking.findById(req.params.id).populate('court');
+    if (booking) {
+      res.json(booking);
+    } else {
+      res.status(404).json({ message: 'Booking not found' });
     }
-
-    booking.court = courtId || booking.court;
-    booking.user = user || booking.user;
-    booking.startTime = startTime || booking.startTime;
-    booking.endTime = endTime || booking.endTime;
-    booking.price = price !== undefined ? price : booking.price;
-    booking.status = status || booking.status;
-    booking.isPaid = isPaid !== undefined ? isPaid : booking.isPaid;
-    booking.paymentMethod = paymentMethod || booking.paymentMethod;
-
-    const updatedBooking = await booking.save();
-
-    const io = req.app.get('socketio');
-    io.emit('booking_update', updatedBooking);
-
-    const logDetails = `Booking ID ${updatedBooking._id} was updated.`;
-    await logActivity(req.user, 'BOOKING_UPDATED', logDetails);
-
-    res.json(updatedBooking);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-
-// @desc    Update booking status and payment
+// @desc    Update booking status
 // @route   PUT /api/bookings/:id/status
 // @access  Operator/Admin
 const updateBookingStatus = async (req, res) => {
@@ -222,8 +142,6 @@ const updateBookingStatus = async (req, res) => {
     if (booking) {
       booking.status = req.body.status || booking.status;
       booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
-      // NOTA: Se actualiza también el método de pago si se envía.
-      booking.paymentMethod = req.body.paymentMethod || booking.paymentMethod;
       
       const updatedBooking = await booking.save();
       
@@ -247,62 +165,33 @@ const updateBookingStatus = async (req, res) => {
 // @route   PUT /api/bookings/:id/cancel
 // @access  Operator/Admin
 const cancelBooking = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user._id;
+    try {
+        const booking = await Booking.findById(req.params.id);
+        if (booking) {
+            booking.status = 'Cancelled';
+            const updatedBooking = await booking.save();
 
-    const booking = await Booking.findById(id).populate('user');
-    if (!booking) {
-      return res.status(404).json({ message: 'Reserva no encontrada.' });
+            const io = req.app.get('socketio');
+            io.emit('booking_deleted', { id: req.params.id });
+
+            const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
+            await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
+
+            res.json({ message: 'Booking cancelled successfully' });
+        } else {
+            res.status(404).json({ message: 'Booking not found' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
-
-    const isOwner = booking.user && booking.user._id.toString() === userId.toString();
-    const isAdminOrOperator = req.user.role === 'Admin' || req.user.role === 'Operator';
-
-    if (!isOwner && !isAdminOrOperator) {
-      return res.status(403).json({ message: 'No tienes permiso para cancelar esta reserva.' });
-    }
-
-    if (new Date(booking.startTime) < new Date()) {
-      return res.status(400).json({ message: 'No se puede cancelar una reserva que ya ha pasado.' });
-    }
-
-    const policyHoursSetting = await Setting.findOne({ key: 'CANCELLATION_POLICY_HOURS' });
-    const penaltyPercentageSetting = await Setting.findOne({ key: 'CANCELLATION_PENALTY_PERCENTAGE' });
-
-    const cancellationHours = parseInt(policyHoursSetting?.value || '24', 10);
-    const penaltyPercentage = parseInt(penaltyPercentageSetting?.value || '0', 10);
-
-    const cancellationDeadline = subHours(new Date(booking.startTime), cancellationHours);
-    let finalPenalty = 0;
-
-    if (isBefore(new Date(), cancellationDeadline) || isAdminOrOperator) {
-        booking.status = 'Cancelled';
-        booking.cancellationReason = req.body.reason || 'Cancelación sin penalización.';
-    } else {
-        booking.status = 'Cancelled with Penalty';
-        finalPenalty = (booking.price * penaltyPercentage) / 100;
-        booking.penaltyAmount = finalPenalty;
-        booking.cancellationReason = req.body.reason || `Cancelación fuera de plazo. Penalización: $${finalPenalty}.`;
-    }
-
-    const updatedBooking = await booking.save();
-    const logDetails = `Booking ID ${updatedBooking._id} cancelled. Status: ${updatedBooking.status}. Penalty: ${finalPenalty}.`;
-    await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
-
-    res.json(updatedBooking);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
-  }
 };
 
 
 module.exports = {
   createBooking,
   getBookings,
-  getAllBookingsAdmin,
-  updateBooking,
+  getBookingById,
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,

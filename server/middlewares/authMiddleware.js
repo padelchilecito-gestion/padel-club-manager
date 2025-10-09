@@ -43,11 +43,4 @@ const admin = (req, res, next) => {
   }
 };
 
-const authorize = (roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
-    return res.status(403).json({ message: 'User role not authorized' });
-  }
-  next();
-};
-
-module.exports = { protect, admin, authorize };
+module.exports = { protect, admin };
