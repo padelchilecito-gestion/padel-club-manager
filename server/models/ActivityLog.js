@@ -16,6 +16,7 @@ const ActivityLogSchema = new mongoose.Schema({
     enum: [
       'USER_LOGIN',
       'USER_REGISTERED',
+      'USER_DELETED',
       'COURT_CREATED',
       'COURT_UPDATED',
       'COURT_DELETED',

@@ -63,7 +63,7 @@ const deleteUser = async (req, res) => {
                 return res.status(400).json({ message: 'Cannot delete the currently logged-in admin.' });
             }
             const deletedUsername = user.username;
-            await user.remove();
+            await user.deleteOne();
             
             const logDetails = `User '${deletedUsername}' was deleted by admin '${req.user.username}'.`;
             await logActivity(req.user, 'USER_DELETED', logDetails);
