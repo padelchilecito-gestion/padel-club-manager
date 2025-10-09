@@ -32,8 +32,6 @@ const configureCloudinary = async () => {
   }
 };
 
-configureCloudinary();
-
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
