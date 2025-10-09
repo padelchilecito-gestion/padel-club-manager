@@ -17,6 +17,10 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Court not found' });
     }
 
+//<<<<<<< fix/backend-syntax-errors//
+    // Las fechas ya vienen en formato ISO desde el frontend, se usan directamente.
+//=======//
+//>>>>>>> main//
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
@@ -37,12 +41,17 @@ const createBooking = async (req, res) => {
       return res.status(409).json({ message: 'The selected time slot is already booked.' });
     }
     
+//<<<<<<< fix/backend-syntax-errors//
+    const durationHours = (end - start) / (1000 * 60 * 60);
+    const price = durationHours * court.pricePerHour;
+//=======//
     // Si el precio no viene (desde el admin), se calcula.
     let finalPrice = price;
     if (finalPrice === undefined) {
       const durationHours = (end - start) / (1000 * 60 * 60);
       finalPrice = durationHours * court.pricePerHour;
     }
+//>>>>>>> main//
 
     const booking = new Booking({
       court: courtId,
@@ -116,8 +125,18 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
+//<<<<<<< fix/backend-syntax-errors//
+        // CORRECCIÓN DEFINITIVA: Se construye la fecha de inicio y fin del día
+        // manualmente para evitar cualquier interpretación incorrecta de la zona horaria.
+        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+
+        // Se crea el inicio del día en la zona horaria del servidor (que ya forzamos a ser la de Argentina).
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        // Se crea el final del día.
+//=======//
         const [year, month, day] = date.split('T')[0].split('-').map(Number);
         const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+//>>>>>>> main//
         const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
         const bookings = await Booking.find({
@@ -132,7 +151,6 @@ const getBookingAvailability = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
-
 
 // @desc    Get all bookings
 // @route   GET /api/bookings

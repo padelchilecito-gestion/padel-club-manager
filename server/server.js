@@ -10,12 +10,26 @@ const setupBookingReminders = require('./tasks/bookingReminders');
 const { configureCloudinary } = require('./config/cloudinaryConfig');
 
 const startServer = async () => {
+//<<<<<<< fix/backend-syntax-errors//
+  // Conectar a la base de datos primero
+  await connectDB();
+
+  // NOTA IMPORTANTE: Se establece la zona horaria de Argentina como principal.
+  // Esto es crucial para que todas las operaciones con fechas funcionen correctamente.
+  process.env.TZ = 'America/Argentina/Buenos_Aires';
+  console.log(`Timezone forced to: ${process.env.TZ}`);
+//=======//
   await connectDB();
   await configureCloudinary();
+//>>>>>>> main//
 
   const app = express();
   const server = http.createServer(app);
 
+//<<<<<<< fix/backend-syntax-errors//
+  // Configuración de CORS
+//=======//
+//>>>>>>> main//
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app',
@@ -29,18 +43,28 @@ const startServer = async () => {
         callback(new Error('Not allowed by CORS'));
       }
     },
+//<<<<<<< fix/backend-syntax-errors//
+    credentials: true,
+//=======//
     credentials: true
+//>>>>>>> main//
   };
 
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
+//<<<<<<< fix/backend-syntax-errors//
+  // Configuración de Socket.IO
+  const io = new Server(server, {
+    cors: corsOptions,
+//=======//
   const io = new Server(server, {
     cors: {
       origin: allowedOrigins,
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
+//>>>>>>> main//
   });
 
   app.set('socketio', io);
@@ -53,6 +77,11 @@ const startServer = async () => {
   });
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
+//<<<<<<< fix/backend-syntax-errors//
+
+  // Definir Rutas
+//=======//
+//>>>>>>> main//
   app.use('/api', apiRoutes);
 
   setupBookingReminders();
