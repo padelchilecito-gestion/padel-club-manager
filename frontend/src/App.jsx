@@ -1,41 +1,60 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 import HomePage from './pages/HomePage';
 import ShopPage from './pages/ShopPage';
+import GalleryPage from './pages/GalleryPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Navbar from './components/Navbar'; // Importa la nueva Navbar
+import Navbar from './components/Navbar';
 
-// Componente para el layout de las páginas públicas
 const PublicLayout = () => (
   <>
     <Navbar />
-    <Outlet /> {/* Aquí se renderizarán HomePage y ShopPage */}
+    <Outlet />
   </>
 );
 
 function App() {
   return (
-    <Routes>
-      {/* Rutas Públicas con Navbar */}
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
-      </Route>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/shop" element={<ShopPage />} />
+            <Route path="/gallery" element={<GalleryPage />} />
+          </Route>
 
-      {/* Rutas sin Navbar */}
-      <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-      {/* Rutas de Admin */}
-      <Route 
-        path="/admin/*" 
-        element={
-          <ProtectedRoute>
-            <AdminLayout />
-          </ProtectedRoute>
-        } 
-      />
-    </Routes>
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+        />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

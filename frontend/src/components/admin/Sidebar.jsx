@@ -11,6 +11,7 @@ import {
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 
 const navLinks = [
@@ -24,6 +25,7 @@ const navLinks = [
   { to: 'reports', text: 'Reportes', icon: DocumentChartBarIcon, role: ['Admin'] },
   { to: 'logs', text: 'Actividad', icon: ClipboardDocumentListIcon, role: ['Admin'] },
   { to: 'settings', text: 'Configuración', icon: Cog6ToothIcon, role: ['Admin'] },
+  { to: 'gallery', text: 'Galería de Fotos', icon: PhotoIcon, role: ['Admin'] },
 ];
 
 const Sidebar = () => {

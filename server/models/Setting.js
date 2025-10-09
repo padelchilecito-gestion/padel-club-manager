@@ -19,6 +19,8 @@ const SettingSchema = new mongoose.Schema({
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
+      'CANCELLATION_POLICY_HOURS',
+      'CANCELLATION_PENALTY_PERCENTAGE',
     ],
   },
   value: {
