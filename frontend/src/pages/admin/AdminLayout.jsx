@@ -11,6 +11,8 @@ import UsersPage from './UsersPage';
 import ReportsPage from './ReportsPage';
 import ActivityLogPage from './ActivityLogPage';
 import SettingsPage from './SettingsPage';
+import CashboxPage from './CashboxPage';
+import SalesHistoryPage from './SalesHistoryPage';
 
 // Import route protectors
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
@@ -34,9 +36,11 @@ const AdminLayout = () => {
             <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
             <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
             <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
+            <Route path="cashbox" element={<ProtectedRoute><CashboxPage /></ProtectedRoute>} />
 
             {/* Routes for Admin only */}
             <Route path="users" element={<AdminRoute><UsersPage /></AdminRoute>} />
+            <Route path="sales" element={<AdminRoute><SalesHistoryPage /></AdminRoute>} />
             <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
             <Route path="logs" element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
             <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />

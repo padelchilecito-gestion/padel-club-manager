@@ -11,16 +11,20 @@ import {
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
+  BuildingStorefrontIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 
 const navLinks = [
   { to: 'dashboard', text: 'Dashboard', icon: ChartBarIcon, role: ['Admin', 'Operator'] },
   { to: 'bookings', text: 'Turnos', icon: CalendarDaysIcon, role: ['Admin', 'Operator'] },
   { to: 'pos', text: 'Punto de Venta', icon: BanknotesIcon, role: ['Admin', 'Operator'] },
+  { to: 'cashbox', text: 'Caja', icon: BuildingStorefrontIcon, role: ['Admin', 'Operator'] },
   { to: 'inventory', text: 'Inventario', icon: ArchiveBoxIcon, role: ['Admin', 'Operator'] },
   { to: 'courts', text: 'Canchas', icon: ViewColumnsIcon, role: ['Admin', 'Operator'] },
   { type: 'divider', role: ['Admin'] },
   { to: 'users', text: 'Usuarios', icon: UsersIcon, role: ['Admin'] },
+  { to: 'sales', text: 'Ventas', icon: DocumentTextIcon, role: ['Admin'] },
   { to: 'reports', text: 'Reportes', icon: DocumentChartBarIcon, role: ['Admin'] },
   { to: 'logs', text: 'Actividad', icon: ClipboardDocumentListIcon, role: ['Admin'] },
   { to: 'settings', text: 'Configuración', icon: Cog6ToothIcon, role: ['Admin'] },

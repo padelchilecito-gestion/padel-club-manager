@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
+import PublicLayout from './components/layout/PublicLayout';
 import HomePage from './pages/HomePage';
 import ShopPage from './pages/ShopPage';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -9,8 +10,11 @@ function App() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<HomePage />} />
-      <Route path="/shop" element={<ShopPage />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/shop" element={<ShopPage />} />
+      </Route>
+
       <Route path="/login" element={<LoginPage />} />
 
       {/* Admin Routes */}
