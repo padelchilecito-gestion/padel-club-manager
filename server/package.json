@@ -2,10 +2,10 @@
   "name": "server",
   "version": "1.0.0",
   "description": "Backend for Padel Club Manager",
-  "main": "start.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node start.js",
-    "server": "nodemon start.js"
+    "start": "node server.js",
+    "server": "nodemon server.js"
   },
   "keywords": [],
   "author": "",

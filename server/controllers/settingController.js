@@ -26,9 +26,15 @@ const updateSettings = async (req, res) => {
 
     try {
         const promises = Object.keys(settings).map(key => {
+            const updateData = { value: settings[key] };
+            // Defensively check for req.user to prevent crash if it's missing
+            if (req.user && req.user.id) {
+                updateData.lastUpdatedBy = req.user.id;
+            }
+
             return Setting.findOneAndUpdate(
                 { key },
-                { value: settings[key], lastUpdatedBy: req.user.id },
+                updateData,
                 { new: true, upsert: true, runValidators: true } // upsert: create if not found
             );
         });
