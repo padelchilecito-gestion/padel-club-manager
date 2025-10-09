@@ -3,43 +3,20 @@ const router = express.Router();
 const {
   createBooking,
   getBookings,
-  getBookingById,
+  updateBooking,
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
+  getAllBookingsAdmin,
 } = require('../controllers/bookingController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, authorize } = require('../middlewares/authMiddleware');
 
-// @route   POST api/bookings
-// @desc    Create a new booking
-// @access  Public
-router.post('/', createBooking);
-
-// @route   GET api/bookings/availability
-// @desc    Get availability for a specific date
-// @access  Public
+router.post('/', protect, createBooking);
 router.get('/availability', getBookingAvailability);
-console.log('[Routes] Booking route /availability registered.');
-
-// @route   GET api/bookings
-// @desc    Get all bookings
-// @access  Operator/Admin
 router.get('/', protect, getBookings);
-
-// @route   GET api/bookings/:id
-// @desc    Get a single booking by ID
-// @access  Operator/Admin
-router.get('/:id', protect, getBookingById);
-
-// @route   PUT api/bookings/:id/status
-// @desc    Update booking status (confirm, etc.)
-// @access  Operator/Admin
+router.get('/admin', protect, authorize(['Admin', 'Operator']), getAllBookingsAdmin);
+router.put('/:id', protect, updateBooking);
 router.put('/:id/status', protect, updateBookingStatus);
-
-// @route   PUT api/bookings/:id/cancel
-// @desc    Cancel a booking
-// @access  Operator/Admin
 router.put('/:id/cancel', protect, cancelBooking);
-
 
 module.exports = router;

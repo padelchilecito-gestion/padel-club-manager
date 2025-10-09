@@ -11,6 +11,7 @@ import {
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 
 const navLinks = [
@@ -24,6 +25,7 @@ const navLinks = [
   { to: 'reports', text: 'Reportes', icon: DocumentChartBarIcon, role: ['Admin'] },
   { to: 'logs', text: 'Actividad', icon: ClipboardDocumentListIcon, role: ['Admin'] },
   { to: 'settings', text: 'Configuración', icon: Cog6ToothIcon, role: ['Admin'] },
+  { to: 'gallery', text: 'Galería de Fotos', icon: PhotoIcon, role: ['Admin'] },
 ];
 
 const Sidebar = () => {
@@ -45,7 +47,7 @@ const Sidebar = () => {
             if (link.type === 'divider') {
               return isAdmin ? <li key={index}><hr className="my-4 border-gray-700" /></li> : null;
             }
-            
+
             if (!link.role.includes(isAdmin ? 'Admin' : 'Operator')) {
               return null;
             }

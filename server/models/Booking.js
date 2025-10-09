@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const mongoosePaginate = require('mongoose-paginate-v2');
 
 const BookingSchema = new mongoose.Schema({
   court: {
@@ -24,7 +25,7 @@ const BookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'Confirmed', 'Cancelled'],
+    enum: ['Pending', 'Confirmed', 'Cancelled', 'Cancelled with Penalty', 'Finalizado'],
     default: 'Pending',
   },
   isPaid: {
@@ -33,8 +34,15 @@ const BookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Efectivo', 'Mercado Pago', 'Otro'],
+    enum: ['Efectivo', 'Mercado Pago', 'Otro', 'Transferencia', 'QR'],
     default: 'Efectivo',
+  },
+  cancellationReason: {
+      type: String,
+  },
+  penaltyAmount: {
+      type: Number,
+      default: 0
   },
   createdAt: {
     type: Date,
@@ -42,7 +50,11 @@ const BookingSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Index to prevent double booking on the same court at the same time
-BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
+BookingSchema.plugin(mongoosePaginate);
+
+// Indexes
+BookingSchema.index({ startTime: 1, court: 1 });
+BookingSchema.index({ 'user.phone': 1 });
+BookingSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Booking', BookingSchema);

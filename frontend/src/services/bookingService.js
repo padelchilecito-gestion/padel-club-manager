@@ -60,13 +60,20 @@ const cancelBooking = async (id) => {
         console.error('Error cancelling booking:', error);
         throw error.response?.data || error;
     }
-}
+};
+
+const getAllBookingsAdmin = async (page = 1, limit = 10, filters = {}) => {
+    const params = { page, limit, ...filters };
+    const response = await apiClient.get('/bookings/admin', { params });
+    return response.data;
+};
 
 export const bookingService = {
   getAvailability,
   createBooking,
   createPaymentPreference,
   getAllBookings,
+  getAllBookingsAdmin,
   updateBookingStatus,
   cancelBooking,
 };
