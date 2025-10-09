@@ -68,6 +68,7 @@ const receiveWebhook = async (req, res) => {
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
             
+            // Emit a real-time event
             const io = req.app.get('socketio');
             io.emit('booking_update', booking);
           }
@@ -75,13 +76,16 @@ const receiveWebhook = async (req, res) => {
 
         // Check if it's a POS sale payment
         if (metadata && metadata.sale_items) {
+          // This is a simplified flow. A real-world scenario might pre-create the sale as 'Pending'.
+          // Here, we create the sale and update stock upon payment confirmation.
           const saleData = {
             items: metadata.sale_items,
             total: payment.transaction_amount,
             paymentMethod: 'Mercado Pago',
-            user: metadata.user_id,
+            user: metadata.user_id, // We must pass the operator's ID in metadata
           };
           
+          // Using the same atomic transaction logic as in saleController
           const session = await mongoose.startSession();
           session.startTransaction();
           try {

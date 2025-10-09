@@ -1,230 +1,137 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
-import { toast } from 'react-toastify';
-import ConfirmationModal from '../../components/common/ConfirmationModal';
+import socket from '../../services/socketService';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { courtService } from '../../services/courtService';
+import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showConfirmCancelModal, setShowConfirmCancelModal] = useState(false);
-  const [bookingToCancel, setBookingToCancel] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [bookingToPay, setBookingToPay] = useState(null);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterCourt, setFilterCourt] = useState('');
-  const [filterDate, setFilterDate] = useState('');
-  const [courts, setCourts] = useState([]);
-
-  const fetchBookings = useCallback(async () => {
-    try {
-      setLoading(true);
-      const filters = {
-        status: filterStatus,
-        courtId: filterCourt,
-        date: filterDate,
-      };
-      const data = await bookingService.getAllBookingsAdmin(currentPage, limit, filters);
-      setBookings(data.docs);
-      setTotalPages(data.totalPages);
-    } catch (err) {
-      setError('Error al cargar las reservas.');
-      toast.error('Error al cargar las reservas.');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, limit, filterStatus, filterCourt, filterDate]);
 
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+    socket.connect();
 
-  useEffect(() => {
-    const loadCourts = async () => {
+    const fetchBookings = async () => {
       try {
-        const data = await courtService.getAllCourts();
-        setCourts(data);
+        setLoading(true);
+        const data = await bookingService.getAllBookings();
+        setBookings(data);
       } catch (err) {
-        console.error("Error loading courts for filter:", err);
+        setError('No se pudieron cargar las reservas.');
+      } finally {
+        setLoading(false);
       }
     };
-    loadCourts();
+
+    fetchBookings();
+
+    const handleBookingUpdate = (updatedBooking) => {
+        setBookings(prevBookings => {
+            const index = prevBookings.findIndex(b => b._id === updatedBooking._id);
+            if (index !== -1) {
+                const newBookings = [...prevBookings];
+                newBookings[index] = updatedBooking;
+                return newBookings;
+            } else {
+                return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+            }
+        });
+    };
+
+    const handleBookingDelete = ({ id }) => {
+        setBookings(prevBookings => prevBookings.filter(b => b._id !== id));
+    };
+
+    socket.on('booking_update', handleBookingUpdate);
+    socket.on('booking_deleted', handleBookingDelete);
+
+    return () => {
+      socket.off('booking_update', handleBookingUpdate);
+      socket.off('booking_deleted', handleBookingDelete);
+      socket.disconnect();
+    };
   }, []);
 
-  const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
+  const handleUpdateStatus = async (id, newStatus, isPaid) => {
     try {
-        const updatedBooking = await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
-        setBookings(prevBookings =>
-            prevBookings.map(b => b._id === id ? updatedBooking : b)
-        );
-        toast.success('Estado de reserva actualizado.');
+        await bookingService.updateBookingStatus(id, { status: newStatus, isPaid });
     } catch (err) {
-        toast.error('Error al actualizar la reserva.');
+        alert('Error al actualizar la reserva.');
     }
   };
 
   const handleCancel = async (id) => {
-    try {
-        const updatedBooking = await bookingService.cancelBooking(id);
-        setBookings(prevBookings =>
-            prevBookings.map(b => b._id === id ? updatedBooking : b)
-        );
-        toast.success('Reserva cancelada exitosamente.');
-        fetchBookings();
-    } catch (err) {
-        toast.error('Error al cancelar la reserva.');
-    }
+      if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
+          try {
+              await bookingService.cancelBooking(id);
+          } catch (err) {
+              alert('Error al cancelar la reserva.');
+          }
+      }
   };
 
-  const confirmCancel = async () => {
-    if (bookingToCancel) {
-      await handleCancel(bookingToCancel._id);
-      setShowConfirmCancelModal(false);
-      setBookingToCancel(null);
-    }
-  };
-
-  const goToPage = (pageNumber) => {
-    if (pageNumber > 0 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-    }
-  };
+  if (loading) return <div className="text-center p-8">Cargando reservas...</div>;
+  if (error) return <div className="text-center p-8 text-danger">{error}</div>;
 
   return (
-    <div className="container mx-auto p-4 bg-dark-secondary rounded-lg shadow-lg">
-      <h2 className="text-3xl font-bold text-primary mb-6">Gestión de Turnos</h2>
-
-      <div className="bg-dark-primary p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label htmlFor="filterStatus" className="block text-sm font-medium text-text-secondary mb-1">Estado</label>
-          <select
-            id="filterStatus"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full bg-dark-secondary border border-gray-600 rounded-md p-2 text-text-primary"
-          >
-            <option value="">Todos</option>
-            <option value="Confirmed">Confirmado</option>
-            <option value="Pending">Pendiente</option>
-            <option value="Cancelled">Cancelado</option>
-            <option value="Finalizado">Finalizado</option>
-            <option value="Cancelled with Penalty">Cancelado con Penalización</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="filterCourt" className="block text-sm font-medium text-text-secondary mb-1">Cancha</label>
-          <select
-            id="filterCourt"
-            value={filterCourt}
-            onChange={(e) => setFilterCourt(e.target.value)}
-            className="w-full bg-dark-secondary border border-gray-600 rounded-md p-2 text-text-primary"
-          >
-            <option value="">Todas</option>
-            {courts.map(court => (
-              <option key={court._id} value={court._id}>{court.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="filterDate" className="block text-sm font-medium text-text-secondary mb-1">Fecha</label>
-          <input
-            type="date"
-            id="filterDate"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-            className="w-full bg-dark-secondary border border-gray-600 rounded-md p-2 text-text-primary"
-          />
-        </div>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary">Gestión de Turnos</h1>
       </div>
 
-      {error && <p className="text-danger mb-4">{error}</p>}
-
-      {loading ? (
-        <p className="text-text-secondary">Cargando reservas...</p>
-      ) : bookings.length === 0 ? (
-        <p className="text-text-secondary">No hay reservas para mostrar.</p>
-      ) : (
-        <div className="space-y-4">
-          {bookings.map((booking) => (
-            <div key={booking._id} className="bg-dark-primary p-4 rounded-lg shadow flex flex-col md:flex-row justify-between items-center">
-              <div className="text-text-primary text-center md:text-left mb-2 md:mb-0 flex-1">
-                <p className="font-semibold text-lg">{booking.court?.name || 'Cancha Desconocida'}</p>
-                <p className="text-sm">
-                  {format(new Date(booking.startTime), 'dd/MM/yyyy HH:mm', { locale: es })} - {format(new Date(booking.endTime), 'HH:mm', { locale: es })}
-                </p>
-                <p className="text-sm">Usuario: {booking.user?.name || booking.user?.username || 'Invitado'}</p>
-                <p className="text-sm">Teléfono: {booking.user?.phone || 'N/A'}</p>
-                <p className={`text-sm ${booking.status === 'Cancelled' || booking.status === 'Cancelled with Penalty' ? 'text-danger' : 'text-primary'}`}>
-                  Estado: {booking.status}
-                  {booking.status === 'Cancelled with Penalty' && booking.penaltyAmount && ` ($${booking.penaltyAmount.toFixed(2)} penalización)`}
-                </p>
-                <p className="text-sm">Método de pago: {booking.paymentMethod}</p>
-              </div>
-              <div className="flex flex-wrap justify-center md:justify-end gap-2">
-                {booking.status === 'Pending' && (
-                  <button
-                    onClick={() => { setBookingToPay(booking); setShowPaymentModal(true); }}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors"
-                  >
-                    Registrar Pago
-                  </button>
-                )}
-                {(booking.status === 'Confirmed' || booking.status === 'Pending') && (
-                  <button
-                    onClick={() => { setBookingToCancel(booking); setShowConfirmCancelModal(true); }}
-                    className="bg-danger hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-6 space-x-2">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-4 py-2 bg-dark-primary text-text-primary rounded-md disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          {[...Array(totalPages)].map((_, index) => (
-            <button
-              key={index + 1}
-              onClick={() => goToPage(index + 1)}
-              className={`px-4 py-2 rounded-md ${currentPage === index + 1 ? 'bg-primary text-white' : 'bg-dark-primary text-text-primary hover:bg-primary-dark'}`}
-            >
-              {index + 1}
-            </button>
-          ))}
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-4 py-2 bg-dark-primary text-text-primary rounded-md disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
-
-      <ConfirmationModal
-        show={showConfirmCancelModal}
-        onClose={() => setShowConfirmCancelModal(false)}
-        onConfirm={confirmCancel}
-        title="Confirmar Cancelación"
-        message={`¿Estás seguro de que quieres cancelar la reserva para el ${bookingToCancel ? format(new Date(bookingToCancel.startTime), 'dd/MM HH:mm') : ''} en la ${bookingToCancel?.court?.name || 'cancha desconocida'}?`}
-      />
+      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
+        <table className="w-full text-sm text-left text-text-secondary">
+          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
+            <tr>
+              <th scope="col" className="px-6 py-3">Cliente</th>
+              <th scope="col" className="px-6 py-3">Cancha</th>
+              <th scope="col" className="px-6 py-3">Horario</th>
+              <th scope="col" className="px-6 py-3">Estado</th>
+              <th scope="col" className="px-6 py-3">Pago</th>
+              <th scope="col" className="px-6 py-3">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.map((booking) => (
+              <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
+                <td className="px-6 py-4 font-medium text-text-primary">{booking.user.name}</td>
+                <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
+                <td className="px-6 py-4">
+                    {format(new Date(booking.startTime), 'dd/MM/yyyy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
+                </td>
+                <td className="px-6 py-4">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
+                        booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
+                    }`}>
+                        {booking.status}
+                    </span>
+                </td>
+                <td className="px-6 py-4">
+                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-500 text-white'
+                    }`}>
+                        {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
+                    </span>
+                </td>
+                <td className="px-6 py-4 flex items-center gap-2">
+                    {!booking.isPaid && booking.status === 'Confirmed' && (
+                         <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-secondary hover:text-green-400" title="Marcar como Pagado">
+                            <CurrencyDollarIcon className="h-5 w-5" />
+                        </button>
+                    )}
+                    {booking.status === 'Confirmed' && (
+                         <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
+                            <XCircleIcon className="h-5 w-5" />
+                        </button>
+                    )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
