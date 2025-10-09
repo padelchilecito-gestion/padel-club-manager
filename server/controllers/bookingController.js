@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
+const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
@@ -81,19 +82,21 @@ const getBookingAvailability = async (req, res) => {
     }
 
     try {
-        // CORRECCIÓN DEFINITIVA: Se construye la fecha de inicio y fin del día
-        // manualmente para evitar cualquier interpretación incorrecta de la zona horaria.
-        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+        // Use date-fns-tz for robust timezone handling
+        const timeZone = 'America/Argentina/Buenos_Aires';
+        const dateStr = date.split('T')[0];
 
-        // Se crea el inicio del día en la zona horaria del servidor (que ya forzamos a ser la de Argentina).
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-        // Se crea el final del día.
-        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+        // The provided date string is treated as a date in the target timezone.
+        // We get the start of that day in that timezone, and convert it to a UTC Date object.
+        const startOfDayUTC = zonedTimeToUtc(dateStr, timeZone);
+
+        // To get the end of the day, we do the same with the end-of-day time.
+        const endOfDayUTC = zonedTimeToUtc(`${dateStr}T23:59:59.999`, timeZone);
 
         const bookings = await Booking.find({
             court: courtId,
             status: { $ne: 'Cancelled' },
-            startTime: { $gte: startOfDay, $lte: endOfDay },
+            startTime: { $gte: startOfDayUTC, $lte: endOfDayUTC },
         }).select('startTime endTime');
 
         res.json(bookings);
