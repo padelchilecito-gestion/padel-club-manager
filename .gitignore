@@ -31,4 +31,4 @@ frontend/.env
 .DS_Store
 .idea/
 .vscode/
-jules-scratch/
+jules-scratch/server/.env
