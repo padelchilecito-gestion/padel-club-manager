@@ -9,7 +9,7 @@ const CashboxPage = () => {
   const fetchCurrentSession = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/cashbox/session');
+      const { data } = await api.get('/cashbox/current');
       setSession(data);
       setError(null);
     } catch (err) {
@@ -31,7 +31,7 @@ const CashboxPage = () => {
     const initialBalance = prompt('Ingrese el saldo inicial:');
     if (initialBalance) {
       try {
-        const { data } = await api.post('/cashbox/open', { initialBalance: parseFloat(initialBalance) });
+        const { data } = await api.post('/cashbox/start', { initialBalance: parseFloat(initialBalance) });
         setSession(data);
         setError(null);
       } catch (err) {
