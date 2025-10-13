@@ -1,9 +1,9 @@
 import apiClient from './api';
 
-const getAvailability = async (courtId, date) => {
+const getAvailability = async (date) => {
   try {
     const response = await apiClient.get('/bookings/availability', {
-      params: { courtId, date },
+      params: { date },
     });
     return response.data;
   } catch (error) {
