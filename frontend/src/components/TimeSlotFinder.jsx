@@ -113,6 +113,17 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
         }
     };
 
+    const DiagnosticPanel = () => (
+        <div className="mt-8 p-4 border border-dashed border-yellow-500 rounded-lg bg-gray-800 text-white font-mono text-xs">
+            <h3 className="font-bold text-yellow-400 mb-2">--- Panel de Diagnóstico ---</h3>
+            <p><strong>Error State:</strong> {JSON.stringify(error, null, 2)}</p>
+            <p><strong>Loading State:</strong> {JSON.stringify(loading)}</p>
+            <p><strong>Club Settings Loaded:</strong> {clubSettings ? 'Sí' : 'No'}</p>
+            <p><strong>Courts Loaded:</strong> {allCourts.length}</p>
+            <p><strong>Time Slots Generated:</strong> {timeSlots.length}</p>
+        </div>
+    );
+
     return (
         <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
             <div className="mb-6">
@@ -156,6 +167,8 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
                     );
                 })}
             </div>
+            {/* Render the diagnostic panel */}
+            <DiagnosticPanel />
         </div>
     );
 };
