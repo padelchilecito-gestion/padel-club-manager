@@ -118,9 +118,9 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
             <h3 className="font-bold text-yellow-400 mb-2">--- Panel de Diagnóstico ---</h3>
             <p><strong>Error State:</strong> {JSON.stringify(error, null, 2)}</p>
             <p><strong>Loading State:</strong> {JSON.stringify(loading)}</p>
-            <p><strong>Club Settings Loaded:</strong> {clubSettings ? 'Sí' : 'No'}</p>
             <p><strong>Courts Loaded:</strong> {allCourts.length}</p>
             <p><strong>Time Slots Generated:</strong> {timeSlots.length}</p>
+            <pre className="mt-2"><strong>Club Settings Object:</strong> {JSON.stringify(clubSettings, null, 2)}</pre>
         </div>
     );
 
