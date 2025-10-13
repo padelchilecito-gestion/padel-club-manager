@@ -72,7 +72,7 @@ const TimeSlotFinder = () => {
             try {
                 setLoading(true);
                 setError('');
-                const date = new Date(selectedDate);
+                const date = new Date(selectedDate + 'T00:00:00');
                 const data = await bookingService.getAvailability(selectedCourt, date.toISOString());
                 setBookedSlots(data);
             } catch (err) {
@@ -87,7 +87,7 @@ const TimeSlotFinder = () => {
     useEffect(() => {
         if (!clubSettings) return;
 
-        const date = new Date(selectedDate);
+        const date = new Date(selectedDate + 'T00:00:00');
         const dayOfWeek = getDay(date); // Domingo = 0, Sábado = 6
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
