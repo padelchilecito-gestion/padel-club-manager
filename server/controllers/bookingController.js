@@ -86,8 +86,6 @@ const getBookingAvailability = async (req, res) => {
         const endDate = new Date(date);
         endDate.setHours(23, 59, 59, 999);
 
-        console.log(`Buscando disponibilidad entre ${startDate.toISOString()} y ${endDate.toISOString()}`);
-
         const bookings = await Booking.find({
             startTime: {
                 $gte: startDate,
@@ -98,13 +96,8 @@ const getBookingAvailability = async (req, res) => {
         res.status(200).json(bookings);
 
     } catch (error) {
-        // ---- LOG MEJORADO ----
-        console.error("¡CRASH EN getAvailability!", error); // Imprime el error completo en los logs
-        res.status(500).json({
-            message: 'Error interno al obtener la disponibilidad.',
-            error: error.message, // Devuelve el mensaje de error específico
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
