@@ -32,6 +32,7 @@ const startServer = async () => {
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
+        console.error(`CORS error: Origin ${origin} not allowed.`); // Log the rejected origin
         callback(new Error('Not allowed by CORS'));
       }
     },
