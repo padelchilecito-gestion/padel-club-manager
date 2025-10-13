@@ -18,6 +18,7 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
         const fetchInitialData = async () => {
             try {
                 setLoading(true);
+                setError(''); // Reset error on new fetch
                 const [settingsData, courtsData] = await Promise.all([
                     settingService.getSettings(),
                     courtService.getAllCourts()
@@ -67,8 +68,8 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
 
             const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10);
             const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10);
-            // Using 30 minutes as the slot duration, as requested
-            const slotDuration = 30;
+            // Use the slot duration from the settings
+            const slotDuration = parseInt(clubSettings.SLOT_DURATION, 10) || 30;
 
             const slots = [];
             let currentTime = setMinutes(setHours(startOfDay(date), openingHour), 0);
