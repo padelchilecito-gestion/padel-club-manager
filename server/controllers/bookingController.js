@@ -72,37 +72,39 @@ const createBooking = async (req, res) => {
   }
 };
 
-// @desc    Get availability for a court on a specific date
-// @route   GET /api/bookings/availability
-// @access  Public
 const getBookingAvailability = async (req, res) => {
-    const { courtId, date } = req.query;
-    if (!courtId || !date) {
-        return res.status(400).json({ message: 'Court ID and date are required.' });
-    }
-
     try {
-        // Use date-fns-tz for robust timezone handling
-        const timeZone = 'America/Argentina/Buenos_Aires';
-        const dateStr = date.split('T')[0];
+        const { date } = req.query;
+        if (!date) {
+            console.error("Error en getAvailability: No se proporcionó fecha.");
+            return res.status(400).json({ message: 'La fecha es requerida' });
+        }
 
-        // The provided date string is treated as a date in the target timezone.
-        // We get the start of that day in that timezone, and convert it to a UTC Date object.
-        const startOfDayUTC = zonedTimeToUtc(dateStr, timeZone);
+        const startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
 
-        // To get the end of the day, we do the same with the end-of-day time.
-        const endOfDayUTC = zonedTimeToUtc(`${dateStr}T23:59:59.999`, timeZone);
+        const endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
+
+        console.log(`Buscando disponibilidad entre ${startDate.toISOString()} y ${endDate.toISOString()}`);
 
         const bookings = await Booking.find({
-            court: courtId,
-            status: { $ne: 'Cancelled' },
-            startTime: { $gte: startOfDayUTC, $lte: endOfDayUTC },
-        }).select('startTime endTime');
+            startTime: {
+                $gte: startDate,
+                $lt: endDate
+            }
+        }).populate('court');
 
-        res.json(bookings);
+        res.status(200).json(bookings);
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        // ---- LOG MEJORADO ----
+        console.error("¡CRASH EN getAvailability!", error); // Imprime el error completo en los logs
+        res.status(500).json({
+            message: 'Error interno al obtener la disponibilidad.',
+            error: error.message, // Devuelve el mensaje de error específico
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 
