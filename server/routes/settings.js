@@ -5,8 +5,8 @@ const { protect, admin } = require('../middlewares/authMiddleware');
 
 // @route   GET api/settings
 // @desc    Get all settings
-// @access  Admin
-router.get('/', protect, admin, getSettings);
+// @access  Public (originally Admin)
+router.get('/', getSettings);
 
 // @route   PUT api/settings
 // @desc    Update settings
