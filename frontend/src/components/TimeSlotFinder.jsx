@@ -3,7 +3,7 @@ import { bookingService } from '../services/bookingService';
 import { courtService } from '../services/courtService';
 import { settingService } from '../services/settingService';
 import { format, getDay, addMinutes, setHours, setMinutes, startOfDay, isToday } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
+import { utcToZonedTime } from 'date-fns-tz/utc';
 
 const TimeSlotFinder = ({ onTimeSelect }) => {
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
