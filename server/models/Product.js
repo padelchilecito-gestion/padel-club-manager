@@ -34,6 +34,10 @@ const ProductSchema = new mongoose.Schema({
     type: Number,
     default: 5,
   },
+  showInShop: {
+    type: Boolean,
+    default: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

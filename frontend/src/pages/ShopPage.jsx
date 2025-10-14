@@ -11,24 +11,20 @@ const ShopPage = () => {
 
   const categories = ['Todos', 'Bebidas', 'Snacks', 'Accesorios', 'Ropa'];
 
-  // Mock data
   useEffect(() => {
-    const mockProducts = [
-      { id: 1, name: 'Gatorade', category: 'Bebidas', price: 800, stock: 25, image: '🥤' },
-      { id: 2, name: 'Agua Mineral', category: 'Bebidas', price: 500, stock: 30, image: '💧' },
-      { id: 3, name: 'Coca Cola', category: 'Bebidas', price: 700, stock: 20, image: '🥤' },
-      { id: 4, name: 'Red Bull', category: 'Bebidas', price: 1200, stock: 15, image: '🥫' },
-      { id: 5, name: 'Papas Fritas', category: 'Snacks', price: 600, stock: 40, image: '🍟' },
-      { id: 6, name: 'Barras de Cereal', category: 'Snacks', price: 450, stock: 35, image: '🍫' },
-      { id: 7, name: 'Chocolate', category: 'Snacks', price: 800, stock: 25, image: '🍫' },
-      { id: 8, name: 'Paleta de Padel Pro', category: 'Accesorios', price: 35000, stock: 5, image: '🎾' },
-      { id: 9, name: 'Pelotas Pack x3', category: 'Accesorios', price: 3500, stock: 15, image: '⚾' },
-      { id: 10, name: 'Grip Antideslizante', category: 'Accesorios', price: 1200, stock: 20, image: '🎯' },
-      { id: 11, name: 'Remera Deportiva', category: 'Ropa', price: 8000, stock: 12, image: '👕' },
-      { id: 12, name: 'Short Deportivo', category: 'Ropa', price: 7500, stock: 10, image: '🩳' },
-    ];
-    setProducts(mockProducts);
-    setFilteredProducts(mockProducts);
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const data = await productService.getAllProducts(true); // Fetch only visible products
+        setProducts(data);
+        setFilteredProducts(data);
+      } catch (err) {
+        setError('No se pudieron cargar los productos.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
   }, []);
 
   useEffect(() => {

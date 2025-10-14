@@ -18,16 +18,37 @@ const authUser = async (req, res) => {
   try {
     const user = await User.findOne({ username });
 
-    if (user && (await user.matchPassword(password))) {
-      // Log the activity
-      await logActivity(user, 'USER_LOGIN', `User '${user.username}' logged in.`);
+    if (user) {
+      const isMatch = await user.matchPassword(password);
+      if (isMatch) {
+        // Lógica actual, todo OK
+        await logActivity(user, 'USER_LOGIN', `User '${user.username}' logged in.`);
+        res.json({
+          _id: user._id,
+          username: user.username,
+          role: user.role,
+          token: generateToken(user._id, user.role, user.username),
+        });
+      } else {
+        // *** INICIO DE LÓGICA DE MIGRACIÓN ***
+        // ¡ESTO ES INSEGURO Y TEMPORAL! Asume que la contraseña antigua era texto plano.
+        if (user.password === password) {
+          user.password = password; // Al guardar, el hook pre-save lo hasheará
+          await user.save();
+          await logActivity(user, 'PASSWORD_MIGRATED', `Password for user '${user.username}' was migrated to a new hash.`);
 
-      res.json({
-        _id: user._id,
-        username: user.username,
-        role: user.role,
-        token: generateToken(user._id, user.role, user.username),
-      });
+          // Procede con el login normal
+          res.json({
+            _id: user._id,
+            username: user.username,
+            role: user.role,
+            token: generateToken(user._id, user.role, user.username),
+          });
+        } else {
+          res.status(401).json({ message: 'Usuario o contraseña inválidos' });
+        }
+        // *** FIN DE LÓGICA DE MIGRACIÓN ***
+      }
     } else {
       res.status(401).json({ message: 'Invalid username or password' });
     }
