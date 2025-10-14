@@ -4,89 +4,33 @@ import { courtService } from '../services/courtService';
 import { settingService } from '../services/settingService';
 import { format, getDay, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
 
-const TimeSlotFinder = ({ onTimeSelect }) => {
+const TimeSlotFinder = ({ courts, settings = {}, onSelectSlot }) => {
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [allBookings, setAllBookings] = useState([]);
-    const [allCourts, setAllCourts] = useState([]);
     const [timeSlots, setTimeSlots] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [clubSettings, setClubSettings] = useState(null);
 
-    // 1. Fetch initial static data (courts and settings)
+    // Generate time slots
+    const generateTimeSlots = useMemo(() => {
+        const { minTime = '09:00', maxTime = '22:00', slotDuration = 60 } = settings;
+        const slots = [];
+        let [startHour, startMinute] = minTime.split(':').map(Number);
+        let [endHour, endMinute] = maxTime.split(':').map(Number);
+
+        let currentTime = setMinutes(setHours(startOfDay(new Date(selectedDate)), startHour), startMinute);
+        const endTime = setMinutes(setHours(startOfDay(new Date(selectedDate)), endHour), endMinute);
+
+        while (currentTime < endTime) {
+            slots.push(new Date(currentTime));
+            currentTime = addMinutes(currentTime, slotDuration);
+        }
+        return slots;
+    }, [selectedDate, settings]);
+
     useEffect(() => {
-        const fetchInitialData = async () => {
-            try {
-                setLoading(true);
-                setError(''); // Reset error on new fetch
-                const [settingsData, courtsData] = await Promise.all([
-                    settingService.getSettings(),
-                    courtService.getAllCourts()
-                ]);
-                setClubSettings(settingsData);
-                setAllCourts(courtsData.filter(c => c.isActive));
-            } catch (err) {
-                setError('No se pudieron cargar los datos iniciales.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchInitialData();
-    }, []);
-
-    // 2. Fetch availability (bookings) when date changes
-    useEffect(() => {
-        if (!selectedDate) return;
-
-        const fetchAvailability = async () => {
-            try {
-                setLoading(true);
-                setError('');
-                // The crucial timezone fix is applied here
-                const date = new Date(selectedDate + 'T00:00:00');
-                const data = await bookingService.getAvailability(date.toISOString());
-                setAllBookings(data);
-            } catch (err) {
-                setError('No se pudo cargar la disponibilidad para la fecha seleccionada.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAvailability();
-    }, [selectedDate]);
-
-    // 3. Generate time slots based on settings and date
-    useEffect(() => {
-        if (!clubSettings) return;
-
-        const generateTimeSlots = () => {
-            const date = new Date(selectedDate + 'T00:00:00');
-            const dayOfWeek = getDay(date);
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-            const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10);
-            const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10);
-            // Use the slot duration from the settings
-            const slotDuration = parseInt(clubSettings.SLOT_DURATION, 10) || 30;
-
-            const slots = [];
-            let currentTime = setMinutes(setHours(startOfDay(date), openingHour), 0);
-            const endTime = setMinutes(setHours(startOfDay(date), closingHour), 0);
-            const now = new Date();
-
-            while (currentTime < endTime) {
-                if (currentTime > now) { // Only show future slots
-                    slots.push(currentTime);
-                }
-                currentTime = addMinutes(currentTime, slotDuration);
-            }
-            setTimeSlots(slots);
-        };
-
-        generateTimeSlots();
-    }, [selectedDate, clubSettings]);
+        setTimeSlots(generateTimeSlots);
+    }, [generateTimeSlots]);
 
     // Memoized calculation to find available courts for a given time slot
     const getAvailableCourtsForSlot = useMemo(() => {
@@ -108,21 +52,10 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
 
     // Handler to pass selected data to the parent component
     const handleCourtSelection = (court, time) => {
-        if (onTimeSelect) {
-            onTimeSelect(court, time, selectedDate);
+        if (onSelectSlot) {
+            onSelectSlot({ court, time, date: selectedDate });
         }
     };
-
-    const DiagnosticPanel = () => (
-        <div className="mt-8 p-4 border border-dashed border-yellow-500 rounded-lg bg-gray-800 text-white font-mono text-xs">
-            <h3 className="font-bold text-yellow-400 mb-2">--- Panel de Diagnóstico ---</h3>
-            <p><strong>Error State:</strong> {JSON.stringify(error, null, 2)}</p>
-            <p><strong>Loading State:</strong> {JSON.stringify(loading)}</p>
-            <p><strong>Courts Loaded:</strong> {allCourts.length}</p>
-            <p><strong>Time Slots Generated:</strong> {timeSlots.length}</p>
-            <pre className="mt-2"><strong>Club Settings Object:</strong> {JSON.stringify(clubSettings, null, 2)}</pre>
-        </div>
-    );
 
     return (
         <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
@@ -167,8 +100,6 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
                     );
                 })}
             </div>
-            {/* Render the diagnostic panel */}
-            <DiagnosticPanel />
         </div>
     );
 };

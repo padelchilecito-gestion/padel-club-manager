@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
 import { format } from 'date-fns';
@@ -8,6 +9,7 @@ const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const location = useLocation();
 
   useEffect(() => {
     socket.connect();
@@ -51,7 +53,7 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, []);
+  }, [location.pathname]);
 
   const handleUpdateStatus = async (id, newStatus, isPaid) => {
     try {
