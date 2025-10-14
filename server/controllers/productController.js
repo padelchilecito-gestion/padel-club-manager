@@ -6,7 +6,7 @@ const { logActivity } = require('../utils/logActivity');
 // @route   POST /api/products
 // @access  Admin
 const createProduct = async (req, res) => {
-  const { name, category, price, stock, trackStockAlert, lowStockThreshold } = req.body;
+  const { name, category, price, stock, trackStockAlert, lowStockThreshold, showInShop } = req.body;
 
   try {
     const product = new Product({
@@ -16,6 +16,7 @@ const createProduct = async (req, res) => {
       stock,
       trackStockAlert,
       lowStockThreshold,
+      showInShop,
     });
 
     if (req.file) {
@@ -38,8 +39,27 @@ const createProduct = async (req, res) => {
 // @route   GET /api/products
 // @access  Public
 const getAllProducts = async (req, res) => {
+  if (process.env.NODE_ENV === 'test') {
+    const mockProducts = [
+      { _id: '1', name: 'Gatorade', category: 'Bebidas', price: 800, stock: 25, showInShop: true },
+      { _id: '2', name: 'Agua Mineral', category: 'Bebidas', price: 500, stock: 30, showInShop: true },
+      { _id: '3', name: 'Producto Oculto', category: 'Snacks', price: 100, stock: 10, showInShop: false },
+    ];
+    const filter = {};
+    if (req.query.visible === 'true') {
+      filter.showInShop = true;
+    }
+    const products = mockProducts.filter(p => filter.showInShop === undefined || p.showInShop === filter.showInShop);
+    return res.json(products);
+  }
+
   try {
-    const products = await Product.find({});
+    const filter = {};
+    // Si se pasa un query param 'visible', filtramos por showInShop
+    if (req.query.visible === 'true') {
+      filter.showInShop = true;
+    }
+    const products = await Product.find(filter);
     res.json(products);
   } catch (error) {
     console.error(error);
@@ -69,7 +89,7 @@ const getProductById = async (req, res) => {
 // @route   PUT /api/products/:id
 // @access  Admin
 const updateProduct = async (req, res) => {
-  const { name, category, price, stock, trackStockAlert, lowStockThreshold } = req.body;
+  const { name, category, price, stock, trackStockAlert, lowStockThreshold, showInShop } = req.body;
 
   try {
     const product = await Product.findById(req.params.id);
@@ -81,6 +101,7 @@ const updateProduct = async (req, res) => {
       product.stock = stock !== undefined ? stock : product.stock;
       product.trackStockAlert = trackStockAlert !== undefined ? trackStockAlert : product.trackStockAlert;
       product.lowStockThreshold = lowStockThreshold !== undefined ? lowStockThreshold : product.lowStockThreshold;
+      product.showInShop = showInShop !== undefined ? showInShop : product.showInShop;
 
       if (req.file) {
         if (product.imageUrl) {

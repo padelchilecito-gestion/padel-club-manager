@@ -9,6 +9,7 @@ const ProductFormModal = ({ product, onClose, onSuccess }) => {
     stock: '',
     trackStockAlert: true,
     lowStockThreshold: 5,
+    showInShop: true,
   });
   const [imageFile, setImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,7 @@ const ProductFormModal = ({ product, onClose, onSuccess }) => {
         stock: product.stock,
         trackStockAlert: product.trackStockAlert,
         lowStockThreshold: product.lowStockThreshold,
+        showInShop: product.showInShop,
       });
     }
   }, [product, isEditMode]);
@@ -112,6 +114,10 @@ const ProductFormModal = ({ product, onClose, onSuccess }) => {
               <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} required min="0" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
             </div>
           )}
+          <div className="flex items-center gap-4">
+            <input type="checkbox" name="showInShop" checked={formData.showInShop} onChange={handleChange} className="h-4 w-4 rounded border-gray-600 bg-dark-primary text-primary focus:ring-primary" />
+            <label htmlFor="showInShop" className="text-sm text-text-secondary">Mostrar en la tienda pública</label>
+          </div>
           {error && <p className="text-danger text-sm text-center">{error}</p>}
           <div className="flex justify-end gap-4 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-md transition-colors">

@@ -1,8 +1,9 @@
 import apiClient from './api';
 
-const getAllProducts = async () => {
+const getAllProducts = async (visible = false) => {
   try {
-    const response = await apiClient.get('/products');
+    const params = visible ? { visible: 'true' } : {};
+    const response = await apiClient.get('/products', { params });
     return response.data;
   } catch (error) {
     console.error('Error fetching products:', error);

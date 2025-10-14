@@ -80,27 +80,33 @@ const getBookingAvailability = async (req, res) => {
             return res.status(400).json({ message: 'La fecha es requerida' });
         }
 
-        const startDate = new Date(date);
-        startDate.setHours(0, 0, 0, 0);
+        // --- INICIO DE LA CORRECCIÓN ---
 
-        const endDate = new Date(date);
-        endDate.setHours(23, 59, 59, 999);
+        // Define la zona horaria de Argentina
+        const timeZone = 'America/Argentina/Buenos_Aires';
+
+        // Convierte la fecha recibida (ej: '2023-10-27') al inicio y fin del día en la zona horaria de Argentina,
+        // y luego a UTC para consultar la base de datos de forma consistente.
+        const start = startOfDay(zonedTimeToUtc(date, timeZone));
+        const end = endOfDay(zonedTimeToUtc(date, timeZone));
 
         const bookings = await Booking.find({
             startTime: {
-                $gte: startDate,
-                $lt: endDate
-            }
+                $gte: start,
+                $lt: end
+            },
+            status: { $ne: 'Cancelled' } // Asegúrate de no contar los turnos cancelados
         }).populate('court');
+
+        // --- FIN DE LA CORRECCIÓN ---
 
         res.status(200).json(bookings);
 
     } catch (error) {
-        // ---- LOG MEJORADO ----
-        console.error("¡CRASH EN getAvailability!", error); // Imprime el error completo en los logs
+        console.error("¡CRASH EN getAvailability!", error);
         res.status(500).json({
             message: 'Error interno al obtener la disponibilidad.',
-            error: error.message, // Devuelve el mensaje de error específico
+            error: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }

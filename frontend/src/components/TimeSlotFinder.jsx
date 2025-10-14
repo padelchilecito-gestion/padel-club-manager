@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { bookingService } from '../services/bookingService';
 import { courtService } from '../services/courtService';
 import { settingService } from '../services/settingService';
-import { format, getDay, addMinutes, setHours, setMinutes, startOfDay, isToday } from 'date-fns';
+import { format, getDay, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
 
 const TimeSlotFinder = ({ onTimeSelect }) => {
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -59,18 +59,17 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
 
     // 3. Generate time slots based on settings and date
     useEffect(() => {
-        if (!clubSettings || !selectedDate) return;
+        if (!clubSettings) return;
 
         const generateTimeSlots = () => {
-            const [year, month, day] = selectedDate.split('-').map(Number);
-            const date = new Date(year, month - 1, day);
-
+            const date = new Date(selectedDate + 'T00:00:00');
             const dayOfWeek = getDay(date);
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-            const openingHour = parseInt(isWeekend ? (clubSettings.WEEKEND_OPENING_HOUR || '9') : (clubSettings.WEEKDAY_OPENING_HOUR || '8'), 10);
-            const closingHour = parseInt(isWeekend ? (clubSettings.WEEKEND_CLOSING_HOUR || '23') : (clubSettings.WEEKDAY_CLOSING_HOUR || '22'), 10);
-            const slotDuration = parseInt(clubSettings.SLOT_DURATION || '30', 10);
+            const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10);
+            const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10);
+            // Use the slot duration from the settings
+            const slotDuration = parseInt(clubSettings.SLOT_DURATION, 10) || 30;
 
             const slots = [];
             let currentTime = setMinutes(setHours(startOfDay(date), openingHour), 0);
@@ -78,7 +77,7 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
             const now = new Date();
 
             while (currentTime < endTime) {
-                if (!isToday(date) || currentTime > now) {
+                if (currentTime > now) { // Only show future slots
                     slots.push(currentTime);
                 }
                 currentTime = addMinutes(currentTime, slotDuration);
@@ -143,37 +142,27 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
             {loading && <p className="text-text-secondary text-center">Cargando disponibilidad...</p>}
             {error && <p className="text-danger text-center">{error}</p>}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="space-y-4">
                 {timeSlots.map(time => {
                     const availableCourts = getAvailableCourtsForSlot(time);
-
-                    // Don't render the time slot if no courts are available
-                    if (availableCourts.length === 0) {
-                        return null;
-                    }
-
-                    const totalCourts = allCourts.length;
-                    const isPartiallyBooked = availableCourts.length < totalCourts;
-
-                    // Determine button color based on availability
-                    const timeSlotBgColor = isPartiallyBooked
-                        ? 'bg-primary/20 border-primary/50' // Lighter orange for partial
-                        : 'bg-secondary/20 border-secondary/50'; // Lighter green for full
-
                     return (
-                        <div key={time.toISOString()} className={`p-4 rounded-lg border ${timeSlotBgColor}`}>
-                            <h3 className="text-lg font-bold text-center text-white mb-3">{format(time, 'HH:mm')}</h3>
-                            <div className="flex flex-col gap-2">
-                                {availableCourts.map(court => (
-                                    <button
-                                        key={court._id}
-                                        onClick={() => handleCourtSelection(court, time)}
-                                        className="w-full px-3 py-2 bg-secondary hover:bg-opacity-80 text-white font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-secondary focus:ring-white"
-                                    >
-                                        {court.name}
-                                    </button>
-                                ))}
-                            </div>
+                        <div key={time.toISOString()}>
+                            <h3 className="text-xl font-semibold text-primary mb-2">{format(time, 'HH:mm')}</h3>
+                            {availableCourts.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {availableCourts.map(court => (
+                                        <button
+                                            key={court._id}
+                                            onClick={() => handleCourtSelection(court, time)}
+                                            className="px-4 py-2 bg-secondary hover:bg-opacity-80 text-white font-bold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
+                                        >
+                                            {court.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-text-secondary">No hay canchas disponibles en este horario.</p>
+                            )}
                         </div>
                     );
                 })}

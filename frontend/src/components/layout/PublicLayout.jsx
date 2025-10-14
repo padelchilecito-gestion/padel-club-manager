@@ -165,7 +165,7 @@ const PublicLayout = () => {
         </div>
       </footer>
 
-      <style jsx>{`
+      <style>{`
         @keyframes slideDown {
           from {
             opacity: 0;

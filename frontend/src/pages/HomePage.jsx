@@ -2,20 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { format, addMinutes, setHours, setMinutes, startOfDay, getDay, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const StepIndicator = ({ number, active, completed, label }) => {
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+          completed
+            ? 'bg-secondary text-dark-primary'
+            : active
+            ? 'bg-primary text-white'
+            : 'bg-gray-600 text-gray-400'
+        }`}
+      >
+        {completed ? '✓' : number}
+      </div>
+      <p className={`text-xs mt-2 ${active ? 'text-text-primary' : 'text-text-secondary'}`}>
+        {label}
+      </p>
+    </div>
+  );
+};
+
 const HomePage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState(null);
+  const [selectedTimes, setSelectedTimes] = useState([]);
   const [selectedCourt, setSelectedCourt] = useState(null);
   const [step, setStep] = useState(1);
-  const [timeSlots, setTimeSlots] = useState([]);
   const [customer, setCustomer] = useState({ name: '', lastName: '', phone: '' });
+  const [timeSlots, setTimeSlots] = useState([]);
   const [courts, setCourts] = useState([
     { id: 1, name: 'Cancha 1', type: 'Cemento', price: 5000 },
     { id: 2, name: 'Cancha 2', type: 'Césped Sintético', price: 6000 },
     { id: 3, name: 'Cancha 3', type: 'Cristal', price: 7000 },
   ]);
-
-  // No auth context needed for this flow
 
   // Generar próximos 7 días
   const getNextDays = () => {
@@ -46,14 +65,28 @@ const HomePage = () => {
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    setSelectedTime(null);
+    setSelectedTimes([]);
     setSelectedCourt(null);
     setStep(1);
   };
 
   const handleTimeSelect = (time) => {
-    setSelectedTime(time);
-    setStep(2);
+    setSelectedTimes(prev => {
+      const isSelected = prev.some(t => t.getTime() === time.getTime());
+      if (isSelected) {
+        return prev.filter(t => t.getTime() !== time.getTime());
+      } else {
+        return [...prev, time].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const handleContinueToCourtSelection = () => {
+    if (selectedTimes.length > 0) {
+      setStep(2);
+    } else {
+      alert('Debes seleccionar al menos un horario.');
+    }
   };
 
   const handleCourtSelect = (court) => {
@@ -61,19 +94,33 @@ const HomePage = () => {
     setStep(3);
   };
 
-  const handleConfirmBooking = (paymentMethod) => {
+  const handleConfirmBooking = async (paymentMethod) => {
     if (!customer.name || !customer.lastName || !customer.phone) {
       alert('Por favor, completa todos tus datos.');
       return;
     }
 
-    alert(`¡Reserva confirmada para ${customer.name} ${customer.lastName}!\n\nCancha: ${selectedCourt.name}\nFecha: ${format(selectedDate, "d 'de' MMMM", { locale: es })}\nHora: ${format(selectedTime, 'HH:mm')}\nMétodo de pago: ${paymentMethod}\nPrecio: $${selectedCourt.price}`);
-    // Aquí irían las llamadas a la API
-    resetBooking();
+    const bookings = selectedTimes.map(time => ({
+      courtId: selectedCourt.id,
+      user: { name: customer.name, lastName: customer.lastName, phone: customer.phone },
+      startTime: time,
+      endTime: addMinutes(time, 30),
+      paymentMethod,
+      isPaid: paymentMethod === 'Efectivo' ? false : true, // Placeholder logic
+    }));
+
+    try {
+      // await bookingService.createBulkBookings(bookings);
+      alert(`¡Reserva confirmada para ${customer.name} ${customer.lastName}!\n\nCancha: ${selectedCourt.name}\nFecha: ${format(selectedDate, "d 'de' MMMM", { locale: es })}\nHorarios: ${selectedTimes.map(t => format(t, 'HH:mm')).join(', ')}\nMétodo de pago: ${paymentMethod}\nPrecio Total: $${selectedCourt.price * selectedTimes.length}`);
+      resetBooking();
+    } catch (error) {
+      alert('Error al crear las reservas.');
+      console.error(error);
+    }
   };
 
   const resetBooking = () => {
-    setSelectedTime(null);
+    setSelectedTimes([]);
     setSelectedCourt(null);
     setStep(1);
   };
@@ -144,7 +191,7 @@ const HomePage = () => {
             <h3 className="text-lg font-semibold text-text-secondary mb-4">Horario</h3>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
               {timeSlots.map((time) => {
-                const isSelected = selectedTime && format(time, 'HH:mm') === format(selectedTime, 'HH:mm');
+                const isSelected = selectedTimes.some(t => t.getTime() === time.getTime());
                 const isPast = time < new Date();
                 return (
                   <button
@@ -165,6 +212,26 @@ const HomePage = () => {
               })}
             </div>
           </div>
+
+          {/* Selected Times and Continue Button */}
+          {selectedTimes.length > 0 && (
+            <div className="mt-8 text-center">
+              <h3 className="text-lg font-semibold text-text-secondary mb-4">Turnos Seleccionados</h3>
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                {selectedTimes.map(time => (
+                  <span key={time.toISOString()} className="bg-primary text-white px-3 py-1 rounded-full text-sm">
+                    {format(time, 'HH:mm')}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={handleContinueToCourtSelection}
+                className="px-8 py-3 bg-gradient-to-r from-secondary to-primary text-dark-primary font-bold rounded-lg hover:shadow-2xl hover:scale-105 transition-all"
+              >
+                Continuar con la Selección de Cancha
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Step 2: Seleccionar Cancha */}
@@ -216,7 +283,29 @@ const HomePage = () => {
 
             {/* Resumen de la reserva */}
             <div className="bg-dark-primary rounded-xl p-6 mb-6">
-              {/* ... (código del resumen igual que antes) ... */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm text-text-secondary mb-2">Fecha</h3>
+                  <p className="text-xl font-bold text-text-primary">
+                    {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm text-text-secondary mb-2">Horarios</h3>
+                  <p className="text-xl font-bold text-text-primary">
+                    {selectedTimes.map(t => format(t, 'HH:mm')).join(', ')}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm text-text-secondary mb-2">Cancha</h3>
+                  <p className="text-xl font-bold text-text-primary">{selectedCourt.name}</p>
+                  <p className="text-sm text-text-secondary">{selectedCourt.type}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm text-text-secondary mb-2">Total a Pagar</h3>
+                  <p className="text-3xl font-bold text-secondary">${selectedCourt.price * selectedTimes.length}</p>
+                </div>
+              </div>
             </div>
 
             {/* Formulario de datos del cliente */}
@@ -261,7 +350,7 @@ const HomePage = () => {
         </div>
       </footer>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -276,27 +365,6 @@ const HomePage = () => {
           animation: fadeIn 0.5s ease-out;
         }
       `}</style>
-    </div>
-  );
-};
-
-const StepIndicator = ({ number, active, completed, label }) => {
-  return (
-    <div className="flex flex-col items-center">
-      <div
-        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
-          completed
-            ? 'bg-secondary text-dark-primary'
-            : active
-            ? 'bg-primary text-white'
-            : 'bg-gray-600 text-gray-400'
-        }`}
-      >
-        {completed ? '✓' : number}
-      </div>
-      <p className={`text-xs mt-2 ${active ? 'text-text-primary' : 'text-text-secondary'}`}>
-        {label}
-      </p>
     </div>
   );
 };
