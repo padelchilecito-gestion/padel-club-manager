@@ -26,8 +26,9 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
                 setClubSettings(settingsData);
                 setAllCourts(courtsData.filter(c => c.isActive));
             } catch (err) {
-                setError('No se pudieron cargar los datos iniciales.');
+                setError('No se pudieron cargar los datos iniciales. Usando valores predeterminados.');
                 console.error(err);
+                setClubSettings({}); // Allow fallback to default values
             } finally {
                 setLoading(false);
             }
@@ -66,10 +67,10 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
             const dayOfWeek = getDay(date);
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-            const openingHour = parseInt(isWeekend ? clubSettings.WEEKEND_OPENING_HOUR : clubSettings.WEEKDAY_OPENING_HOUR, 10);
-            const closingHour = parseInt(isWeekend ? clubSettings.WEEKEND_CLOSING_HOUR : clubSettings.WEEKDAY_CLOSING_HOUR, 10);
+            const openingHour = parseInt(isWeekend ? (clubSettings.WEEKEND_OPENING_HOUR || '9') : (clubSettings.WEEKDAY_OPENING_HOUR || '8'), 10);
+            const closingHour = parseInt(isWeekend ? (clubSettings.WEEKEND_CLOSING_HOUR || '23') : (clubSettings.WEEKDAY_CLOSING_HOUR || '22'), 10);
             // Use the slot duration from the settings
-            const slotDuration = parseInt(clubSettings.SLOT_DURATION, 10) || 30;
+            const slotDuration = parseInt(clubSettings.SLOT_DURATION || '30', 10);
 
             const slots = [];
             let currentTime = setMinutes(setHours(startOfDay(date), openingHour), 0);
