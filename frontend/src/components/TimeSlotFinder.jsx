@@ -3,7 +3,6 @@ import { bookingService } from '../services/bookingService';
 import { courtService } from '../services/courtService';
 import { settingService } from '../services/settingService';
 import { format, getDay, addMinutes, setHours, setMinutes, startOfDay, isToday } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
 
 const TimeSlotFinder = ({ onTimeSelect }) => {
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -63,11 +62,6 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
         if (!clubSettings || !selectedDate) return;
 
         const generateTimeSlots = () => {
-            // Use a specific timezone for consistency, e.g., the club's timezone
-            const timeZone = 'America/Argentina/Buenos_Aires';
-            const nowInTimeZone = utcToZonedTime(new Date(), timeZone);
-
-            // Parse the selected date string correctly into a Date object
             const [year, month, day] = selectedDate.split('-').map(Number);
             const date = new Date(year, month - 1, day);
 
@@ -81,11 +75,10 @@ const TimeSlotFinder = ({ onTimeSelect }) => {
             const slots = [];
             let currentTime = setMinutes(setHours(startOfDay(date), openingHour), 0);
             const endTime = setMinutes(setHours(startOfDay(date), closingHour), 0);
+            const now = new Date();
 
             while (currentTime < endTime) {
-                // If the selected date is today, only show future slots.
-                // Otherwise, show all slots for the selected date.
-                if (!isToday(date) || currentTime > nowInTimeZone) {
+                if (!isToday(date) || currentTime > now) {
                     slots.push(currentTime);
                 }
                 currentTime = addMinutes(currentTime, slotDuration);
