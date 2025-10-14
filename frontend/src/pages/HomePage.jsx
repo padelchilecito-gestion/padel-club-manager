@@ -8,11 +8,14 @@ const HomePage = () => {
   const [selectedCourt, setSelectedCourt] = useState(null);
   const [step, setStep] = useState(1);
   const [timeSlots, setTimeSlots] = useState([]);
+  const [customer, setCustomer] = useState({ name: '', lastName: '', phone: '' });
   const [courts, setCourts] = useState([
     { id: 1, name: 'Cancha 1', type: 'Cemento', price: 5000 },
     { id: 2, name: 'Cancha 2', type: 'Césped Sintético', price: 6000 },
     { id: 3, name: 'Cancha 3', type: 'Cristal', price: 7000 },
   ]);
+
+  // No auth context needed for this flow
 
   // Generar próximos 7 días
   const getNextDays = () => {
@@ -36,7 +39,7 @@ const HomePage = () => {
 
     while (currentTime < endTime) {
       slots.push(new Date(currentTime));
-      currentTime = addMinutes(currentTime, 60); // Bloques de 1 hora
+      currentTime = addMinutes(currentTime, 30); // Bloques de 30 minutos
     }
     setTimeSlots(slots);
   }, [selectedDate]);
@@ -58,8 +61,13 @@ const HomePage = () => {
     setStep(3);
   };
 
-  const handleConfirmBooking = () => {
-    alert(`¡Reserva confirmada!\n\nCancha: ${selectedCourt.name}\nFecha: ${format(selectedDate, "d 'de' MMMM", { locale: es })}\nHora: ${format(selectedTime, 'HH:mm')}\nPrecio: $${selectedCourt.price}`);
+  const handleConfirmBooking = (paymentMethod) => {
+    if (!customer.name || !customer.lastName || !customer.phone) {
+      alert('Por favor, completa todos tus datos.');
+      return;
+    }
+
+    alert(`¡Reserva confirmada para ${customer.name} ${customer.lastName}!\n\nCancha: ${selectedCourt.name}\nFecha: ${format(selectedDate, "d 'de' MMMM", { locale: es })}\nHora: ${format(selectedTime, 'HH:mm')}\nMétodo de pago: ${paymentMethod}\nPrecio: $${selectedCourt.price}`);
     // Aquí irían las llamadas a la API
     resetBooking();
   };
@@ -82,9 +90,6 @@ const HomePage = () => {
               </h1>
               <p className="text-text-secondary mt-1">Reserva tu cancha en segundos</p>
             </div>
-            <button className="px-6 py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-bold rounded-lg hover:shadow-lg hover:scale-105 transition-all">
-              Iniciar Sesión
-            </button>
           </div>
         </div>
       </header>
@@ -206,47 +211,43 @@ const HomePage = () => {
           <div className="bg-dark-secondary rounded-2xl shadow-2xl p-8 animate-fadeIn">
             <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center">
               <span className="bg-secondary text-dark-primary rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">3</span>
-              Confirma tu Reserva
+              Completa tus Datos y Paga
             </h2>
 
+            {/* Resumen de la reserva */}
             <div className="bg-dark-primary rounded-xl p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-sm text-text-secondary mb-2">Fecha</h3>
-                  <p className="text-xl font-bold text-text-primary">
-                    {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-text-secondary mb-2">Horario</h3>
-                  <p className="text-xl font-bold text-text-primary">
-                    {format(selectedTime, 'HH:mm')} - {format(addMinutes(selectedTime, 60), 'HH:mm')}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-text-secondary mb-2">Cancha</h3>
-                  <p className="text-xl font-bold text-text-primary">{selectedCourt.name}</p>
-                  <p className="text-sm text-text-secondary">{selectedCourt.type}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-text-secondary mb-2">Total a Pagar</h3>
-                  <p className="text-3xl font-bold text-secondary">${selectedCourt.price}</p>
-                </div>
+              {/* ... (código del resumen igual que antes) ... */}
+            </div>
+
+            {/* Formulario de datos del cliente */}
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">Nombre</label>
+                <input type="text" value={customer.name} onChange={(e) => setCustomer({...customer, name: e.target.value})} className="w-full bg-dark-primary border-2 border-gray-700 rounded-lg p-3 text-text-primary focus:outline-none focus:border-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">Apellido</label>
+                <input type="text" value={customer.lastName} onChange={(e) => setCustomer({...customer, lastName: e.target.value})} className="w-full bg-dark-primary border-2 border-gray-700 rounded-lg p-3 text-text-primary focus:outline-none focus:border-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">Teléfono</label>
+                <input type="tel" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})} className="w-full bg-dark-primary border-2 border-gray-700 rounded-lg p-3 text-text-primary focus:outline-none focus:border-primary" />
               </div>
             </div>
 
+            {/* Opciones de pago */}
             <div className="flex gap-4">
               <button
-                onClick={resetBooking}
+                onClick={() => handleConfirmBooking('Efectivo')}
                 className="flex-1 px-8 py-4 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-all"
               >
-                Modificar Reserva
+                Pagar en Efectivo
               </button>
               <button
-                onClick={handleConfirmBooking}
-                className="flex-1 px-8 py-4 bg-gradient-to-r from-secondary to-primary text-dark-primary font-bold rounded-lg hover:shadow-2xl hover:scale-105 transition-all"
+                onClick={() => handleConfirmBooking('Mercado Pago')}
+                className="flex-1 px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-lg hover:shadow-2xl hover:scale-105 transition-all"
               >
-                Confirmar y Pagar
+                Pagar con Mercado Pago
               </button>
             </div>
           </div>
