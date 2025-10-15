@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllCourts } from '../services/courtService';
+import courtService from '../services/courtService';
 import { getSettings } from '../services/settingService';
 import TimeSlotFinder from '../components/TimeSlotFinder';
 import BookingModal from '../components/BookingModal';
@@ -19,7 +19,7 @@ const HomePage = () => {
         const fetchInitialData = async () => {
             try {
                 const [fetchedCourts, fetchedSettings] = await Promise.all([
-                    getAllCourts(),
+                    courtService.getAllCourts(),
                     getSettings()
                 ]);
 
