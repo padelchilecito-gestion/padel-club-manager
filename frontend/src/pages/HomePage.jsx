@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import courtService from '../services/courtService';
+import * as courtService from '../services/courtService';
 import { getSettings } from '../services/settingService';
 import TimeSlotFinder from '../components/TimeSlotFinder';
 import BookingModal from '../components/BookingModal';
