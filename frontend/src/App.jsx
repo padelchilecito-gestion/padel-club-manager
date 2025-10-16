@@ -1,54 +1,88 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import * as settingService from './services/settingService';
 import './App.css';
 
+// Lazy loading de los componentes principales
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const PublicLayout = lazy(() => import('./components/layout/PublicLayout'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
+// Componente para la pantalla de carga
+const LoadingScreen = () => (
+  <div className="loading-container">Cargando...</div>
+);
+
+// Componente para la pantalla de error de configuración
+const ConfigurationErrorScreen = () => (
+  <div className="error-container">
+    <h1>Configuración Requerida</h1>
+    <p>La configuración del club no está completa.</p>
+    <p>Si eres el administrador, por favor <a href="/admin/settings">configura el club aquí</a> para continuar.</p>
+  </div>
+);
+
 function App() {
+  const [isConfigured, setIsConfigured] = useState(false);
   const [clubSettings, setClubSettings] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const checkConfiguration = async () => {
       try {
         const settings = await settingService.getPublicSettings();
-        if (!settings.clubName || !settings.clubAddress) {
-          throw new Error('La configuración del club no está completa. Por favor, contacta al administrador.');
+        // Verificamos que los datos esenciales existan y no estén vacíos
+        if (settings && settings.clubName && settings.clubAddress) {
+          setClubSettings(settings);
+          setIsConfigured(true);
+        } else {
+          setIsConfigured(false);
         }
-        setClubSettings(settings);
-      } catch (err) {
-        console.error('Error fetching initial data:', err);
-        setError(err.message);
+      } catch (error) {
+        console.error("Error al verificar la configuración:", error);
+        setIsConfigured(false); // Si hay un error de red, asumimos que no está configurado
       } finally {
         setLoading(false);
       }
     };
-    fetchInitialData();
+
+    checkConfiguration();
   }, []);
 
   if (loading) {
-    return <div className="loading-container">Cargando...</div>;
+    return <LoadingScreen />;
   }
 
-  // Si hay un error pero el usuario está intentando acceder al panel de admin, se lo permitimos.
-  if (error && !window.location.pathname.startsWith('/admin')) {
+  // Si la ruta actual es del admin, renderizamos el Router completo para permitir el acceso
+  if (window.location.pathname.startsWith('/admin')) {
     return (
-      <div className="error-container">
-        <h1>Error</h1>
-        <p>{error}</p>
-        <p>Si eres el administrador, por favor <a href="/admin/settings">configura el club aquí</a>.</p>
-      </div>
+      <Router>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/*" element={
+              <AuthProvider>
+                <AdminLayout />
+              </AuthProvider>
+            } />
+            {/* Redirigimos cualquier otra ruta a la página de configuración si no está configurado */}
+            <Route path="/*" element={!isConfigured ? <ConfigurationErrorScreen /> : <PublicLayout clubSettings={clubSettings} />} />
+          </Routes>
+        </Suspense>
+      </Router>
     );
   }
 
+  // Si no está configurado y no estamos en una ruta de admin, mostramos el error
+  if (!isConfigured) {
+    return <ConfigurationErrorScreen />;
+  }
+
+  // Si todo está correcto, renderizamos la aplicación normalmente
   return (
     <Router>
-      <Suspense fallback={<div className="loading-container">Cargando...</div>}>
+      <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin/*" element={
