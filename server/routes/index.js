@@ -13,10 +13,12 @@ const paymentRoutes = require('./payments');
 const reportRoutes = require('./reports');
 const logRoutes = require('./logs');
 const settingRoutes = require('./settings');
+const availabilityRoutes = require('./availability');
 
 console.log('[Routes] Index router loaded.');
 
 // Mount all routes onto the main router
+router.use('/availability', availabilityRoutes);
 router.use('/users', userRoutes);
 router.use('/auth', authRoutes);
 router.use('/courts', courtRoutes);
