@@ -56,7 +56,11 @@ const startServer = async () => {
     });
   });
 
-  app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
+  // Ruta de Health Check para Render
+  app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send('Padel Club Manager API is healthy');
+  });
 
   // Definir Rutas
   app.use('/api', apiRoutes);
