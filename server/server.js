@@ -56,6 +56,7 @@ const startServer = async () => {
     });
   });
 
+ 
   // Ruta de Health Check para Render
   app.get('/', (req, res) => {
     res.setHeader('Content-Type', 'text/plain');
@@ -63,6 +64,9 @@ const startServer = async () => {
   });
 
   // Definir Rutas
+
+   // Definir Rutas
+
   app.use('/api', apiRoutes);
 
   const PORT = process.env.PORT || 5000;
