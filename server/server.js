@@ -56,9 +56,7 @@ const startServer = async () => {
     });
   });
 
-  app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
-
-  // Definir Rutas
+   // Definir Rutas
   app.use('/api', apiRoutes);
 
   const PORT = process.env.PORT || 5000;
