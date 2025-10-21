@@ -4,7 +4,6 @@
   "description": "Backend for Padel Club Manager",
   "main": "server.js",
   "scripts": {
-    "prestart": "node seed.js",
     "start": "node server.js",
     "server": "nodemon --watch . --ignore ../frontend/ server.js",
     "db:seed": "node seed.js"
