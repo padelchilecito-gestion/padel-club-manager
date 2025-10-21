@@ -19,6 +19,7 @@ const SettingSchema = new mongoose.Schema({
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
+      'SLOT_DURATION',
     ],
   },
   value: {
