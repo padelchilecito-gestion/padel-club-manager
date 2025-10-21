@@ -9,6 +9,7 @@ const defaultSettings = [
   { key: 'WEEKEND_OPENING_HOUR', value: '09:00' },
   { key: 'WEEKEND_CLOSING_HOUR', value: '23:00' },
   { key: 'TIMEZONE', value: 'America/Argentina/Buenos_Aires' },
+  { key: 'SLOT_DURATION', value: '60' },
 ];
 
 const seedDatabase = async () => {
