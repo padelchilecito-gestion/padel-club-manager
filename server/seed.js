@@ -19,33 +19,40 @@ const seedDatabase = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
+    console.log('MongoDB connected successfully for seeding.');
 
-    console.log('MongoDB connected successfully.');
-
+    // Upsert settings
     for (const setting of defaultSettings) {
-      await Setting.updateOne({ key: setting.key }, { $set: { value: setting.value } }, { upsert: true });
+      await Setting.findOneAndUpdate(
+        { key: setting.key },
+        { $set: { value: setting.value } },
+        { upsert: true, new: true, runValidators: true }
+      );
       console.log(`Setting ${setting.key} ensured.`);
     }
 
+    // Upsert admin user
     const adminData = {
       username: 'admin',
       password: 'admin123',
       role: 'Admin',
     };
+    const existingAdmin = await User.findOne({ username: adminData.username });
+    if (!existingAdmin) {
+        await User.create(adminData);
+        console.log('Admin user created.');
+    } else {
+        console.log('Admin user already exists.');
+    }
 
-    await User.findOneAndUpdate(
-      { username: adminData.username },
-      { $setOnInsert: adminData },
-      { upsert: true, new: true, runValidators: true }
-    );
-    console.log('Admin user ensured.');
 
     console.log('Database seeding completed successfully.');
   } catch (error) {
     console.error('Error seeding the database:', error);
-    process.exit(1); // Exit with error code
+    process.exit(1); // Exit with error code to prevent server start
   } finally {
-    mongoose.connection.close();
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed after seeding.');
   }
 };
 
