@@ -26,6 +26,7 @@ frontend/.env
 /dist
 /build
 /frontend/dist
+/test-results
 
 # Misc
 .DS_Store
