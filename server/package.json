@@ -4,8 +4,9 @@
   "description": "Backend for Padel Club Manager",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "server": "nodemon server.js"
+    "start": "node seed.js && node server.js",
+    "server": "nodemon server.js",
+    "db:seed": "node seed.js"
   },
   "keywords": [],
   "author": "",
