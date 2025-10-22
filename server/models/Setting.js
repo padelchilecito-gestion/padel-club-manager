@@ -13,7 +13,6 @@ const SettingSchema = new mongoose.Schema({
       'CLOUDINARY_API_SECRET',
       'WHATSAPP_SENDER_NUMBER',
       'WHATSAPP_API_TOKEN',
-      // Nuevas claves
       'TIMEZONE',
       'WEEKDAY_OPENING_HOUR',
       'WEEKDAY_CLOSING_HOUR',
