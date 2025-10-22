@@ -1,5 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const { version } = require('../package.json');
+
+// @desc    Get API Version
+// @route   GET /api/version
+// @access  Public
+router.get('/version', (req, res) => {
+  res.json({ version: version });
+});
 
 // Import all route files
 const userRoutes = require('./users');
