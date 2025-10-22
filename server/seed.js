@@ -10,7 +10,7 @@ const defaultSettings = [
   { key: 'WEEKEND_OPENING_HOUR', value: '09:00' },
   { key: 'WEEKEND_CLOSING_HOUR', value: '23:00' },
   { key: 'TIMEZONE', value: 'America/Argentina/Buenos_Aires' },
-  { key: 'SLOT_DURATION', value: '60' }, // Essential key for booking logic
+  { key: 'SLOT_DURATION', value: '60' },
 ];
 
 const seedDatabase = async () => {
@@ -44,8 +44,6 @@ const seedDatabase = async () => {
 
     const existingAdmin = await User.findOne({ username: adminData.username });
     if (!existingAdmin) {
-        // Using .create() here is safe because we've confirmed the user doesn't exist.
-        // This ensures the pre-save hook for password hashing is triggered.
         await User.create(adminData);
         console.log('Admin user created.');
     } else {
@@ -56,7 +54,7 @@ const seedDatabase = async () => {
 
   } catch (error) {
     console.error('An error occurred during database seeding:', error);
-    process.exit(1); // Exit with a failure code
+    process.exit(1);
   } finally {
     await mongoose.connection.close();
     console.log('Database connection closed.');
