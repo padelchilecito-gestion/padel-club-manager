@@ -27,6 +27,19 @@ const createCourt = async (req, res) => {
   }
 };
 
+// @desc    Get all public courts
+// @route   GET /api/courts/public
+// @access  Public
+const getPublicCourts = async (req, res) => {
+	try {
+	  const courts = await Court.find({ isActive: true }).sort({ name: 1 });
+	  res.json(courts);
+	} catch (error) {
+	  console.error(error);
+	  res.status(500).json({ message: 'Server Error' });
+	}
+  };
+
 // @desc    Get all courts
 // @route   GET /api/courts
 // @access  Public
@@ -112,6 +125,7 @@ const deleteCourt = async (req, res) => {
 module.exports = {
   createCourt,
   getAllCourts,
+  getPublicCourts,
   getCourtById,
   updateCourt,
   deleteCourt,

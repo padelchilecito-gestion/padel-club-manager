@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   createCourt,
   getAllCourts,
+  getPublicCourts,
   getCourtById,
   updateCourt,
   deleteCourt,
@@ -18,6 +19,11 @@ router.post('/', protect, admin, createCourt);
 // @desc    Get all courts
 // @access  Public
 router.get('/', getAllCourts);
+
+// @route   GET api/courts/public
+// @desc    Get all public courts
+// @access  Public
+router.get('/public', getPublicCourts);
 
 // @route   GET api/courts/:id
 // @desc    Get a single court by ID
