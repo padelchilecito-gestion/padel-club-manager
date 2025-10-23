@@ -22,14 +22,13 @@ const getSettings = async (req, res) => {
 // @route   PUT /api/settings
 // @access  Admin
 const updateSettings = async (req, res) => {
-    const settings = req.body;
+    const settings = req.body; // Expects an object like { KEY: 'value', ... }
 
     try {
-        const promises = Object.keys(settings)
-            .filter(key => settings[key] !== null && settings[key] !== undefined && settings[key] !== '')
-            .map(key => {
-                const updateData = { value: settings[key] };
-                if (req.user && req.user.id) {
+        const promises = Object.keys(settings).map(key => {
+            const updateData = { value: settings[key] };
+            // Defensively check for req.user to prevent crash if it's missing
+            if (req.user && req.user.id) {
                 updateData.lastUpdatedBy = req.user.id;
             }
 

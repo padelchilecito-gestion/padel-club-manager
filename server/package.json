@@ -1,6 +1,6 @@
 {
-  "name": "server",
-  "version": "1.0.0",
+  "name": "padel-club-manager-server",
+  "version": "1.1.0",
   "description": "Backend for Padel Club Manager",
   "main": "server.js",
   "scripts": {

@@ -12,7 +12,6 @@ const SettingsPage = () => {
     WEEKDAY_CLOSING_HOUR: '23',
     WEEKEND_OPENING_HOUR: '9',
     WEEKEND_CLOSING_HOUR: '22',
-    SLOT_DURATION: '60',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -108,18 +107,6 @@ const SettingsPage = () => {
                     <label htmlFor="WEEKEND_CLOSING_HOUR" className="block text-sm font-medium text-text-secondary">Cierre (Fin de Semana)</label>
                     <input type="number" name="WEEKEND_CLOSING_HOUR" value={settings.WEEKEND_CLOSING_HOUR} onChange={handleChange} min="0" max="23" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="SLOT_DURATION" className="block text-sm font-medium text-text-secondary">Duración del Turno (en minutos)</label>
-                  <input
-                    type="number"
-                    name="SLOT_DURATION"
-                    id="SLOT_DURATION"
-                    value={settings.SLOT_DURATION || ''}
-                    onChange={handleChange}
-                    className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600"
-                    placeholder="Ej: 90"
-                  />
                 </div>
               </div>
             </fieldset>
