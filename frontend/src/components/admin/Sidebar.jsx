@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { version as frontendVersion } from '../../../package.json';
 import api from '../../services/api';
 import {
   LayoutDashboard,
@@ -17,6 +16,8 @@ import {
   Building,
   LogOut
 } from 'lucide-react';
+
+const frontendVersion = import.meta.env.VITE_APP_VERSION;
 
 const Sidebar = () => {
   const { isAdmin, logout } = useAuth();
