@@ -2,41 +2,55 @@ const express = require('express');
 const router = express.Router();
 const {
   createCourt,
-  getAllCourts,
-  getPublicCourts,
+  getCourts,
   getCourtById,
   updateCourt,
   deleteCourt,
+  getPublicCourts,
+  getAvailabilityForPublic, // <-- Esta es la función que usamos
 } = require('../controllers/courtController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
-// @route   POST api/courts
-// @desc    Create a new court
-// @access  Admin
-router.post('/', protect, admin, createCourt);
+// === RUTAS PÚBLICAS ===
 
-// @route   GET api/courts
-// @desc    Get all courts
-// @access  Public
-router.get('/', getAllCourts);
-
-// @route   GET api/courts/public
-// @desc    Get all public courts
+// @desc    Get all active courts for public view
+// @route   GET /api/courts/public
 // @access  Public
 router.get('/public', getPublicCourts);
 
-// @route   GET api/courts/:id
-// @desc    Get a single court by ID
+// @desc    Get court availability for a specific date (Public)
+// @route   GET /api/courts/availability/:date/:courtId
 // @access  Public
-router.get('/:id', getCourtById);
+// --- LÍNEA CORREGIDA ---
+// Se añaden :date y :courtId para que coincida con la llamada del frontend
+router.get('/availability/:date/:courtId', getAvailabilityForPublic);
+// --- FIN DE CORRECCIÓN ---
 
-// @route   PUT api/courts/:id
+
+// === RUTAS DE ADMIN ===
+
+// @desc    Create a court
+// @route   POST /api/courts
+// @access  Admin
+router.post('/', protect, admin, createCourt);
+
+// @desc    Get all courts (admin view)
+// @route   GET /api/courts
+// @access  Admin
+router.get('/', protect, admin, getCourts);
+
+// @desc    Get court by ID
+// @route   GET /api/courts/:id
+// @access  Admin
+router.get('/:id', protect, admin, getCourtById);
+
 // @desc    Update a court
+// @route   PUT /api/courts/:id
 // @access  Admin
 router.put('/:id', protect, admin, updateCourt);
 
-// @route   DELETE api/courts/:id
 // @desc    Delete a court
+// @route   DELETE /api/courts/:id
 // @access  Admin
 router.delete('/:id', protect, admin, deleteCourt);
 
