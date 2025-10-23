@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../../services/settingService';
-import { Loading, Error, Success } from '../../components/ui/Feedback';
+// --- LÍNEA CORREGIDA ---
+import { FullPageLoading as Loading, ErrorMessage as Error, SuccessMessage as Success } from '../../components/ui/Feedback';
+// --- FIN DE CORRECCIÓN ---
 import { Settings, Save, Info, Clock, BookOpen, CreditCard, Mail } from 'lucide-react';
 
 // Componente reutilizable para las tarjetas de configuración
@@ -88,7 +90,7 @@ const SettingsPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-
+    
     // Convertir números si el tipo es 'number'
     const val = type === 'number' ? (value === '' ? '' : Number(value)) : value;
 
@@ -119,7 +121,7 @@ const SettingsPage = () => {
           settingsToUpdate[key] = settings[key];
         }
       }
-
+      
       await updateSettings(settingsToUpdate);
       setSuccessMessage('Configuración guardada exitosamente.');
     } catch (err) {
@@ -132,6 +134,7 @@ const SettingsPage = () => {
   };
 
   if (isLoading && !Object.keys(settings).length) {
+    // Esta línea ahora funcionará porque 'Loading' es un alias de 'FullPageLoading'
     return <Loading text="Cargando configuración..." />;
   }
 
@@ -152,6 +155,7 @@ const SettingsPage = () => {
         </button>
       </div>
 
+      {/* Estas líneas ahora funcionarán */}
       {error && <Error message={error} onClose={() => setError(null)} />}
       {successMessage && <Success message={successMessage} onClose={() => setSuccessMessage('')} />}
 
@@ -159,7 +163,7 @@ const SettingsPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Columna Izquierda */}
           <div className="space-y-6">
-
+            
             {/* Información del Club */}
             <SettingsCard title="Información del Club" icon={Info}>
               <InputField
@@ -310,7 +314,7 @@ const SettingsPage = () => {
                 helpText="Enviar email al confirmar un pago."
               />
             </SettingsCard>
-
+            
           </div>
         </div>
       </form>
