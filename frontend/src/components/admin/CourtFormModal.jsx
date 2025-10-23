@@ -168,4 +168,62 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 bg
+              className="px-4 py-2 bg-gray-600 text-white rounded-md font-semibold hover:bg-gray-500 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-indigo-900 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (court ? 'Guardando...' : 'Creando...') : (court ? 'Guardar Cambios' : 'Crear Cancha')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Componentes helper para inputs
+const InputField = ({ label, name, type = 'text', value, onChange, required = false }) => (
+  <div>
+    <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
+      {label}
+    </label>
+    <input
+      type={type}
+      id={name}
+      name={name}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+    />
+  </div>
+);
+
+const SelectField = ({ label, name, value, onChange, options, required = false }) => (
+  <div>
+    <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
+      {label}
+    </label>
+    <select
+      id={name}
+      name={name}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+export default CourtFormModal;
