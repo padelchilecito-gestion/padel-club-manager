@@ -1,26 +1,18 @@
-import apiClient from './api';
+import api from './api';
 
-const getSettings = async () => {
-  try {
-    const response = await apiClient.get('/settings');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    throw error.response?.data || error;
-  }
+/**
+ * Obtiene la configuración como un objeto key-value.
+ */
+export const getSettings = async () => {
+  const { data } = await api.get('/settings');
+  return data;
 };
 
-const updateSettings = async (settingsData) => {
-  try {
-    const response = await apiClient.put('/settings', settingsData);
-    return response.data;
-  } catch (error) {
-    console.error('Error updating settings:', error);
-    throw error.response?.data || error;
-  }
-};
-
-export const settingService = {
-  getSettings,
-  updateSettings,
+/**
+ * Actualiza la configuración.
+ * @param {object} settings - Un objeto con las claves y valores a actualizar.
+ */
+export const updateSettings = async (settings) => {
+  const { data } = await api.put('/settings', settings);
+  return data;
 };
