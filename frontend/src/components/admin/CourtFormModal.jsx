@@ -1,29 +1,34 @@
 import React, { useState, useEffect } from 'react';
-// --- LÍNEA CORREGIDA ---
-// Importamos las funciones específicas en lugar del objeto 'courtService'
+// Importamos las funciones específicas
 import { createCourt, updateCourt } from '../../services/courtService';
-// --- FIN DE CORRECCIÓN ---
 
 const CourtFormModal = ({ court, onClose, onSuccess }) => {
+  // Estado inicial con los nombres CORRECTOS y SIN availableSlots
   const [formData, setFormData] = useState({
     name: '',
-    type: 'classic', // 'classic', 'panoramic'
-    price: '',
-    availableSlots: [], // ['09:00', '10:30', ...]
-    status: 'available', // 'available', 'maintenance'
+    courtType: 'classic', // Nombre correcto
+    pricePerHour: '',   // Nombre correcto
+    status: 'available',
   });
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [slotInput, setSlotInput] = useState(''); // Para el input de slots
 
   useEffect(() => {
     if (court) {
       setFormData({
-        name: court.name,
-        type: court.type,
-        price: court.price.toString(),
-        availableSlots: court.availableSlots || [],
-        status: court.status,
+        name: court.name || '',
+        courtType: court.courtType || court.type || 'classic', // Usar nombre nuevo, con fallback
+        pricePerHour: court.pricePerHour ? court.pricePerHour.toString() : (court.price ? court.price.toString() : ''), // Usar nombre nuevo, con fallback
+        status: court.status || 'available',
+        // No incluir availableSlots aquí
+      });
+    } else {
+      // Resetear para 'Nueva Cancha'
+      setFormData({
+        name: '',
+        courtType: 'classic',
+        pricePerHour: '',
+        status: 'available',
       });
     }
   }, [court]);
@@ -33,44 +38,33 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAddSlot = () => {
-    if (slotInput && /^\d{2}:\d{2}$/.test(slotInput) && !formData.availableSlots.includes(slotInput)) {
-      setFormData((prev) => ({
-        ...prev,
-        availableSlots: [...prev.availableSlots, slotInput].sort(),
-      }));
-      setSlotInput('');
-    }
-  };
-
-  const handleRemoveSlot = (slotToRemove) => {
-    setFormData((prev) => ({
-      ...prev,
-      availableSlots: prev.availableSlots.filter((slot) => slot !== slotToRemove),
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
+      // Construir objeto con nombres CORRECTOS y SIN availableSlots
       const dataToSubmit = {
-        ...formData,
-        price: parseFloat(formData.price),
+        name: formData.name,
+        courtType: formData.courtType, // Nombre correcto
+        pricePerHour: parseFloat(formData.pricePerHour), // Nombre correcto
+        status: formData.status,
+        // No incluir availableSlots aquí
       };
 
-      // --- LÍNEA CORREGIDA ---
-      // Llamamos a las funciones importadas directamente
       const serviceCall = court
         ? updateCourt(court._id, dataToSubmit)
         : createCourt(dataToSubmit);
-      // --- FIN DE CORRECCIÓN ---
 
       await serviceCall;
-      onSuccess(); // Cierra el modal y refresca la lista
+      onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Error al guardar la cancha');
+      // Manejar el error de validación específico
+      if (err.response && err.response.status === 400 && err.response.data.message.includes('validation failed')) {
+         setError(`Error de validación: ${err.response.data.message}. Verifica los campos.`);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Error al guardar la cancha');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -78,27 +72,34 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit}>
-          <div className="p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">
+      {/* Contenedor principal del modal */}
+      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Encabezado del Modal */}
+        <div className="p-6 border-b border-gray-700">
+            <h3 className="text-xl font-semibold text-white">
               {court ? 'Editar Cancha' : 'Nueva Cancha'}
             </h3>
+        </div>
 
+        {/* Cuerpo del Modal (Scrollable) */}
+        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto">
+          <div className="p-6">
             {error && (
               <div className="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded-lg relative mb-4" role="alert">
                 <strong className="font-bold">Error: </strong>
                 <span className="block sm:inline">{error}</span>
+                <button type="button" onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3 text-red-100 hover:text-white">&times;</button>
               </div>
             )}
 
             <div className="space-y-4">
+              {/* Campos del formulario con los nombres CORRECTOS */}
               <InputField label="Nombre" name="name" value={formData.name} onChange={handleChange} required />
-              
+
               <SelectField
                 label="Tipo"
-                name="type"
-                value={formData.type}
+                name="courtType" // Nombre correcto
+                value={formData.courtType}
                 onChange={handleChange}
                 options={[
                   { value: 'classic', label: 'Clásica (Muro)' },
@@ -106,8 +107,8 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
                 ]}
               />
 
-              <InputField label="Precio" name="price" type="number" value={formData.price} onChange={handleChange} required />
-              
+              <InputField label="Precio por Hora" name="pricePerHour" type="number" value={formData.pricePerHour} onChange={handleChange} required step="0.01" min="0"/> {/* Nombre correcto */}
+
               <SelectField
                 label="Estado"
                 name="status"
@@ -119,51 +120,14 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
                 ]}
               />
 
-              {/* Gestión de Slots */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Horarios Disponibles</label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="time"
-                    value={slotInput}
-                    onChange={(e) => setSlotInput(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSlot}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700"
-                  >
-                    Añadir
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 p-2 bg-gray-900 rounded-md min-h-[40px] border border-gray-700">
-                  {formData.availableSlots.length === 0 ? (
-                    <span className="text-gray-500 text-sm p-2">Añade horarios (ej: 09:00, 10:30)</span>
-                  ) : (
-                    formData.availableSlots.map((slot) => (
-                      <span
-                        key={slot}
-                        className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2"
-                      >
-                        {slot}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSlot(slot)}
-                          className="text-indigo-200 hover:text-white"
-                        >
-                          &times;
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
+              {/* SECCIÓN DE HORARIOS ELIMINADA */}
+
             </div>
           </div>
+        </form>
 
-          {/* Footer del Modal */}
-          <div className="bg-gray-750 px-6 py-4 flex justify-end gap-3">
+        {/* Footer del Modal */}
+        <div className="bg-gray-750 px-6 py-4 flex justify-end gap-3 border-t border-gray-700">
             <button
               type="button"
               onClick={onClose}
@@ -172,22 +136,23 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
             >
               Cancelar
             </button>
+            {/* Llamar a handleSubmit desde aquí */}
             <button
-              type="submit"
+              type="button" // Cambiado a button para que no envíe el form dos veces
+              onClick={handleSubmit} // Llamar a la función al hacer clic
               disabled={isLoading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md font-semibold hover:bg-indigo-700 disabled:bg-indigo-900 disabled:cursor-not-allowed"
             >
               {isLoading ? (court ? 'Guardando...' : 'Creando...') : (court ? 'Guardar Cambios' : 'Crear Cancha')}
             </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 };
 
-// Componentes helper para inputs
-const InputField = ({ label, name, type = 'text', value, onChange, required = false }) => (
+// --- Componentes Helper (sin cambios funcionales, solo asegurar que 'name' es correcto) ---
+const InputField = ({ label, name, type = 'text', value, onChange, required = false, ...props }) => (
   <div>
     <label htmlFor={name} className="block text-sm font-medium text-gray-300 mb-1">
       {label}
@@ -195,10 +160,11 @@ const InputField = ({ label, name, type = 'text', value, onChange, required = fa
     <input
       type={type}
       id={name}
-      name={name}
+      name={name} // Asegurar que el 'name' HTML coincide
       value={value}
       onChange={onChange}
       required={required}
+      {...props} // Pasar props adicionales como step, min
       className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
     />
   </div>
@@ -211,7 +177,7 @@ const SelectField = ({ label, name, value, onChange, options, required = false }
     </label>
     <select
       id={name}
-      name={name}
+      name={name} // Asegurar que el 'name' HTML coincide
       value={value}
       onChange={onChange}
       required={required}
