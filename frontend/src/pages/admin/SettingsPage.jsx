@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../../services/settingService';
-// --- LÍNEA CORREGIDA ---
 import { FullPageLoading as Loading, ErrorMessage as Error, SuccessMessage as Success } from '../../components/ui/Feedback';
-// --- FIN DE CORRECCIÓN ---
 import { Settings, Save, Info, Clock, BookOpen, CreditCard, Mail } from 'lucide-react';
 
 // Componente reutilizable para las tarjetas de configuración
@@ -134,7 +132,6 @@ const SettingsPage = () => {
   };
 
   if (isLoading && !Object.keys(settings).length) {
-    // Esta línea ahora funcionará porque 'Loading' es un alias de 'FullPageLoading'
     return <Loading text="Cargando configuración..." />;
   }
 
@@ -155,12 +152,16 @@ const SettingsPage = () => {
         </button>
       </div>
 
-      {/* Estas líneas ahora funcionarán */}
       {error && <Error message={error} onClose={() => setError(null)} />}
       {successMessage && <Success message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* --- CAMBIO REALIZADO AQUÍ ---
+          Cambié 'md:grid-cols-2' por 'lg:grid-cols-2'.
+          Esto hace que la grilla sea vertical (1 columna) en móviles Y tablets,
+          y solo se divida en 2 columnas en pantallas grandes (lg: 1024px+).
+        */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Columna Izquierda */}
           <div className="space-y-6">
             
