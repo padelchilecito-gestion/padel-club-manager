@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { courtService } from '../services/courtService';
-import { settingService } from '../services/settingService';
+import { getSettings } from '../services/settingService';
 import TimeSlotFinder from '../components/TimeSlotFinder';
 import BookingModal from '../components/BookingModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +20,7 @@ const HomePage = () => {
             try {
                 const [fetchedCourts, fetchedSettings] = await Promise.all([
                     courtService.getAllCourts(),
-                    settingService.getSettings()
+                    getSettings()
                 ]);
 
                 // --- INICIO DE LA CORRECCIÓN: VALIDACIÓN DE DATOS ---
