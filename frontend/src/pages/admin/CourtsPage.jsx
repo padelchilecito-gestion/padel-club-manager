@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { courtService } from '../../services/courtService';
+// --- LÍNEA CORREGIDA ---
+// Importamos las funciones específicas que usa esta página
+import { getCourts, deleteCourt } from '../../services/courtService';
+// --- FIN DE CORRECCIÓN ---
 import CourtFormModal from '../../components/admin/CourtFormModal';
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/solid';
+import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
+// Usamos Lucide para consistencia con el resto del admin
+import { Box, Plus, Pencil, Trash2 } from 'lucide-react';
 
 const CourtsPage = () => {
   const [courts, setCourts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourt, setSelectedCourt] = useState(null);
-
-  const fetchCourts = async () => {
-    try {
-      setLoading(true);
-      const data = await courtService.getAllCourts();
-      setCourts(data);
-    } catch (err) {
-      setError('No se pudieron cargar las canchas.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchCourts();
   }, []);
+
+  const fetchCourts = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      // --- LÍNEA CORREGIDA ---
+      const data = await getCourts(); // Se llama a la función directamente
+      setCourts(data);
+    } catch (err) {
+      setError(err.message || 'Error al cargar las canchas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOpenModal = (court = null) => {
     setSelectedCourt(court);
@@ -37,75 +44,101 @@ const CourtsPage = () => {
   };
 
   const handleSuccess = () => {
-    fetchCourts(); // Refetch courts after a successful operation
     handleCloseModal();
+    fetchCourts(); // Refrescar la lista de canchas
   };
 
-  const handleDelete = async (courtId) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta cancha?')) {
+  const handleDeleteCourt = async (id) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta cancha? Esta acción no se puede deshacer.')) {
       try {
-        await courtService.deleteCourt(courtId);
-        alert('Cancha eliminada con éxito.');
-        fetchCourts(); // Refetch
+        setError(null);
+        // --- LÍNEA CORREGIDA ---
+        await deleteCourt(id); // Se llama a la función directamente
+        fetchCourts(); // Refrescar la lista
       } catch (err) {
-        alert('Error al eliminar la cancha.');
+        setError(err.response?.data?.message || err.message || 'Error al eliminar la cancha');
       }
     }
   };
-  
-  if (loading) return <div className="text-center p-8">Cargando canchas...</div>;
-  if (error) return <div className="text-center p-8 text-danger">{error}</div>;
+
+  if (isLoading && courts.length === 0) {
+    return <FullPageLoading text="Cargando canchas..." />;
+  }
 
   return (
-    <div>
+    <div className="container mx-auto p-6 text-white">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary">Gestión de Canchas</h1>
+        <h1 className="text-3xl font-bold flex items-center">
+          <Box className="mr-3" size={30} />
+          Gestión de Canchas
+        </h1>
         <button
-          onClick={() => handleOpenModal()}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          onClick={() => handleOpenModal(null)}
+          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold shadow-md hover:bg-indigo-700 transition duration-300"
         >
-          Añadir Cancha
+          <Plus className="mr-2" size={20} />
+          Nueva Cancha
         </button>
       </div>
 
-      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
-        <table className="w-full text-sm text-left text-text-secondary">
-          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
+      {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
+
+      <div className="bg-gray-800 shadow-lg rounded-lg overflow-x-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-750">
             <tr>
-              <th scope="col" className="px-6 py-3">Nombre</th>
-              <th scope="col" className="px-6 py-3">Tipo</th>
-              <th scope="col" className="px-6 py-3">Precio/Hora</th>
-              <th scope="col" className="px-6 py-3">Estado</th>
-              <th scope="col" className="px-6 py-3">Acciones</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nombre</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tipo</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Precio</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estado</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            {courts.map((court) => (
-              <tr key={court._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                <td className="px-6 py-4 font-medium text-text-primary">{court.name}</td>
-                <td className="px-6 py-4">{court.courtType}</td>
-                <td className="px-6 py-4">${court.pricePerHour.toFixed(2)}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      court.isActive ? 'bg-secondary text-dark-primary' : 'bg-gray-500 text-white'
-                  }`}>
-                      {court.isActive ? 'Activa' : 'Inactiva'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 flex items-center gap-4">
-                  <button onClick={() => handleOpenModal(court)} className="text-blue-400 hover:text-blue-300" title="Editar Cancha">
-                    <PencilIcon className="h-5 w-5" />
-                  </button>
-                  <button onClick={() => handleDelete(court._id)} className="text-danger hover:text-red-400" title="Eliminar Cancha">
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
+          <tbody className="bg-gray-800 divide-y divide-gray-700">
+            {courts.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="px-6 py-4 text-center text-gray-400">
+                  No hay canchas creadas.
                 </td>
               </tr>
-            ))}
+            ) : (
+              courts.map((court) => (
+                <tr key={court._id} className="hover:bg-gray-750">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{court.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{court.type === 'classic' ? 'Clásica' : 'Panorámica'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${court.price}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        court.status === 'available' ? 'bg-green-800 text-green-100' : 'bg-yellow-800 text-yellow-100'
+                      }`}
+                    >
+                      {court.status === 'available' ? 'Disponible' : 'Mantenimiento'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => handleOpenModal(court)}
+                      className="text-indigo-400 hover:text-indigo-300 mr-4"
+                      title="Editar"
+                    >
+                      <Pencil size={20} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCourt(court._id)}
+                      className="text-red-500 hover:text-red-400"
+                      title="Eliminar"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-      
+
       {isModalOpen && (
         <CourtFormModal
           court={selectedCourt}
