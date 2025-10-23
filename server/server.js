@@ -25,6 +25,7 @@ const startServer = async () => {
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app',
+    'https://padel-club-manager-6arn60r3x-eduardo-miguel-riccis-projects.vercel.app',
   ];
 
   const corsOptions = {
