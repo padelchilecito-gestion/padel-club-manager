@@ -1,243 +1,160 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getPublicCourts, getAvailability } from '../services/courtService';
+import { bookingService } from '../services/bookingService';
 import { addDays, format, isBefore, startOfToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
-// AHORA ESTE MODAL SÍ VA A FUNCIONAR
-import BookingModal from './BookingModal'; 
-import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import BookingModal from './BookingModal';
+import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 const TimeSlotFinder = ({ settings }) => {
-  const [courts, setCourts] = useState([]);
-  const [selectedCourt, setSelectedCourt] = useState('');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [availability, setAvailability] = useState([]);
+  const [selectedSlots, setSelectedSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // 'selectedSlot' ahora guardará el objeto 'bookingDetails' que el modal espera
-  const [selectedSlot, setSelectedSlot] = useState(null); 
 
   const today = startOfToday();
-  const maxBookingDays = settings.bookingLeadTime || 7; 
-
-  useEffect(() => {
-    const fetchCourts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getPublicCourts(); 
-        
-        if (data && data.length > 0) {
-          setCourts(data); 
-          setSelectedCourt(data[0]._id);
-        } else {
-          setCourts([]); 
-          setError('No hay canchas disponibles para reservar en este momento.');
-        }
-      } catch (err) {
-        setCourts([]);
-        setError(err.message || 'Error al cargar las canchas');
-      } finally {
-        // Dejamos que fetchAvailability maneje el fin de la carga
-      }
-    };
-    fetchCourts();
-  }, []);
+  const maxBookingDays = settings.bookingLeadTime || 7;
 
   const fetchAvailability = useCallback(async () => {
-    if (!selectedCourt || !selectedDate) {
-      setAvailability([]); 
-      return;
-    }
+    setLoading(true);
+    setError(null);
+    setSelectedSlots([]); // Reset selection on date change
     try {
-      setLoading(true); 
-      setError(null);
-      const availableData = await getAvailability(selectedDate, selectedCourt);
-      setAvailability(Array.isArray(availableData) ? availableData : []);
-
+      const data = await bookingService.getAvailability(selectedDate);
+      setAvailability(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error en fetchAvailability:", err);
       setError(err.message || 'Error al cargar la disponibilidad');
-      setAvailability([]); 
+      setAvailability([]);
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
-  }, [selectedCourt, selectedDate]); 
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchAvailability();
-  }, [fetchAvailability]); 
+  }, [fetchAvailability]);
 
-  const handleDateChange = (date) => {
-    const newDate = new Date(date);
-    if (isBefore(newDate, today)) {
-      setSelectedDate(format(today, 'yyyy-MM-dd'));
-    } else {
-      setSelectedDate(date);
-    }
-  };
-
-  const handleDayShift = (days) => {
-    const currentDate = new Date(selectedDate + 'T00:00:00'); 
-    const newDate = addDays(currentDate, days);
-    
-    if (isBefore(newDate, today)) {
-      setSelectedDate(format(today, 'yyyy-MM-dd'));
-    } else {
-      setSelectedDate(format(newDate, 'yyyy-MM-dd'));
-    }
-  };
-
-  // --- CORRECCIÓN DE COMPATIBILIDAD ---
   const handleSlotClick = (slot) => {
-    // slot es { startTime: "07:30", isAvailable: true }
-    if (slot.isAvailable) {
-      const courtDetails = courts.find(c => c._id === selectedCourt);
-      
-      // BookingModal.jsx espera un objeto anidado 'bookingDetails'
-      // Lo construimos aquí
-      const bookingDetailsForModal = {
-        court: courtDetails, // Pasamos el objeto de cancha completo
-        date: selectedDate + 'T00:00:00', // Pasamos la fecha (con T00 para que 'date-fns' la tome bien)
-        
-        // BookingModal.jsx espera 'time' (no 'startTime')
-        // También espera que 'time' sea un objeto Date, no un string
-        // (lo deducimos por el 'format(time, 'HH:mm')' que usa el modal)
-        time: new Date(`${selectedDate}T${slot.startTime}`),
-      };
+    if (!slot.isAvailable) return;
 
-      console.log('--- Datos construidos para BookingModal.jsx ---');
-      console.log(bookingDetailsForModal);
+    const slotIdentifier = slot.startTime;
+    const isSelected = selectedSlots.includes(slotIdentifier);
 
-      // Guardamos este objeto para pasárselo al modal
-      setSelectedSlot(bookingDetailsForModal);
+    if (isSelected) {
+      setSelectedSlots(prev => prev.filter(s => s !== slotIdentifier));
+    } else {
+      // Allow selecting consecutive slots
+      const newSelection = [...selectedSlots, slotIdentifier].sort();
+      setSelectedSlots(newSelection);
+    }
+  };
+
+  const handleBooking = () => {
+    if (selectedSlots.length > 0) {
       setIsModalOpen(true);
     }
   };
-  // --- FIN DE CORRECCIÓN ---
 
-  const selectedCourtDetails = courts.find(c => c._id === selectedCourt);
-  const dateForDisplay = new Date(selectedDate + 'T00:00:00');
+  const handleBookingSuccess = () => {
+    setIsModalOpen(false);
+    setSelectedSlots([]);
+    fetchAvailability(); // Re-fetch to show updated availability
+  };
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl mx-auto">
+    <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-4xl mx-auto">
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
-      {/* Selector de Cancha */}
-      <div className="mb-4">
-        <label htmlFor="court" className="block text-sm font-medium text-gray-300 mb-2">
-          Selecciona una Cancha
+      {/* Date Selector */}
+      <div className="mb-6">
+        <label htmlFor="date" className="block text-lg font-bold text-gray-200 mb-2">
+          1. Selecciona una Fecha
         </label>
-        <select
-          id="court"
-          value={selectedCourt}
-          onChange={(e) => setSelectedCourt(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          disabled={loading || courts.length === 0} 
-        >
-          {courts.map((court) => (
-            <option key={court._id} value={court._id}>
-              {court.name} ({court.type})
-            </option>
-          ))}
-        </select>
-        {selectedCourtDetails && (
-          <p className="text-sm text-gray-400 mt-2">
-            Precio por turno: ${selectedCourtDetails.pricePerHour}
-          </p>
+        <div className="flex items-center space-x-2">
+            <button
+                onClick={() => setSelectedDate(format(addDays(new Date(selectedDate), -1), 'yyyy-MM-dd'))}
+                disabled={loading || isBefore(new Date(selectedDate), addDays(today, 1))}
+                className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+                <ChevronLeft size={20} />
+            </button>
+            <input
+                type="date"
+                id="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={format(today, 'yyyy-MM-dd')}
+                max={format(addDays(today, maxBookingDays), 'yyyy-MM-dd')}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-indigo-500"
+                disabled={loading}
+            />
+            <button
+                onClick={() => setSelectedDate(format(addDays(new Date(selectedDate), 1), 'yyyy-MM-dd'))}
+                disabled={loading || new Date(selectedDate) >= addDays(today, maxBookingDays)}
+                className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+                <ChevronRight size={20} />
+            </button>
+        </div>
+      </div>
+
+      {/* Time Slot Grid */}
+      <div className="mb-6">
+        <h3 className="text-lg font-bold text-gray-200 mb-3">2. Selecciona uno o más turnos</h3>
+        {loading ? (
+          <InlineLoading text="Buscando turnos..." />
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {availability.map((slot) => {
+              const isSelected = selectedSlots.includes(slot.startTime);
+              return (
+                <button
+                  key={slot.startTime}
+                  onClick={() => handleSlotClick(slot)}
+                  disabled={!slot.isAvailable}
+                  className={`p-3 rounded-md text-center font-semibold transition-all duration-200 border-2
+                    ${!slot.isAvailable ? 'bg-gray-700 text-gray-500 cursor-not-allowed line-through' : ''}
+                    ${isSelected ? 'bg-indigo-500 border-indigo-300 ring-2 ring-indigo-300' : ''}
+                    ${slot.isAvailable && !isSelected ? 'bg-green-600 hover:bg-green-500 border-transparent' : ''}
+                  `}
+                >
+                  <Clock size={16} className="inline-block mr-1.5" />
+                  {slot.startTime}
+                </button>
+              );
+            })}
+             {availability.length === 0 && !loading && (
+                <div className="col-span-full bg-gray-700/50 p-4 rounded-md text-center text-gray-400 flex items-center justify-center">
+                    <AlertCircle className="mr-2" />
+                    No hay turnos disponibles para esta fecha.
+                </div>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Selector de Fecha (Sin cambios) */}
-      <div className="mb-6">
-        <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
-          Selecciona una Fecha
-        </label>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleDayShift(-1)}
-            disabled={loading || selectedDate === format(today, 'yyyy-MM-dd')}
-            className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className="relative flex-grow">
-            <input
-              type="date"
-              id="date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              min={format(today, 'yyyy-MM-dd')}
-              max={format(addDays(today, maxBookingDays), 'yyyy-MM-dd')}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 pr-10"
-              disabled={loading}
-            />
-            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          </div>
-          <button
-            onClick={() => handleDayShift(1)}
-            disabled={loading || selectedDate === format(addDays(today, maxBookingDays), 'yyyy-MM-dd')}
-            className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-        <p className="text-center text-lg font-semibold text-white mt-3">
-          {format(dateForDisplay, 'EEEE, dd \'de\' MMMM', { locale: es })}
-        </p>
-      </div>
-
-      {/* Grilla de Turnos (Sin cambios) */}
-      {loading ? (
-        <InlineLoading text="Buscando turnos disponibles..." />
-      ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {availability.map((slot) => (
+      {/* Booking Action Button */}
+      {selectedSlots.length > 0 && (
+        <div className="mt-8 text-center">
             <button
-              key={slot.startTime} 
-              onClick={() => handleSlotClick(slot)} 
-              disabled={!slot.isAvailable}
-              className={`p-3 rounded-md text-center font-semibold transition-colors
-                ${
-                  slot.isAvailable
-                    ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
-                    : 'bg-gray-700 text-gray-500 cursor-not-allowed line-through'
-                }
-              `}
+                onClick={handleBooking}
+                className="w-full max-w-md px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg transform hover:scale-105 transition-transform"
             >
-              <Clock size={16} className="inline-block mr-1 mb-0.5" />
-              {slot.startTime}
+                Reservar {selectedSlots.length} {selectedSlots.length > 1 ? 'turnos' : 'turno'}
             </button>
-          ))}
-          {availability.length === 0 && !loading && (
-            <p className="text-gray-400 col-span-full text-center">
-              No hay turnos para mostrar en esta fecha o cancha.
-            </p>
-          )}
         </div>
       )}
 
-      {/* --- CORRECCIÓN DE LLAMADA AL MODAL --- */}
-      {/* El modal (BookingModal.jsx) espera las props 'isOpen', 'bookingDetails', y 'onClose'.
-        Ahora se las pasamos con esos nombres.
-      */}
+      {/* Modal */}
       <BookingModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedSlot(null);
-        }}
-        bookingDetails={selectedSlot} // Le pasamos el objeto que construimos
-        
-        // El modal también espera 'user', pero no lo tenemos. 
-        // Pasamos null o un objeto vacío.
-        user={null} 
-        
-        // El modal no espera onBookingSuccess, así que no lo pasamos
+        onClose={() => setIsModalOpen(false)}
+        selectedDate={selectedDate}
+        selectedSlots={selectedSlots}
+        onBookingSuccess={handleBookingSuccess}
       />
-      {/* --- FIN DE CORRECCIÓN --- */}
     </div>
   );
 };

@@ -43,5 +43,14 @@ export default defineConfig({
   // --- 3. AÑADIR ESTE BLOQUE PARA LA VERSIÓN ---
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(version)
-  }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })
