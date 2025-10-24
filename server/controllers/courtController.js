@@ -2,21 +2,32 @@ const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting'); // Importar el modelo Setting
 const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
-const { generateTimeSlots } = require('../utils/timeSlotGenerator'); // Esto ahora existe
+const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
 // --- NUEVA FUNCIÓN (Punto 1) ---
-// Obtiene la disponibilidad agregada (fecha primero)
 const getAggregatedAvailability = async (req, res) => {
   try {
     const { date } = req.params;
     const timeZone = 'America/Argentina/Buenos_Aires';
 
-    // Buscar settings directamente en la BD
+    // 1. Buscar settings directamente en la BD
     const settings = await Setting.findOne(); 
     
-    if (!settings || !settings.openTime || !settings.closeTime || !settings.slotDuration) {
-      return res.status(400).json({ message: 'La configuración del club no está completa.' });
+    // --- CORRECCIÓN DE LA VALIDACIÓN (AQUÍ ESTABA EL ERROR 400) ---
+    // Hacemos el chequeo más robusto.
+    // Buscamos que las propiedades no sean nulas, ni strings vacíos, 
+    // y que la duración sea un número mayor a 0.
+    if (!settings || 
+        !settings.openTime || settings.openTime === "" ||
+        !settings.closeTime || settings.closeTime === "" ||
+        !settings.slotDuration || settings.slotDuration <= 0) 
+    {
+      // Si falla, devolvemos el 400 CON el mensaje
+      return res.status(400).json({ 
+        message: 'La configuración del club no está completa. Faltan Hora de Apertura, Cierre o Duración del Turno (debe ser > 0).' 
+      });
     }
+    // --- FIN DE LA CORRECCIÓN ---
 
     // 2. Generar todos los slots posibles para ese día
     const allPossibleSlots = generateTimeSlots(
@@ -86,11 +97,8 @@ const getAggregatedAvailability = async (req, res) => {
 
 
 /* --- INICIO DEL CÓDIGO ORIGINAL (QUE FALTABA) --- */
-/* (Estas funciones ahora están incluidas) */
 
 // @desc    (Admin) Get all courts
-// @route   GET /api/courts
-// @access  Admin
 const getCourts = async (req, res) => {
   try {
     const courts = await Court.find({});
@@ -102,8 +110,6 @@ const getCourts = async (req, res) => {
 };
 
 // @desc    (Admin) Create a court
-// @route   POST /api/courts
-// @access  Admin
 const createCourt = async (req, res) => {
   const {
     name,
@@ -130,8 +136,6 @@ const createCourt = async (req, res) => {
 };
 
 // @desc    (Admin) Get court by ID
-// @route   GET /api/courts/:id
-// @access  Admin
 const getCourtById = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
@@ -147,8 +151,6 @@ const getCourtById = async (req, res) => {
 };
 
 // @desc    (Admin) Update court
-// @route   PUT /api/courts/:id
-// @access  Admin
 const updateCourt = async (req, res) => {
   const { name, courtType, pricePerHour, isActive, availableSlots } = req.body;
   try {
@@ -172,13 +174,11 @@ const updateCourt = async (req, res) => {
 };
 
 // @desc    (Admin) Delete court
-// @route   DELETE /api/courts/:id
-// @access  Admin
 const deleteCourt = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
     if (court) {
-      await court.deleteOne(); // Reemplaza remove()
+      await court.deleteOne(); 
       res.json({ message: 'Court removed' });
     } else {
       res.status(404).json({ message: 'Court not found' });
@@ -191,8 +191,6 @@ const deleteCourt = async (req, res) => {
 
 
 // @desc    (Public) Get active courts
-// @route   GET /api/courts/public
-// @access  Public
 const getPublicCourts = async (req, res) => {
   try {
     const courts = await Court.find({ isActive: true });
@@ -203,8 +201,6 @@ const getPublicCourts = async (req, res) => {
 };
 
 // @desc    (Public) Get availability for a specific court
-// @route   GET /api/courts/availability/:date/:courtId
-// @access  Public
 const getAvailabilityForPublic = async (req, res) => {
   try {
     const { date, courtId } = req.params;
@@ -224,7 +220,6 @@ const getAvailabilityForPublic = async (req, res) => {
       status: { $ne: 'Cancelled' },
     });
     
-    // (Asegúrate de que 'court.availableSlots' exista en tu modelo Court)
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
