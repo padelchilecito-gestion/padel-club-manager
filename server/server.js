@@ -1,10 +1,10 @@
 const express = require('express');
-// --- CORRECCIÓN 1: Comentamos la línea que causa el crash 'MODULE_NOT_FOUND' ---
-// const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware');
+// const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
-const { setupSocketIO } = require('./config/socket');
+const { setupSocketIO } = require('./config/socket'); // Esto ahora debería funcionar
 const { logActivity } = require('./utils/logActivity');
-const { connectToRabbitMQ } = require('./config/rabbitmq');
+// --- CORRECCIÓN 1: Comentamos la importación de RabbitMQ ---
+// const { connectToRabbitMQ } = require('./config/rabbitmq'); 
 const { setupScheduledTasks } = require('./utils/scheduler');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
@@ -23,7 +23,7 @@ const { protect, admin } = require('./middlewares/authMiddleware');
 // Cargar variables de entorno
 dotenv.config();
 
-// Forzar zona horaria (¡Importante!)
+// Forzar zona horaria
 process.env.TZ = 'America/Argentina/Buenos_Aires';
 console.log(`Timezone forced to: ${process.env.TZ}`);
 
@@ -32,18 +32,19 @@ connectDB();
 
 const app = express();
 
-// --- CORRECCIÓN 2: Añadimos la URL de Vercel a la lista de CORS ---
+// Configuración de CORS (ya corregida)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://padel-club-manager.vercel.app',
-  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app' // URL AÑADIDA
+  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
+  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app' // Añadida por si acaso
 ];
-// --- FIN DE CORRECCIÓN 2 ---
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    // Permitir solicitudes sin 'origin' (como Postman o apps móviles) o si está en la lista
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.error(`CORS error: Origin ${origin} not allowed.`);
@@ -89,7 +90,7 @@ app.use(hpp());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutos
-  max: 200, // Límite de 200 peticiones por IP cada 10 min
+  max: 200, 
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
 });
 app.use('/api', limiter);
@@ -102,7 +103,6 @@ if (process.env.NODE_ENV === 'production') {
   const __dirname = path.resolve();
   app.use(express.static(path.join(__dirname, '/frontend/dist')));
 
-  // Si la ruta no es de la API, sirve el index.html
   app.get('*', (req, res) =>
     res.sendFile(path.resolve(__dirname, 'frontend', 'dist', 'index.html'))
   );
@@ -112,11 +112,10 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// --- CORRECCIÓN 3: Comentamos el uso del middleware que falta ---
+// Middlewares de error (comentados)
 // app.use(logErrors);
 // app.use(errorHandler);
 // app.use(logger); 
-// --- FIN DE CORRECCIÓN 3 ---
 
 const PORT = process.env.PORT || 10000;
 
@@ -124,16 +123,17 @@ const server = http.createServer(app);
 
 // Configurar Socket.IO
 const io = setupSocketIO(server, allowedOrigins);
-app.set('socketio', io); // Hacer 'io' accesible en los controladores
+app.set('socketio', io); 
 
 // Iniciar servidor
 server.listen(PORT, async () => {
   console.log(`Server started on port ${PORT}`);
   try {
-    // Conectar a RabbitMQ al iniciar
+    // --- CORRECCIÓN 2: Comentamos la conexión a RabbitMQ ---
     // const channel = await connectToRabbitMQ();
     // app.set('rabbitMQChannel', channel);
     // console.log('RabbitMQ connected and channel set in app.');
+    // --- FIN DE CORRECCIÓN 2 ---
     
     // Configurar tareas programadas
     setupScheduledTasks();
