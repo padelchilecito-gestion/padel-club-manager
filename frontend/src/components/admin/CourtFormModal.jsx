@@ -78,7 +78,16 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
     } catch (err) {
       // Mostrar mensaje de error específico de validación si es un 400
       if (err.response && err.response.status === 400) {
-         setError(`Error de validación: ${err.response.data.message || 'Verifica los campos.'}`);
+         // Acceder al mensaje de error dentro de la respuesta de Mongoose si existe
+         const message = err.response.data.message || 'Error de validación. Verifica los campos.';
+         // A veces Mongoose anida el error, intentamos mostrarlo
+         if (err.response.data.errors) {
+            const firstErrorKey = Object.keys(err.response.data.errors)[0];
+            const nestedMessage = err.response.data.errors[firstErrorKey]?.message;
+            setError(`Error de validación: ${nestedMessage || message}`);
+         } else {
+            setError(`Error de validación: ${message}`);
+         }
       } else {
         // Mostrar otros errores (incluyendo errores de validación local)
         setError(err.response?.data?.message || err.message || 'Error al guardar la cancha');
