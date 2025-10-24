@@ -1,7 +1,8 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting'); 
-const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
+const { TZDate } = require('date-fns-tz');
+const { startOfDay, endOfDay } = require('date-fns');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
 // (Esta función ya estaba bien, la dejamos como está)
@@ -50,8 +51,8 @@ const getAggregatedAvailability = async (req, res) => {
     }
 
     // 7. Obtener todas las reservas (bookings) para ese día
-    const start = startOfDay(zonedTimeToUtc(date, timeZone));
-    const end = endOfDay(zonedTimeToUtc(date, timeZone));
+    const start = startOfDay(new TZDate(date, timeZone));
+    const end = endOfDay(new TZDate(date, timeZone));
     
     const bookings = await Booking.find({
       startTime: { $gte: start, $lt: end },
@@ -61,7 +62,7 @@ const getAggregatedAvailability = async (req, res) => {
     // 8. Mapear la disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
       
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = new TZDate(`${date}T${slotTime}:00`, timeZone);
 
       const bookedCourtIds = bookings
         .filter(b => b.startTime.getTime() === slotDateTimeUTC.getTime())
@@ -221,8 +222,8 @@ const getAvailabilityForPublic = async (req, res) => {
       return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
     }
     
-    const start = startOfDay(zonedTimeToUtc(date, timeZone));
-    const end = endOfDay(zonedTimeToUtc(date, timeZone));
+    const start = startOfDay(new TZDate(date, timeZone));
+    const end = endOfDay(new TZDate(date, timeZone));
 
     const bookings = await Booking.find({
       court: courtId,
@@ -236,7 +237,7 @@ const getAvailabilityForPublic = async (req, res) => {
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = new TZDate(`${date}T${slotTime}:00`, timeZone);
       
       const isBooked = bookings.some(
         b => b.startTime.getTime() === slotDateTimeUTC.getTime()
