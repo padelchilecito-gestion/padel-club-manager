@@ -15,7 +15,12 @@ export const getPublicCourts = async () => {
  * (En el backend se llama 'getAvailabilityForPublic')
  */
 export const getAvailability = async (date, courtId) => {
-  return await api.get(`/courts/availability/${date}/${courtId}`);
+  // --- CORRECCIÓN AQUÍ ---
+  // Faltaba desestructurar { data } para retornar solo el array,
+  // igual que hace getPublicCourts.
+  const { data } = await api.get(`/courts/availability/${date}/${courtId}`);
+  return data;
+  // --- FIN DE CORRECCIÓN ---
 };
 
 // --- FUNCIONES DE ADMIN (LAS QUE YA ESTABAN) ---
