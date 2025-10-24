@@ -1,6 +1,17 @@
 import api from './api';
 
-// --- FUNCIONES PÚBLICAS (LAS QUE FALTABAN) ---
+// --- NUEVA FUNCIÓN (Punto 1) ---
+/**
+ * Obtiene la disponibilidad agregada para una FECHA (en todas las canchas).
+ */
+export const getAggregatedAvailability = async (date) => {
+  // Llama a la nueva ruta: GET /api/courts/availability/:date
+  const { data } = await api.get(`/courts/availability/${date}`);
+  return data;
+};
+
+
+// --- FUNCIONES ANTIGUAS (Mantenidas por si el Admin las usa) ---
 
 /**
  * Obtiene solo las canchas activas para el público.
@@ -11,19 +22,14 @@ export const getPublicCourts = async () => {
 };
 
 /**
- * Obtiene la disponibilidad para una cancha y fecha específicas.
- * (En el backend se llama 'getAvailabilityForPublic')
+ * (Obsoleto para el flujo público) Obtiene la disponibilidad para una cancha y fecha específicas.
  */
 export const getAvailability = async (date, courtId) => {
-  // --- CORRECCIÓN AQUÍ ---
-  // Faltaba desestructurar { data } para retornar solo el array,
-  // igual que hace getPublicCourts.
   const { data } = await api.get(`/courts/availability/${date}/${courtId}`);
   return data;
-  // --- FIN DE CORRECCIÓN ---
 };
 
-// --- FUNCIONES DE ADMIN (LAS QUE YA ESTABAN) ---
+// --- FUNCIONES DE ADMIN ---
 
 /**
  * (Admin) Obtiene todas las canchas.
