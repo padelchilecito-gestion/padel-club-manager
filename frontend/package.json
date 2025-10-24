@@ -1,39 +1,42 @@
 {
-  "name": "padel-club-manager-frontend",
+  "name": "padel-club-manager-server",
   "version": "1.1.0",
-  "private": true,
+  "description": "Backend for Padel Club Manager",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "server": "nodemon --watch . --ignore ../frontend/ server.js",
+    "db:seed": "node seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@heroicons/react": "^2.2.0",
-    "axios": "^1.7.2",
-    "chart.js": "^4.4.3",
-    "date-fns": "^3.6.0",
-    "date-fns-tz": "^3.1.3",
-    "jwt-decode": "^4.0.0",
-    "lucide-react": "^0.417.0",
-    "react": "^18.3.1",
-    "react-chartjs-2": "^5.2.0",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.25.1",
-    "socket.io-client": "^4.7.5"
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.41.0", 
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "date-fns-tz": "^3.2.0", 
+    "dotenv": "^16.3.1", 
+    "express": "^4.18.2", 
+    "express-async-handler": "^1.2.0", 
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.3.1",
+    // --- LINE ADDED ---
+    "helmet": "^7.1.0", 
+    // --- END LINE ADDED ---
+    "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "mercadopago": "^2.0.8", 
+    "mongoose": "^7.6.3", 
+    "morgan": "^1.1.0",
+    "multer": "^1.4.5-lts.1",
+    "multer-storage-cloudinary": "^4.0.0",
+    "socket.io": "^4.7.2", 
+    "xss-clean": "^0.1.4"
+    // (Ensure the last line does NOT have a comma)
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react": "^7.35.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.8",
-    "postcss": "^8.4.40",
-    "tailwindcss": "^3.4.7",
-    "vite": "^5.4.21",
-    "vite-plugin-pwa": "^0.20.1"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "nodemon": "^3.0.1" 
   }
 }
