@@ -24,8 +24,16 @@ const TimeSlotFinder = ({ settings }) => {
       try {
         setLoading(true);
         setError(null);
-        const data = await getPublicCourts();
+        
+        // --- CORRECCIÓN DE ERROR .map N°1 ---
+        // Asumimos que getPublicCourts() también devuelve la respuesta completa de Axios.
+        // Extraemos .data de la respuesta.
+        const response = await getPublicCourts();
+        const data = Array.isArray(response.data) ? response.data : [];
+        // --- FIN DE CORRECCIÓN ---
+
         setCourts(data);
+        
         if (data.length > 0) {
           setSelectedCourt(data[0]._id);
         } else {
@@ -40,7 +48,6 @@ const TimeSlotFinder = ({ settings }) => {
     fetchCourts();
   }, []);
 
-  // Se usa useCallback para optimizar y evitar re-renders innecesarios.
   const fetchAvailability = useCallback(async () => {
     if (!selectedCourt || !selectedDate) {
       setAvailability([]); 
@@ -51,25 +58,28 @@ const TimeSlotFinder = ({ settings }) => {
       setLoading(true);
       setError(null);
       
-      // 1. Llamamos a la API. availableData es el array que viste en la consola.
-      const availableData = await getAvailability(selectedDate, selectedCourt);
+      // --- CORRECCIÓN DE ERROR .map N°2 (El error que reportaste) ---
+      // El error 'a.map is not a function' indica que 'availableData' 
+      // en el fix anterior era un objeto (la respuesta de Axios) y no un array.
+      // La solución es extraer la propiedad .data de la respuesta.
+      const response = await getAvailability(selectedDate, selectedCourt);
       
-      // --- CORRECCIÓN CLAVE ---
-      // El backend ya nos dio la lista procesada. 
-      // No necesitamos mapear nada, solo establecer el estado directamente.
+      // Verificamos que response.data sea un array antes de establecerlo
+      const availableData = Array.isArray(response.data) ? response.data : [];
       setAvailability(availableData);
       // --- FIN DE LA CORRECCIÓN ---
 
     } catch (err) {
       console.error("Error en fetchAvailability:", err);
+      // Si la API falla (ej. 404), err.response.data puede ser un objeto de error
+      // Nos aseguramos de setear un array vacío.
       setError(err.message || 'Error al cargar la disponibilidad');
-      setAvailability([]); // Limpiar turnos en caso de error
+      setAvailability([]); 
     } finally {
       setLoading(false);
     }
-  }, [selectedCourt, selectedDate]); // 'courts' ya no es dependencia aquí
+  }, [selectedCourt, selectedDate]); 
 
-  // El useEffect ahora solo *llama* a la función
   useEffect(() => {
     fetchAvailability();
   }, [fetchAvailability]); 
@@ -95,13 +105,12 @@ const TimeSlotFinder = ({ settings }) => {
   };
 
   const handleSlotClick = (slot) => {
-    // El 'slot' que recibimos ahora es { time: "07:00", isAvailable: true }
     if (slot.isAvailable) {
       setSelectedSlot({
         courtId: selectedCourt,
         courtName: courts.find(c => c._id === selectedCourt)?.name,
         date: selectedDate,
-        startTime: slot.time, // Usamos slot.time
+        startTime: slot.time, 
         price: courts.find(c => c._id === selectedCourt)?.price || 0,
       });
       setIsModalOpen(true);
@@ -127,6 +136,7 @@ const TimeSlotFinder = ({ settings }) => {
           className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           disabled={loading || courts.length === 0}
         >
+          {/* Este .map ahora es seguro porque 'courts' siempre será un array */}
           {courts.map((court) => (
             <option key={court._id} value={court._id}>
               {court.name} ({court.type})
@@ -183,7 +193,7 @@ const TimeSlotFinder = ({ settings }) => {
         <InlineLoading text="Buscando turnos disponibles..." />
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {/* Ahora 'availability' es el array correcto de la API */}
+          {/* Este .map (el que causaba el error) ahora es seguro */}
           {availability.map((slot) => (
             <button
               key={slot.time}
@@ -217,7 +227,6 @@ const TimeSlotFinder = ({ settings }) => {
           onClose={() => setIsModalOpen(false)}
           onBookingSuccess={() => {
             setIsModalOpen(false);
-            // Refrescar disponibilidad
             fetchAvailability(); 
           }}
         />
