@@ -2,7 +2,9 @@ const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-const { zonedTimeToUtc, startOfDay, endOfDay, addMinutes }_ = require('date-fns-tz');
+// --- CORRECIÓN AQUÍ ---
+// Se eliminó el guion bajo "_" al final de la línea
+const { zonedTimeToUtc, startOfDay, endOfDay, addMinutes } = require('date-fns-tz');
 
 // @desc    Create a new booking (MODIFICADO para Puntos 3, 4, 5)
 // @route   POST /api/bookings
@@ -65,7 +67,6 @@ const createBooking = async (req, res) => {
         name: user.name,
         lastName: user.lastName,
         phone: user.phone,
-        // (Si el usuario está logueado, podríamos añadir req.user._id)
       },
       startTime: startTime,
       endTime: endTime,
@@ -81,7 +82,8 @@ const createBooking = async (req, res) => {
     io.emit('booking_update', createdBooking);
     
     // (req.user no existe en una ruta pública, loguear anónimamente o quitarlo)
-    // await logActivity(req.user, 'BOOKING_CREATED', logDetails);
+    // const logDetails = `Booking created for ${createdBooking.user.name} ...`;
+    // await logActivity(null, 'BOOKING_CREATED', logDetails);
 
     if (createdBooking.user.phone) {
         const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${startTime.toLocaleString(timeZone)} ha sido confirmada. Total: $${totalPrice}. ¡Te esperamos!`;
@@ -95,10 +97,126 @@ const createBooking = async (req, res) => {
   }
 };
 
-// (El resto de funciones: getBookingAvailability, getBookings, etc. siguen igual)
-// ...
+/* --- DE AQUÍ EN ADELANTE, ES TU CÓDIGO ORIGINAL --- */
+/* (Asegúrate de que estas funciones estén en tu archivo) */
+
+const getBookingAvailability = async (req, res) => {
+    try {
+        const { date } = req.query;
+        if (!date) {
+            console.error("Error en getAvailability: No se proporcionó fecha.");
+            return res.status(400).json({ message: 'La fecha es requerida' });
+        }
+        const timeZone = 'America/Argentina/Buenos_Aires';
+        const start = startOfDay(zonedTimeToUtc(date, timeZone));
+        const end = endOfDay(zonedTimeToUtc(date, timeZone));
+        const bookings = await Booking.find({
+            startTime: {
+                $gte: start,
+                $lt: end
+            },
+            status: { $ne: 'Cancelled' }
+        }).populate('court');
+        res.status(200).json(bookings);
+    } catch (error) {
+        console.error("¡CRASH EN getAvailability!", error);
+        res.status(500).json({
+            message: 'Error interno al obtener la disponibilidad.',
+            error: error.message,
+        });
+    }
+};
+
+// @desc    Get all bookings
+// @route   GET /api/bookings
+// @access  Operator/Admin
+const getBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({}).populate('court', 'name courtType').sort({ startTime: -1 });
+    res.json(bookings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Get a single booking by ID
+// @route   GET /api/bookings/:id
+// @access  Operator/Admin
+const getBookingById = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate('court');
+    if (booking) {
+      res.json(booking);
+    } else {
+      res.status(404).json({ message: 'Booking not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Update booking status
+// @route   PUT /api/bookings/:id/status
+// @access  Operator/Admin
+const updateBookingStatus = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (booking) {
+      booking.status = req.body.status || booking.status;
+      booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
+      
+      const updatedBooking = await booking.save();
+      
+      const io = req.app.get('socketio');
+      io.emit('booking_update', updatedBooking);
+      
+      // const logDetails = `Booking ID ${updatedBooking._id} status changed...`;
+      // await logActivity(req.user, 'BOOKING_UPDATED', logDetails);
+
+      res.json(updatedBooking);
+    } else {
+      res.status(404).json({ message: 'Booking not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Cancel a booking
+// @route   PUT /api/bookings/:id/cancel
+// @access  Operator/Admin
+const cancelBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+        if (booking) {
+            booking.status = 'Cancelled';
+            const updatedBooking = await booking.save();
+
+            const io = req.app.get('socketio');
+            io.emit('booking_deleted', { id: req.params.id });
+
+            // const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
+            // await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
+
+            res.json({ message: 'Booking cancelled successfully' });
+        } else {
+            res.status(404).json({ message: 'Booking not found' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 
 module.exports = {
   createBooking,
-  // ... (exporta el resto de tus funciones)
+  getBookings,
+  getBookingById,
+  updateBookingStatus,
+  cancelBooking,
+  getBookingAvailability,
 };
