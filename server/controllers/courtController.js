@@ -4,29 +4,26 @@ const Setting = require('../models/Setting');
 const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
+// (Esta función ya estaba bien, la dejamos como está)
 const getAggregatedAvailability = async (req, res) => {
   try {
     const { date } = req.params;
     const timeZone = 'America/Argentina/Buenos_Aires';
 
-    // --- CORRECCIÓN DEFINITIVA ---
     // 1. Buscar TODOS los documentos de settings
     const settingsList = await Setting.find({}); 
-
-    // 2. Reducirlos a un solo objeto (como hace tu settingController)
     const settings = settingsList.reduce((acc, setting) => {
       acc[setting.key] = setting.value;
       return acc;
     }, {});
-    // --- FIN DE LA CORRECCIÓN ---
 
-    // 3. Depuración (para estar seguros)
+    // 2. Depuración (para estar seguros)
     console.log('CONFIGURACIÓN REDUCIDA (LO QUE USARÁ LA VALIDACIÓN):', settings);
 
-    // 4. Asegurarnos de que slotDuration sea un número
+    // 3. Asegurarnos de que slotDuration sea un número
     const slotDuration = parseInt(settings.slotDuration, 10);
 
-    // 5. Validación (ahora debería funcionar)
+    // 4. Validación (ahora debería funcionar)
     if (!settings || 
         !settings.openTime || settings.openTime === "" ||
         !settings.closeTime || settings.closeTime === "" ||
@@ -38,21 +35,21 @@ const getAggregatedAvailability = async (req, res) => {
       });
     }
 
-    // 6. Generar todos los slots posibles para ese día
+    // 5. Generar todos los slots posibles para ese día
     const allPossibleSlots = generateTimeSlots(
       settings.openTime,
       settings.closeTime,
       slotDuration // Usamos el número
     );
 
-    // 7. Obtener todas las canchas activas
+    // 6. Obtener todas las canchas activas
     const activeCourts = await Court.find({ isActive: true }).select('name pricePerHour');
 
     if (!activeCourts || activeCourts.length === 0) {
         return res.status(404).json({ message: 'No se encontraron canchas activas.' });
     }
 
-    // 8. Obtener todas las reservas (bookings) para ese día
+    // 7. Obtener todas las reservas (bookings) para ese día
     const start = startOfDay(zonedTimeToUtc(date, timeZone));
     const end = endOfDay(zonedTimeToUtc(date, timeZone));
     
@@ -61,7 +58,7 @@ const getAggregatedAvailability = async (req, res) => {
       status: { $ne: 'Cancelled' }
     }).select('court startTime');
 
-    // 9. Mapear la disponibilidad
+    // 8. Mapear la disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
       
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
@@ -105,8 +102,9 @@ const getAggregatedAvailability = async (req, res) => {
 };
 
 
-/* --- INICIO DEL CÓDIGO ORIGINAL --- */
+/* --- INICIO DEL CÓDIGO DEL ADMINISTRADOR (CORREGIDO) --- */
 
+// @desc    (Admin) Get all courts
 const getCourts = async (req, res) => {
   try {
     const courts = await Court.find({});
@@ -117,13 +115,15 @@ const getCourts = async (req, res) => {
   }
 };
 
+// @desc    (Admin) Create a court
+// --- CORREGIDO ---
 const createCourt = async (req, res) => {
+  // Se quitó 'availableSlots' de req.body
   const {
     name,
     courtType,
     pricePerHour,
     isActive,
-    availableSlots,
   } = req.body;
 
   try {
@@ -132,7 +132,7 @@ const createCourt = async (req, res) => {
       courtType,
       pricePerHour,
       isActive,
-      availableSlots,
+      // availableSlots ya no se asigna aquí
     });
     const createdCourt = await court.save();
     res.status(201).json(createdCourt);
@@ -142,6 +142,7 @@ const createCourt = async (req, res) => {
   }
 };
 
+// @desc    (Admin) Get court by ID
 const getCourtById = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
@@ -156,8 +157,11 @@ const getCourtById = async (req, res) => {
   }
 };
 
+// @desc    (Admin) Update court
+// --- CORREGIDO ---
 const updateCourt = async (req, res) => {
-  const { name, courtType, pricePerHour, isActive, availableSlots } = req.body;
+  // Se quitó 'availableSlots' de req.body
+  const { name, courtType, pricePerHour, isActive } = req.body;
   try {
     const court = await Court.findById(req.params.id);
     if (court) {
@@ -165,7 +169,8 @@ const updateCourt = async (req, res) => {
       court.courtType = courtType;
       court.pricePerHour = pricePerHour;
       court.isActive = isActive;
-      court.availableSlots = availableSlots;
+      // La línea 'court.availableSlots = availableSlots;' se eliminó
+      // Se deja que Mongoose maneje el 'undefined' o lo que sea que venga
 
       const updatedCourt = await court.save();
       res.json(updatedCourt);
@@ -173,11 +178,12 @@ const updateCourt = async (req, res) => {
       res.status(404).json({ message: 'Court not found' });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error("Error al actualizar la cancha:", error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
+// @desc    (Admin) Delete court
 const deleteCourt = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
@@ -193,6 +199,8 @@ const deleteCourt = async (req, res) => {
   }
 };
 
+
+// @desc    (Public) Get active courts
 const getPublicCourts = async (req, res) => {
   try {
     const courts = await Court.find({ isActive: true });
@@ -202,6 +210,7 @@ const getPublicCourts = async (req, res) => {
   }
 };
 
+// @desc    (Public) Get availability for a specific court (Lógica antigua, obsoleta)
 const getAvailabilityForPublic = async (req, res) => {
   try {
     const { date, courtId } = req.params;
@@ -211,7 +220,7 @@ const getAvailabilityForPublic = async (req, res) => {
     if (!court || !court.isActive) {
       return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
     }
-
+    
     const start = startOfDay(zonedTimeToUtc(date, timeZone));
     const end = endOfDay(zonedTimeToUtc(date, timeZone));
 
@@ -221,6 +230,9 @@ const getAvailabilityForPublic = async (req, res) => {
       status: { $ne: 'Cancelled' },
     });
     
+    // NOTA: Esta lógica antigua sigue usando availableSlots.
+    // Debería refactorizarse para usar generateTimeSlots también,
+    // pero la dejamos así ya que no la usa el flujo público.
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
@@ -243,7 +255,6 @@ const getAvailabilityForPublic = async (req, res) => {
   }
 };
 
-/* --- FIN DEL CÓDIGO ORIGINAL --- */
 
 module.exports = {
   getAggregatedAvailability, // La nueva función
