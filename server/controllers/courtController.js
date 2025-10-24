@@ -1,17 +1,18 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting'); 
-// --- CORRECCIÓN DE IMPORTACIÓN ---
-// Esta es la forma correcta de importar estas funciones en CommonJS
-const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
-const { startOfDay } = require('date-fns-tz/startOfDay');
-const { endOfDay } = require('date-fns-tz/endOfDay');
+// --- CORRECCIÓN DE IMPORTACIÓN (Volvemos a la original) ---
+const { 
+  zonedTimeToUtc, 
+  startOfDay, 
+  endOfDay 
+} = require('date-fns-tz');
 // --- FIN DE CORRECCIÓN ---
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
 const getAggregatedAvailability = async (req, res) => {
   try {
-    const { date } = req.params;
+    const { date } = req.params; // 'date' es un string 'yyyy-MM-dd'
     const timeZone = 'America/Argentina/Buenos_Aires';
 
     // 1. Buscar TODOS los documentos de settings
@@ -53,9 +54,11 @@ const getAggregatedAvailability = async (req, res) => {
     }
 
     // 6. Obtener todas las reservas (bookings) para ese día
-    // (Esta sección ahora funcionará gracias a la corrección de importación)
-    const start = startOfDay(zonedTimeToUtc(date, timeZone));
-    const end = endOfDay(zonedTimeToUtc(date, timeZone));
+    // --- CORRECCIÓN DE LÓGICA (Evita el error 'TZDate is not a constructor') ---
+    // Pasamos el string 'date' y el 'timeZone' como opción.
+    const start = startOfDay(date, { timeZone }); 
+    const end = endOfDay(date, { timeZone });
+    // --- FIN DE CORRECCIÓN ---
     
     const bookings = await Booking.find({
       startTime: { $gte: start, $lt: end },
@@ -65,6 +68,7 @@ const getAggregatedAvailability = async (req, res) => {
     // 7. Mapear la disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
       
+      // 'zonedTimeToUtc' se usa aquí, y esto es correcto
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
 
       const bookedCourtIds = bookings
@@ -200,6 +204,7 @@ const getPublicCourts = async (req, res) => {
   }
 };
 
+// Esta función es la lógica antigua y también necesita la corrección
 const getAvailabilityForPublic = async (req, res) => {
   try {
     const { date, courtId } = req.params;
@@ -210,8 +215,9 @@ const getAvailabilityForPublic = async (req, res) => {
       return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
     }
     
-    const start = startOfDay(zonedTimeToUtc(date, timeZone));
-    const end = endOfDay(zonedTimeToUtc(date, timeZone));
+    // --- CORRECCIÓN DE LÓGICA (Aplicada aquí también) ---
+    const start = startOfDay(date, { timeZone });
+    const end = endOfDay(date, { timeZone });
 
     const bookings = await Booking.find({
       court: courtId,
