@@ -17,7 +17,7 @@ const TimeSlotFinder = ({ settings }) => {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const today = startOfToday();
-  const maxBookingDays = settings.bookingLeadTime || 7; // Días por defecto si no está configurado
+  const maxBookingDays = settings.bookingLeadTime || 7; 
 
   useEffect(() => {
     const fetchCourts = async () => {
@@ -25,19 +25,18 @@ const TimeSlotFinder = ({ settings }) => {
         setLoading(true);
         setError(null);
         
-        // --- CORRECCIÓN ---
-        // Ahora getPublicCourts() devuelve el array directamente (gracias al fix en courtService.js).
-        // Mi última corrección (response.data) era incorrecta.
+        // (Esto ya estaba corregido)
         const data = await getPublicCourts(); 
-        // --- FIN DE CORRECCIÓN ---
-
-        setCourts(data);
+        
         if (data.length > 0) {
+          setCourts(data); // courts es un array
           setSelectedCourt(data[0]._id);
         } else {
+          setCourts([]); // Asegurarse de que sea un array vacío
           setError('No hay canchas disponibles para reservar en este momento.');
         }
       } catch (err) {
+        setCourts([]);
         setError(err.message || 'Error al cargar las canchas');
       } finally {
         setLoading(false);
@@ -51,19 +50,15 @@ const TimeSlotFinder = ({ settings }) => {
       setAvailability([]); 
       return;
     }
-
     try {
       setLoading(true);
       setError(null);
       
-      // --- CORRECCIÓN ---
-      // Ahora getAvailability() devuelve el array directamente (gracias al fix en courtService.js).
+      // (Esto ya estaba corregido)
       const availableData = await getAvailability(selectedDate, selectedCourt);
       
-      // El backend ya nos dio la lista procesada. 
-      // La establecemos directamente.
-      setAvailability(availableData);
-      // --- FIN DE CORRECCIÓN ---
+      // Nos aseguramos de que sea un array
+      setAvailability(Array.isArray(availableData) ? availableData : []);
 
     } catch (err) {
       console.error("Error en fetchAvailability:", err);
@@ -98,18 +93,38 @@ const TimeSlotFinder = ({ settings }) => {
     }
   };
 
+  // --- FUNCIÓN DE DEBUG ---
   const handleSlotClick = (slot) => {
+    console.log('--- 1. Clic en Slot ---');
+    console.log('Slot recibido:', slot);
+
     if (slot.isAvailable) {
-      setSelectedSlot({
+      const courtDetails = courts.find(c => c._id === selectedCourt);
+      
+      const newSlotDetails = {
         courtId: selectedCourt,
-        courtName: courts.find(c => c._id === selectedCourt)?.name,
+        courtName: courtDetails ? courtDetails.name : 'Cancha no encontrada',
         date: selectedDate,
         startTime: slot.time,
-        price: courts.find(c => c._id === selectedCourt)?.price || 0,
-      });
+        price: courtDetails ? courtDetails.price : 0,
+      };
+
+      console.log('--- 2. Datos para el Modal ---');
+      console.log('Datos a establecer:', newSlotDetails);
+      console.log('Array de canchas (para verificar):', courts);
+      console.log('ID de cancha seleccionada:', selectedCourt);
+
+      setSelectedSlot(newSlotDetails);
       setIsModalOpen(true);
+      
+      console.log('--- 3. Estado de Modal ---');
+      console.log('Modal seteado a: Abierto');
+      
+    } else {
+      console.warn('Clic en slot NO disponible (esto no debería pasar si está deshabilitado)');
     }
   };
+  // --- FIN DE FUNCIÓN DE DEBUG ---
 
   const selectedCourtDetails = courts.find(c => c._id === selectedCourt);
   const dateForDisplay = new Date(selectedDate + 'T00:00:00');
@@ -118,6 +133,7 @@ const TimeSlotFinder = ({ settings }) => {
     <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl mx-auto">
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
+      {/* Selector de Cancha */}
       <div className="mb-4">
         <label htmlFor="court" className="block text-sm font-medium text-gray-300 mb-2">
           Selecciona una Cancha
@@ -142,8 +158,10 @@ const TimeSlotFinder = ({ settings }) => {
         )}
       </div>
 
+      {/* Selector de Fecha */}
       <div className="mb-6">
-        <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
+        {/* ... (código de fecha sin cambios) ... */}
+         <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
           Selecciona una Fecha
         </label>
         <div className="flex items-center space-x-2">
@@ -179,14 +197,16 @@ const TimeSlotFinder = ({ settings }) => {
         </p>
       </div>
 
+      {/* Grilla de Turnos */}
       {loading ? (
         <InlineLoading text="Buscando turnos disponibles..." />
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+          {/* Este .map ahora funciona */}
           {availability.map((slot) => (
             <button
               key={slot.time}
-              onClick={() => handleSlotClick(slot)}
+              onClick={() => handleSlotClick(slot)} // Llama a la función de debug
               disabled={!slot.isAvailable}
               className={`p-3 rounded-md text-center font-semibold transition-colors
                 ${
@@ -208,6 +228,9 @@ const TimeSlotFinder = ({ settings }) => {
         </div>
       )}
 
+      {/* Modal de Reserva */}
+      {/* Esta condición {isModalOpen && selectedSlot && ...} es la que 
+          probablemente está fallando. Los logs nos dirán por qué. */}
       {isModalOpen && selectedSlot && (
         <BookingModal
           slot={selectedSlot}
