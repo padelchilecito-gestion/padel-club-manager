@@ -1,17 +1,17 @@
 const express = require('express');
 // const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
-const { setupSocketIO } = require('./config/socket'); 
+const { setupSocketIO } = require('./config/socket');
 const { logActivity } = require('./utils/logActivity');
 // const { connectToRabbitMQ } = require('./config/rabbitmq'); // Comentado
 // --- CORRECCIÓN 1: Comentamos la importación del scheduler ---
-// const { setupScheduledTasks } = require('./utils/scheduler'); 
+// const { setupScheduledTasks } = require('./utils/scheduler');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
-const morgan = require('morgan');
+const morgan = require('morgan'); // <-- ESTA LÍNEA AHORA FUNCIONARÁ
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -38,7 +38,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://padel-club-manager.vercel.app',
   'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app' 
+  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app'
 ];
 
 app.use(cors({
@@ -63,7 +63,7 @@ app.use(helmet({
       "connect-src": [
         "'self'",
         "https://api.mercadopago.com",
-        "https://padel-club-backend.onrender.com", 
+        "https://padel-club-backend.onrender.com",
         "wss://padel-club-backend.onrender.com",
         ...allowedOrigins
       ],
@@ -88,8 +88,8 @@ app.use(hpp());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, 
-  max: 200, 
+  windowMs: 10 * 60 * 1000,
+  max: 200,
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
 });
 app.use('/api', limiter);
@@ -114,7 +114,7 @@ if (process.env.NODE_ENV === 'production') {
 // Middlewares de error (comentados)
 // app.use(logErrors);
 // app.use(errorHandler);
-// app.use(logger); 
+// app.use(logger);
 
 const PORT = process.env.PORT || 10000;
 
@@ -122,7 +122,7 @@ const server = http.createServer(app);
 
 // Configurar Socket.IO
 const io = setupSocketIO(server, allowedOrigins);
-app.set('socketio', io); 
+app.set('socketio', io);
 
 // Iniciar servidor
 server.listen(PORT, async () => {
@@ -132,9 +132,9 @@ server.listen(PORT, async () => {
     // const channel = await connectToRabbitMQ();
     // app.set('rabbitMQChannel', channel);
     // console.log('RabbitMQ connected and channel set in app.');
-    
+
     // --- CORRECCIÓN 2: Comentamos el uso del scheduler ---
-    // setupScheduledTasks(); 
+    // setupScheduledTasks();
     // --- FIN DE CORRECCIÓN 2 ---
 
   } catch (error) {
