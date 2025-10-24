@@ -1,57 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createCourt,
   getCourts,
+  createCourt,
   getCourtById,
   updateCourt,
   deleteCourt,
   getPublicCourts,
-  getAvailabilityForPublic, // <-- Esta es la función que usamos
+  getAvailabilityForPublic,
+  getAggregatedAvailability // Importar la nueva función
 } = require('../controllers/courtController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
-// === RUTAS PÚBLICAS ===
+// --- NUEVA RUTA (Punto 1) ---
+// GET /api/courts/availability/:date
+// Obtiene la disponibilidad agregada para una fecha, sin especificar cancha
+router.get('/availability/:date', getAggregatedAvailability);
 
-// @desc    Get all active courts for public view
-// @route   GET /api/courts/public
-// @access  Public
+// --- Rutas existentes ---
+router.route('/').get(protect, admin, getCourts).post(protect, admin, createCourt);
 router.get('/public', getPublicCourts);
-
-// @desc    Get court availability for a specific date (Public)
-// @route   GET /api/courts/availability/:date/:courtId
-// @access  Public
-// --- LÍNEA CORREGIDA ---
-// Se añaden :date y :courtId para que coincida con la llamada del frontend
-router.get('/availability/:date/:courtId', getAvailabilityForPublic);
-// --- FIN DE CORRECCIÓN ---
-
-
-// === RUTAS DE ADMIN ===
-
-// @desc    Create a court
-// @route   POST /api/courts
-// @access  Admin
-router.post('/', protect, admin, createCourt);
-
-// @desc    Get all courts (admin view)
-// @route   GET /api/courts
-// @access  Admin
-router.get('/', protect, admin, getCourts);
-
-// @desc    Get court by ID
-// @route   GET /api/courts/:id
-// @access  Admin
-router.get('/:id', protect, admin, getCourtById);
-
-// @desc    Update a court
-// @route   PUT /api/courts/:id
-// @access  Admin
-router.put('/:id', protect, admin, updateCourt);
-
-// @desc    Delete a court
-// @route   DELETE /api/courts/:id
-// @access  Admin
-router.delete('/:id', protect, admin, deleteCourt);
+router.get('/availability/:date/:courtId', getAvailabilityForPublic); // Ruta vieja
+router
+  .route('/:id')
+  .get(protect, admin, getCourtById)
+  .put(protect, admin, updateCourt)
+  .delete(protect, admin, deleteCourt);
 
 module.exports = router;
