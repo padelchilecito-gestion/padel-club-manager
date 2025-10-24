@@ -7,13 +7,9 @@ import BookingModal from './BookingModal'; // El modal reescrito
 import { Calendar, Clock, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 
 const TimeSlotFinder = ({ settings }) => {
-  // Punto 1: No hay 'selectedCourt'. Solo 'selectedDate'.
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [availability, setAvailability] = useState([]);
-  
-  // Punto 2: Estado para selección múltiple
   const [selectedSlots, setSelectedSlots] = useState([]); 
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,22 +17,25 @@ const TimeSlotFinder = ({ settings }) => {
   const today = startOfToday();
   const maxBookingDays = settings.bookingLeadTime || 7;
 
-  // Carga la disponibilidad agregada cuando la fecha cambia
   const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // Punto 1: Llamar a la nueva API solo con la fecha
       const data = await getAggregatedAvailability(selectedDate);
       setAvailability(data);
-      setSelectedSlots([]); // Limpiar selección al cambiar de día
+      setSelectedSlots([]); 
     } catch (err) {
-      setError(err.message || 'Error al cargar la disponibilidad');
+      // --- CORRECCIÓN DE MANEJO DE ERROR ---
+      // Esto leerá el mensaje "La configuración del club no está completa."
+      // que envía el backend y lo mostrará en la UI.
+      const errorMsg = err.response?.data?.message || err.message || 'Error al cargar la disponibilidad';
+      setError(errorMsg);
+      // --- FIN DE CORRECCIÓN ---
       setAvailability([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]); // Solo depende de la fecha
+  }, [selectedDate]); 
 
   useEffect(() => {
     fetchAvailability();
@@ -62,32 +61,27 @@ const TimeSlotFinder = ({ settings }) => {
     }
   };
 
-  // Punto 2: Lógica de selección múltiple
   const handleSlotClick = (slot) => {
     const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
 
     if (isSelected) {
-      // Deseleccionar
       const newSlots = selectedSlots.filter(s => s.startTime !== slot.startTime);
       setSelectedSlots(sortSlots(newSlots));
     } else {
-      // Seleccionar
       const newSlots = [...selectedSlots, { ...slot, date: selectedDate }];
       
-      // Validar consecutividad (simple)
       if (newSlots.length > 1) {
         const sorted = sortSlots(newSlots);
         if (!areSlotsConsecutive(sorted, settings.slotDuration || 30)) {
           setError('Solo puedes seleccionar turnos consecutivos.');
           setTimeout(() => setError(null), 3000);
-          return; // No añadir
+          return; 
         }
       }
       setSelectedSlots(sortSlots(newSlots));
     }
   };
 
-  // Funciones helper para selección múltiple
   const sortSlots = (slots) => {
     return slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
@@ -110,7 +104,6 @@ const TimeSlotFinder = ({ settings }) => {
     }
   };
 
-  // Punto 5: Calcular totales
   const totalSlots = selectedSlots.length;
   const totalPrice = selectedSlots.reduce((total, slot) => total + slot.price, 0);
   const totalDuration = totalSlots * (settings.slotDuration || 30);
@@ -119,9 +112,9 @@ const TimeSlotFinder = ({ settings }) => {
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl mx-auto">
+      {/* Ahora el error 400 mostrará un mensaje claro */}
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
-      {/* Punto 1: Selector de Fecha (ahora es el paso principal) */}
       <div className="mb-6">
         <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
           1. Selecciona una Fecha
@@ -159,80 +152,81 @@ const TimeSlotFinder = ({ settings }) => {
         </p>
       </div>
 
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        2. Selecciona uno o más turnos (consecutivos)
-      </label>
-      
-      {/* Grilla de Turnos (Punto 2) */}
-      {loading ? (
-        <InlineLoading text="Buscando turnos disponibles..." />
-      ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {availability.map((slot) => {
-            const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
-            return (
-              <button
-                key={slot.startTime}
-                onClick={() => handleSlotClick(slot)}
-                disabled={!slot.isAvailable}
-                className={`p-3 rounded-md text-center font-semibold transition-all
-                  ${
-                    !slot.isAvailable
-                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed line-through'
-                      : isSelected
-                      ? 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 ring-2 ring-white'
-                      : 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
-                  }
-                `}
-              >
-                <Clock size={16} className="inline-block mr-1 mb-0.5" />
-                {slot.startTime}
-              </button>
-            );
-          })}
-          {availability.length === 0 && !loading && (
-            <p className="text-gray-400 col-span-full text-center">
-              No hay turnos para mostrar en esta fecha.
-            </p>
+      {!error && ( // No mostrar la grilla si hay un error de configuración
+        <>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            2. Selecciona uno o más turnos (consecutivos)
+          </label>
+          
+          {loading ? (
+            <InlineLoading text="Buscando turnos disponibles..." />
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              {availability.map((slot) => {
+                const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
+                return (
+                  <button
+                    key={slot.startTime}
+                    onClick={() => handleSlotClick(slot)}
+                    disabled={!slot.isAvailable}
+                    className={`p-3 rounded-md text-center font-semibold transition-all
+                      ${
+                        !slot.isAvailable
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed line-through'
+                          : isSelected
+                          ? 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 ring-2 ring-white'
+                          : 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
+                      }
+                    `}
+                  >
+                    <Clock size={16} className="inline-block mr-1 mb-0.5" />
+                    {slot.startTime}
+                  </button>
+                );
+              })}
+              {availability.length === 0 && !loading && (
+                <p className="text-gray-400 col-span-full text-center">
+                  No hay turnos para mostrar en esta fecha.
+                </p>
+              )}
+            </div>
           )}
-        </div>
+
+          {selectedSlots.length > 0 && (
+            <div className="mt-6 p-4 bg-gray-900 rounded-lg">
+              <h3 className="text-lg font-semibold text-white mb-3">Tu Reserva</h3>
+              <div className="flex justify-between items-center text-gray-300 mb-2">
+                <span>Turnos seleccionados:</span>
+                <span className="font-bold">{totalSlots}</span>
+              </div>
+              <div className="flex justify-between items-center text-gray-300 mb-2">
+                <span>Tiempo total:</span>
+                <span className="font-bold">{totalDuration} minutos</span>
+              </div>
+              <div className="flex justify-between items-center text-xl text-white mt-3">
+                <span className="font-bold">Total a Pagar:</span>
+                <span className="font-bold text-green-400">${totalPrice}</span>
+              </div>
+              <button
+                onClick={handleOpenModal}
+                className="w-full mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-md transition-colors flex items-center justify-center"
+              >
+                <ShoppingCart size={18} className="mr-2" />
+                Continuar Reserva
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Resumen de Reserva (Punto 5) */}
-      {selectedSlots.length > 0 && (
-        <div className="mt-6 p-4 bg-gray-900 rounded-lg">
-          <h3 className="text-lg font-semibold text-white mb-3">Tu Reserva</h3>
-          <div className="flex justify-between items-center text-gray-300 mb-2">
-            <span>Turnos seleccionados:</span>
-            <span className="font-bold">{totalSlots}</span>
-          </div>
-          <div className="flex justify-between items-center text-gray-300 mb-2">
-            <span>Tiempo total:</span>
-            <span className="font-bold">{totalDuration} minutos</span>
-          </div>
-          <div className="flex justify-between items-center text-xl text-white mt-3">
-            <span className="font-bold">Total a Pagar:</span>
-            <span className="font-bold text-green-400">${totalPrice}</span>
-          </div>
-          <button
-            onClick={handleOpenModal}
-            className="w-full mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-md transition-colors flex items-center justify-center"
-          >
-            <ShoppingCart size={18} className="mr-2" />
-            Continuar Reserva
-          </button>
-        </div>
-      )}
-
-      {/* Modal de Reserva (Puntos 3, 4, 5) */}
       {isModalOpen && (
         <BookingModal
-          slots={selectedSlots} // Pasa los slots seleccionados
+          slots={selectedSlots} 
           settings={settings}
           onClose={() => setIsModalOpen(false)}
           onBookingSuccess={() => {
             setIsModalOpen(false);
-            fetchAvailability(); // Refresca la lista de turnos
+            fetchAvailability(); 
           }}
         />
       )}
