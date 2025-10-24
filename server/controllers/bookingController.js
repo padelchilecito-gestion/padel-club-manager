@@ -2,113 +2,131 @@ const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
+const { zonedTimeToUtc } = require('date-fns-tz');
+const { parseISO, startOfDay, endOfDay } = require('date-fns');
 
-// @desc    Create a new booking
+// @desc    Get availability for a specific date across all courts
+// @route   GET /api/bookings/availability
+// @access  Public
+const getBookingAvailability = async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date is required' });
+    }
+
+    try {
+        const timeZone = 'America/Argentina/Buenos_Aires';
+        const startOfDayUTC = startOfDay(zonedTimeToUtc(date, timeZone));
+        const endOfDayUTC = endOfDay(zonedTimeToUtc(date, timeZone));
+
+        const courts = await Court.find({ status: 'available' });
+        const bookings = await Booking.find({
+            startTime: { $gte: startOfDayUTC, $lt: endOfDayUTC },
+            status: { $ne: 'Cancelled' },
+        });
+
+        // Generate all possible slots for the day
+        const openingTime = 9; // 9:00 AM
+        const closingTime = 23; // 11:00 PM
+        const slotDuration = 30; // 30 minutes
+        const allSlots = [];
+        for (let hour = openingTime; hour < closingTime; hour++) {
+            for (let minute = 0; minute < 60; minute += slotDuration) {
+                allSlots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+            }
+        }
+
+        const availability = allSlots.map(slotTime => {
+            const slotStart = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+
+            const bookedCourtsForSlot = bookings.filter(b =>
+                slotStart >= b.startTime && slotStart < b.endTime
+            ).map(b => b.court.toString());
+
+            const availableCourts = courts.length - bookedCourtsForSlot.length;
+
+            return {
+                startTime: slotTime,
+                isAvailable: availableCourts > 0,
+                availableCourtsCount: availableCourts,
+            };
+        });
+
+        res.status(200).json(availability);
+    } catch (error) {
+        console.error('Error fetching availability:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+
+// @desc    Create a new booking with multiple slots
 // @route   POST /api/bookings
 // @access  Public
 const createBooking = async (req, res) => {
-  const { courtId, user, startTime, endTime, paymentMethod, isPaid } = req.body;
+    const { date, slots, userName, userPhone, paymentMethod } = req.body;
 
-  try {
-    const court = await Court.findById(courtId);
-    if (!court) {
-      return res.status(404).json({ message: 'Court not found' });
+    if (!date || !slots || !Array.isArray(slots) || slots.length === 0 || !userName || !userPhone) {
+        return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // Las fechas ya vienen en formato ISO desde el frontend, se usan directamente.
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    if (start >= end) {
-      return res.status(400).json({ message: 'End time must be after start time.' });
-    }
-
-    // Check for conflicting bookings
-    const conflictingBooking = await Booking.findOne({
-      court: courtId,
-      status: { $ne: 'Cancelled' },
-      $or: [
-        { startTime: { $lt: end, $gte: start } },
-        { endTime: { $gt: start, $lte: end } },
-        { startTime: { $lte: start }, endTime: { $gte: end } }
-      ],
-    });
-
-    if (conflictingBooking) {
-      return res.status(409).json({ message: 'The selected time slot is already booked.' });
-    }
-    
-    const durationHours = (end - start) / (1000 * 60 * 60);
-    const price = durationHours * court.pricePerHour;
-
-    const booking = new Booking({
-      court: courtId,
-      user,
-      startTime: start,
-      endTime: end,
-      price,
-      paymentMethod,
-      isPaid: isPaid || false,
-      status: 'Confirmed',
-    });
-
-    const createdBooking = await booking.save();
-    
-    const io = req.app.get('socketio');
-    io.emit('booking_update', createdBooking);
-    
-    const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
-    await logActivity(req.user, 'BOOKING_CREATED', logDetails);
-
-    if (createdBooking.user.phone) {
-        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en Padel Club Manager para la cancha "${court.name}" el ${start.toLocaleString()} ha sido confirmada. ¡Te esperamos!`;
-        await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
-    }
-
-    res.status(201).json(createdBooking);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-const getBookingAvailability = async (req, res) => {
     try {
-        const { date } = req.query;
-        if (!date) {
-            console.error("Error en getAvailability: No se proporcionó fecha.");
-            return res.status(400).json({ message: 'La fecha es requerida' });
-        }
-
-        // --- INICIO DE LA CORRECCIÓN ---
-
-        // Define la zona horaria de Argentina
         const timeZone = 'America/Argentina/Buenos_Aires';
 
-        // Convierte la fecha recibida (ej: '2023-10-27') al inicio y fin del día en la zona horaria de Argentina,
-        // y luego a UTC para consultar la base de datos de forma consistente.
-        const start = startOfDay(zonedTimeToUtc(date, timeZone));
-        const end = endOfDay(zonedTimeToUtc(date, timeZone));
+        // 1. Sort slots and create Date objects
+        const sortedSlots = slots.sort();
+        const startTimes = sortedSlots.map(slot => zonedTimeToUtc(`${date}T${slot}:00`, timeZone));
+        const startTime = startTimes[0];
+        const endTime = new Date(startTimes[startTimes.length - 1].getTime() + 30 * 60 * 1000); // Add 30 mins to the last slot
 
-        const bookings = await Booking.find({
-            startTime: {
-                $gte: start,
-                $lt: end
-            },
-            status: { $ne: 'Cancelled' } // Asegúrate de no contar los turnos cancelados
-        }).populate('court');
-
-        // --- FIN DE LA CORRECCIÓN ---
-
-        res.status(200).json(bookings);
-
-    } catch (error) {
-        console.error("¡CRASH EN getAvailability!", error);
-        res.status(500).json({
-            message: 'Error interno al obtener la disponibilidad.',
-            error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        // 2. Find an available court for the entire duration
+        const courts = await Court.find({ status: 'available' });
+        const conflictingBookings = await Booking.find({
+            status: { $ne: 'Cancelled' },
+            $or: [
+                { startTime: { $lt: endTime, $gte: startTime } },
+                { endTime: { $gt: startTime, $lte: endTime } },
+            ],
         });
+
+        const bookedCourtIds = conflictingBookings.map(b => b.court.toString());
+        const availableCourt = courts.find(c => !bookedCourtIds.includes(c._id.toString()));
+
+        if (!availableCourt) {
+            return res.status(409).json({ message: 'No single court is available for the entire selected time range.' });
+        }
+
+        // 3. Calculate price and create booking
+        const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+        const totalPrice = durationHours * availableCourt.pricePerHour;
+
+        const booking = new Booking({
+            court: availableCourt._id,
+            user: { name: userName, phone: userPhone },
+            startTime,
+            endTime,
+            price: totalPrice,
+            paymentMethod: paymentMethod || 'Efectivo',
+            status: 'Confirmed', // Or 'Pending' if payment is required
+        });
+
+        const createdBooking = await booking.save();
+
+        // 4. Emit socket event and log activity (optional but good practice)
+        const io = req.app.get('socketio');
+        if (io) {
+            io.emit('booking_update', { ...createdBooking.toObject(), court: availableCourt });
+        }
+
+        // Log activity if a user is logged in
+        if (req.user) {
+            await logActivity(req.user, 'BOOKING_CREATED', `Booking for ${userName} on ${availableCourt.name}.`);
+        }
+
+        res.status(201).json(createdBooking);
+    } catch (error) {
+        console.error('Error creating booking:', error);
+        res.status(500).json({ message: 'Server error while creating booking.' });
     }
 };
 

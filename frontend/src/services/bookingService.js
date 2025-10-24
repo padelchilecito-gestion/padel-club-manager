@@ -2,18 +2,21 @@ import apiClient from './api';
 
 const getAvailability = async (date) => {
   try {
+    // The new endpoint expects just a date
     const response = await apiClient.get('/bookings/availability', {
       params: { date },
     });
     return response.data;
   } catch (error) {
     console.error('Error fetching availability:', error);
-    throw error;
+    throw error.response?.data || error;
   }
 };
 
-const createBooking = async (bookingData) => {
+const createBooking = async ({ date, slots, userName, userPhone, paymentMethod }) => {
   try {
+    // The new endpoint expects this specific payload
+    const bookingData = { date, slots, userName, userPhone, paymentMethod };
     const response = await apiClient.post('/bookings', bookingData);
     return response.data;
   } catch (error) {
