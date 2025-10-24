@@ -3,12 +3,10 @@ const Court = require('../models/Court');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
 // --- CORRECCIÓN DE IMPORTACIÓN ---
-// Cambiamos la forma de importar para evitar el error '...is not a constructor'
-const fnsTz = require('date-fns-tz');
-const zonedTimeToUtc = fnsTz.zonedTimeToUtc;
-const startOfDay = fnsTz.startOfDay;
-const endOfDay = fnsTz.endOfDay;
-const addMinutes = fnsTz.addMinutes;
+const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
+const { startOfDay } = require('date-fns-tz/startOfDay');
+const { endOfDay } = require('date-fns-tz/endOfDay');
+const { addMinutes } = require('date-fns-tz/addMinutes');
 // --- FIN DE CORRECCIÓN ---
 
 // @desc    Create a new booking (MODIFICADO para Puntos 3, 4, 5)
@@ -32,7 +30,8 @@ const createBooking = async (req, res) => {
     // (Esta sección ahora funcionará gracias a la corrección de importación)
     const startTime = zonedTimeToUtc(`${firstSlot.date}T${firstSlot.startTime}`, timeZone);
     
-    const slotDuration = 30; // Debería venir de settings
+    // TODO: Esto debería venir de settings
+    const slotDuration = 30; 
     const endTime = addMinutes(
       zonedTimeToUtc(`${lastSlot.date}T${lastSlot.startTime}`, timeZone),
       slotDuration
