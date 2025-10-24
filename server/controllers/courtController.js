@@ -1,6 +1,6 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
-const Setting = require('../models/Setting'); // Importar el modelo Setting
+const Setting = require('../models/Setting'); 
 const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
@@ -13,37 +13,40 @@ const getAggregatedAvailability = async (req, res) => {
     // 1. Buscar settings directamente en la BD
     const settings = await Setting.findOne(); 
     
-    // --- CORRECCIÓN DE LA VALIDACIÓN (AQUÍ ESTABA EL ERROR 400) ---
-    // Hacemos el chequeo más robusto.
-    // Buscamos que las propiedades no sean nulas, ni strings vacíos, 
-    // y que la duración sea un número mayor a 0.
+    // --- LOG DE DEPURACIÓN ---
+    // ¡Vamos a ver qué está encontrando realmente en la base de datos!
+    console.log('LEYENDO CONFIGURACIÓN DE LA BD:', settings);
+    // --- FIN DE LOG DE DEPURACIÓN ---
+
+    // 2. Validación (La que está fallando)
     if (!settings || 
         !settings.openTime || settings.openTime === "" ||
         !settings.closeTime || settings.closeTime === "" ||
         !settings.slotDuration || settings.slotDuration <= 0) 
     {
-      // Si falla, devolvemos el 400 CON el mensaje
+      console.error('ERROR: La validación de settings falló. Datos encontrados:', settings);
       return res.status(400).json({ 
         message: 'La configuración del club no está completa. Faltan Hora de Apertura, Cierre o Duración del Turno (debe ser > 0).' 
       });
     }
-    // --- FIN DE LA CORRECCIÓN ---
 
-    // 2. Generar todos los slots posibles para ese día
+    // 3. Generar todos los slots posibles para ese día
     const allPossibleSlots = generateTimeSlots(
       settings.openTime,
       settings.closeTime,
       settings.slotDuration
     );
 
-    // 3. Obtener todas las canchas activas
+    // ... (el resto de la función sigue igual) ...
+    
+    // 4. Obtener todas las canchas activas
     const activeCourts = await Court.find({ isActive: true }).select('name pricePerHour');
 
     if (!activeCourts || activeCourts.length === 0) {
         return res.status(404).json({ message: 'No se encontraron canchas activas.' });
     }
 
-    // 4. Obtener todas las reservas (bookings) para ese día
+    // 5. Obtener todas las reservas (bookings) para ese día
     const start = startOfDay(zonedTimeToUtc(date, timeZone));
     const end = endOfDay(zonedTimeToUtc(date, timeZone));
     
@@ -52,7 +55,7 @@ const getAggregatedAvailability = async (req, res) => {
       status: { $ne: 'Cancelled' }
     }).select('court startTime');
 
-    // 5. Mapear la disponibilidad
+    // 6. Mapear la disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
       
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
@@ -96,7 +99,7 @@ const getAggregatedAvailability = async (req, res) => {
 };
 
 
-/* --- INICIO DEL CÓDIGO ORIGINAL (QUE FALTABA) --- */
+/* --- INICIO DEL CÓDIGO ORIGINAL --- */
 
 // @desc    (Admin) Get all courts
 const getCourts = async (req, res) => {
