@@ -1,8 +1,8 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
-const Setting = require('../models/Setting'); // <-- CORRECCIÓN 1: Importar el modelo Setting
+const Setting = require('../models/Setting'); // Importar el modelo Setting
 const { zonedTimeToUtc, startOfDay, endOfDay } = require('date-fns-tz');
-const { generateTimeSlots } = require('../utils/timeSlotGenerator'); // <-- CORRECCIÓN 2: Esto ahora funcionará
+const { generateTimeSlots } = require('../utils/timeSlotGenerator'); // Esto ahora existe
 
 // --- NUEVA FUNCIÓN (Punto 1) ---
 // Obtiene la disponibilidad agregada (fecha primero)
@@ -11,7 +11,7 @@ const getAggregatedAvailability = async (req, res) => {
     const { date } = req.params;
     const timeZone = 'America/Argentina/Buenos_Aires';
 
-    // --- CORRECCIÓN 1: Buscar settings directamente en la BD ---
+    // Buscar settings directamente en la BD
     const settings = await Setting.findOne(); 
     
     if (!settings || !settings.openTime || !settings.closeTime || !settings.slotDuration) {
@@ -85,8 +85,8 @@ const getAggregatedAvailability = async (req, res) => {
 };
 
 
-/* --- DE AQUÍ EN ADELANTE, ES TU CÓDIGO ORIGINAL --- */
-/* (Asegúrate de que estas funciones estén en tu archivo) */
+/* --- INICIO DEL CÓDIGO ORIGINAL (QUE FALTABA) --- */
+/* (Estas funciones ahora están incluidas) */
 
 // @desc    (Admin) Get all courts
 // @route   GET /api/courts
@@ -110,7 +110,7 @@ const createCourt = async (req, res) => {
     courtType,
     pricePerHour,
     isActive,
-    availableSlots, // Asegúrate de que esto se maneje
+    availableSlots,
   } = req.body;
 
   try {
@@ -119,7 +119,7 @@ const createCourt = async (req, res) => {
       courtType,
       pricePerHour,
       isActive,
-      availableSlots, // Asegúrate de que esto se maneje
+      availableSlots,
     });
     const createdCourt = await court.save();
     res.status(201).json(createdCourt);
@@ -223,8 +223,11 @@ const getAvailabilityForPublic = async (req, res) => {
       startTime: { $gte: start, $lt: end },
       status: { $ne: 'Cancelled' },
     });
+    
+    // (Asegúrate de que 'court.availableSlots' exista en tu modelo Court)
+    const availableSlots = court.availableSlots || [];
 
-    const availability = court.availableSlots.map(slotTime => {
+    const availability = availableSlots.map(slotTime => {
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
       
       const isBooked = bookings.some(
@@ -243,6 +246,8 @@ const getAvailabilityForPublic = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener la disponibilidad' });
   }
 };
+
+/* --- FIN DEL CÓDIGO ORIGINAL --- */
 
 
 module.exports = {
