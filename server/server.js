@@ -1,80 +1,46 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+// (Líneas 1-27 sin cambios)
+const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware');
+const routes = require('./routes');
+const { setupSocketIO } = require('./config/socket');
+const { logActivity } = require('./utils/logActivity');
+const { connectToRabbitMQ } = require('./config/rabbitmq');
+const { setupScheduledTasks } = require('./utils/scheduler');
 
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const apiRoutes = require('./routes');
-const Setting = require('./models/Setting');
+// Cargar variables de entorno
+dotenv.config();
 
-const startServer = async () => {
-  // Conectar a la base de datos primero
-  await connectDB();
+// Forzar zona horaria (¡Importante!)
+process.env.TZ = 'America/Argentina/Buenos_Aires';
+console.log(`Timezone forced to: ${process.env.TZ}`);
 
-  // NOTA IMPORTANTE: Se establece la zona horaria de Argentina como principal.
-  // Esto es crucial para que todas las operaciones con fechas funcionen correctamente.
-  process.env.TZ = 'America/Argentina/Buenos_Aires';
-  console.log(`Timezone forced to: ${process.env.TZ}`);
+// Conectar a MongoDB
+connectDB();
 
-  const app = express();
-  app.set('trust proxy', 1);
-  const server = http.createServer(app);
+const app = express();
 
-  // Configuración de CORS
-  const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:5173',
-    'https://padel-club-manager-xi.vercel.app',
-    'https://padel-club-manager-6arn60r3x-eduardo-miguel-riccis-projects.vercel.app',
-  ];
+// --- CORRECCIÓN DE CORS ---
+// Añadimos la URL de Vercel que estaba dando error
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://padel-club-manager.vercel.app',
+  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app' // URL AÑADIDA
+];
+// --- FIN DE CORRECCIÓN ---
 
-  const corsOptions = {
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.error(`CORS error: Origin ${origin} not allowed.`); // Log the rejected origin
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  };
+app.use(cors({
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      console.error(`CORS error: Origin ${origin} not allowed.`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 
-  app.use(cors(corsOptions));
-  app.use(express.json({ extended: false }));
-
-  // Configuración de Socket.IO
-  const io = new Server(server, {
-    cors: corsOptions,
-  });
-
-  app.set('socketio', io);
-
-  io.on('connection', (socket) => {
-    console.log('A user connected via WebSocket');
-    socket.on('disconnect', () => {
-      console.log('User disconnected');
-    });
-  });
-
- 
-  // Ruta de Health Check para Render
-  app.get('/', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send('Padel Club Manager API is healthy');
-  });
-
-  // Definir Rutas
-
-   // Definir Rutas
-
-  app.use('/api', apiRoutes);
-
-  const PORT = process.env.PORT || 5000;
-
-  server.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
-};
-
-startServer();
+// (El resto del archivo 'server.js' sigue igual...)
+// ...
+// (Líneas 44 en adelante sin cambios)
+// ...
