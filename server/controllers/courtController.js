@@ -1,7 +1,6 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// Asegúrate de que date-fns esté instalado en el backend: npm install date-fns date-fns-tz
 const { format } = require('date-fns-tz'); 
 const { startOfDay, endOfDay, parseISO } = require('date-fns');
 
@@ -10,16 +9,52 @@ const { startOfDay, endOfDay, parseISO } = require('date-fns');
 // @route   POST /api/courts
 // @access  Admin
 const createCourt = async (req, res) => {
-  // --- LÍNEA CORREGIDA ---
-  // Leer los nombres correctos del body y quitar availableSlots
-  const { name, courtType, pricePerHour, status } = req.body;
-  // --- FIN DE CORRECCIÓN ---
+  // --- AÑADIR LOGGING DETALLADO AQUÍ ---
+  console.log('--- [Debug Create Court] ---');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('req.body RECIBIDO:', JSON.stringify(req.body, null, 2)); 
+  // --- FIN DEL LOGGING ---
+
+  // Intentamos leer los nombres NUEVOS primero
+  let { name, courtType, pricePerHour, status } = req.body;
+
+  // --- LOGGING DE VARIABLES EXTRAÍDAS ---
+  console.log('[Debug Create Court] Valores extraídos (esperados):');
+  console.log('  name:', name);
+  console.log('  courtType:', courtType);
+  console.log('  pricePerHour:', pricePerHour);
+  console.log('  status:', status);
+  // --- FIN LOGGING ---
+  
+  // --- BLOQUE DE COMPATIBILIDAD TEMPORAL (POR SI ACASO) ---
+  // Si los campos nuevos NO llegaron, intentar leer los viejos
+  if (courtType === undefined && req.body.type !== undefined) {
+      console.warn('[Debug Create Court] WARNING: Recibido campo antiguo "type", usando como courtType.');
+      courtType = req.body.type;
+  }
+  if (pricePerHour === undefined && req.body.price !== undefined) {
+      console.warn('[Debug Create Court] WARNING: Recibido campo antiguo "price", usando como pricePerHour.');
+      pricePerHour = req.body.price;
+  }
+   // --- FIN BLOQUE COMPATIBILIDAD ---
+
+
   try {
-    // Validar que los campos requeridos no sean undefined o null
+    console.log('[Debug Create Court] Intentando validación y creación...');
+    // Validar que los campos requeridos (con los nombres NUEVOS) no sean undefined o null
     if (!name || !courtType || pricePerHour == null || !status) {
-       return res.status(400).json({ message: 'Faltan campos obligatorios: nombre, tipo, precio por hora, estado.' });
+       console.error('[Debug Create Court] Error: Faltan campos obligatorios:', { name, courtType, pricePerHour, status });
+       // Ser más específico en el mensaje de error devuelto
+       let missing = [];
+       if (!name) missing.push('nombre');
+       if (!courtType) missing.push('tipo');
+       if (pricePerHour == null) missing.push('precio por hora');
+       if (!status) missing.push('estado');
+       return res.status(400).json({ message: `Faltan campos obligatorios: ${missing.join(', ')}.` });
     }
-     if (isNaN(pricePerHour) || pricePerHour < 0) {
+     const parsedPrice = parseFloat(pricePerHour); // Convertir aquí
+     if (isNaN(parsedPrice) || parsedPrice < 0) {
+        console.error('[Debug Create Court] Error: Precio inválido:', pricePerHour);
         return res.status(400).json({ message: 'El precio por hora debe ser un número válido mayor o igual a cero.' });
      }
 
@@ -27,17 +62,41 @@ const createCourt = async (req, res) => {
     const court = new Court({
       name,
       courtType,    // Usar nombre correcto
-      pricePerHour, // Usar nombre correcto
+      pricePerHour: parsedPrice, // Usar nombre correcto y valor parseado
       status,
-      // No incluir availableSlots aquí, ya no se gestiona a nivel de cancha
+      // No incluir availableSlots
     });
-    const createdCourt = await court.save();
+    
+    console.log('[Debug Create Court] Objeto Court a guardar:', JSON.stringify(court.toObject(), null, 2));
+    
+    const createdCourt = await court.save(); // La validación de Mongoose ocurre aquí
+    
+    console.log('[Debug Create Court] Cancha creada con éxito:', createdCourt._id);
+    console.log('--- [Debug Create Court] Finalizado ---');
     res.status(201).json(createdCourt);
+
   } catch (error) {
-    // Si Mongoose lanza un error de validación, lo capturamos aquí también
+    // Capturar y loguear el error de Mongoose
+    console.error('[Debug Create Court] ¡ERROR DURANTE court.save()!');
+    console.error('  Tipo de Error:', error.name); // Ej: ValidationError
+    console.error('  Mensaje:', error.message);
+    // Loguear detalles específicos de errores de validación
+     if (error.name === 'ValidationError' && error.errors) {
+       console.error('  Detalles de Validación:');
+       for (const field in error.errors) {
+         console.error(`    - Campo '${field}': ${error.errors[field].message}`);
+       }
+     }
+    console.error('  Stack:', error.stack); // Stack trace completo
+    console.log('--- [Debug Create Court] Finalizado con Error ---');
+    
+    // Devolver el error al frontend
     res.status(400).json({ message: error.message });
   }
 };
+
+// ... (El resto de las funciones: getCourts, getCourtById, updateCourt, deleteCourt, getPublicCourts, getAvailabilityForPublic, generateTimeSlots) ...
+// ... (Asegúrate de copiar el resto del archivo desde la versión anterior que te pasé) ...
 
 // @desc    Get all courts (admin view)
 // @route   GET /api/courts
@@ -47,7 +106,7 @@ const getCourts = async (req, res) => {
     const courts = await Court.find({});
     res.json(courts);
   } catch (error) {
-    console.error("Error en getCourts:", error); // Añadir log
+    console.error("Error en getCourts:", error); 
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -64,11 +123,10 @@ const getCourtById = async (req, res) => {
       res.status(404).json({ message: 'Cancha no encontrada' });
     }
   } catch (error) {
-     // Si el ID es inválido (ej. "public"), Mongoose lanza CastError
      if (error.name === 'CastError') {
        return res.status(400).json({ message: `ID de cancha inválido: ${req.params.id}` });
      }
-    console.error("Error en getCourtById:", error); // Añadir log
+    console.error("Error en getCourtById:", error); 
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -77,35 +135,72 @@ const getCourtById = async (req, res) => {
 // @route   PUT /api/courts/:id
 // @access  Admin
 const updateCourt = async (req, res) => {
-  // --- LEER NOMBRES CORRECTOS ---
+  // --- LOGGING PARA UPDATE ---
+  console.log(`--- [Debug Update Court ID: ${req.params.id}] ---`);
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('req.body RECIBIDO:', JSON.stringify(req.body, null, 2));
+  // --- FIN LOGGING ---
+
+  // Leer los nombres correctos
   const { name, courtType, pricePerHour, status } = req.body;
-  // --- FIN DE CORRECCIÓN ---
+   console.log('[Debug Update Court] Valores extraídos:');
+   console.log('  name:', name);
+   console.log('  courtType:', courtType);
+   console.log('  pricePerHour:', pricePerHour);
+   console.log('  status:', status);
+   
   try {
     const court = await Court.findById(req.params.id);
     if (court) {
+       console.log('[Debug Update Court] Cancha encontrada. Aplicando cambios...');
        // Validar datos antes de asignar
-       if (name !== undefined) court.name = name;
-       if (courtType !== undefined) court.courtType = courtType; // Usar nombre correcto
+       let changesMade = false;
+       if (name !== undefined && court.name !== name) { court.name = name; changesMade = true; console.log('  - name actualizado'); }
+       if (courtType !== undefined && court.courtType !== courtType) { court.courtType = courtType; changesMade = true; console.log('  - courtType actualizado'); } // Usar nombre correcto
        if (pricePerHour !== undefined) {
           const parsedPrice = parseFloat(pricePerHour);
           if (isNaN(parsedPrice) || parsedPrice < 0) {
+             console.error('[Debug Update Court] Error: Precio inválido:', pricePerHour);
              return res.status(400).json({ message: 'El precio por hora debe ser un número válido >= 0.' });
           }
-          court.pricePerHour = parsedPrice; // Usar nombre correcto
+          if (court.pricePerHour !== parsedPrice) {
+            court.pricePerHour = parsedPrice; changesMade = true; console.log('  - pricePerHour actualizado'); // Usar nombre correcto
+          }
        }
-       if (status !== undefined) court.status = status;
-       // No modificar availableSlots aquí
-      
-      const updatedCourt = await court.save();
-      res.json(updatedCourt);
+       if (status !== undefined && court.status !== status) { court.status = status; changesMade = true; console.log('  - status actualizado'); }
+       
+       if (!changesMade) {
+          console.log('[Debug Update Court] No se detectaron cambios.');
+          console.log('--- [Debug Update Court] Finalizado ---');
+          return res.json(court); // Devolver la cancha sin cambios
+       }
+       
+       console.log('[Debug Update Court] Intentando guardar cambios...');
+       const updatedCourt = await court.save(); // La validación ocurre aquí
+       console.log('[Debug Update Court] Cambios guardados con éxito.');
+       console.log('--- [Debug Update Court] Finalizado ---');
+       res.json(updatedCourt);
     } else {
+      console.warn(`[Debug Update Court] Cancha no encontrada con ID: ${req.params.id}`);
       res.status(404).json({ message: 'Cancha no encontrada' });
     }
   } catch (error) {
-    // Capturar errores de validación de Mongoose al guardar
+    // Capturar y loguear errores de Mongoose
+    console.error('[Debug Update Court] ¡ERROR DURANTE court.save()!');
+    console.error('  Tipo de Error:', error.name);
+    console.error('  Mensaje:', error.message);
+     if (error.name === 'ValidationError' && error.errors) {
+       console.error('  Detalles de Validación:');
+       for (const field in error.errors) {
+         console.error(`    - Campo '${field}': ${error.errors[field].message}`);
+       }
+     }
+    console.error('  Stack:', error.stack);
+    console.log('--- [Debug Update Court] Finalizado con Error ---');
     res.status(400).json({ message: error.message });
   }
 };
+
 
 // @desc    Delete a court
 // @route   DELETE /api/courts/:id
@@ -114,7 +209,7 @@ const deleteCourt = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
     if (court) {
-      await court.deleteOne(); // Usar deleteOne() que es más moderno
+      await court.deleteOne(); 
       res.json({ message: 'Cancha eliminada' });
     } else {
       res.status(404).json({ message: 'Cancha no encontrada' });
@@ -123,7 +218,7 @@ const deleteCourt = async (req, res) => {
      if (error.name === 'CastError') {
        return res.status(400).json({ message: `ID de cancha inválido: ${req.params.id}` });
      }
-    console.error("Error en deleteCourt:", error); // Añadir log
+    console.error("Error en deleteCourt:", error); 
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -133,13 +228,12 @@ const deleteCourt = async (req, res) => {
 // @access  Public
 const getPublicCourts = async (req, res) => {
   try {
-    // Seleccionar los campos correctos (pricePerHour, courtType) y excluir _id si no se necesita
     const courts = await Court.find({ status: 'available' }).select(
-      'name courtType pricePerHour' // Quitar availableSlots
+      'name courtType pricePerHour' // Nombres correctos
     );
     res.json(courts);
   } catch (error) {
-    console.error("Error en getPublicCourts:", error); // Añadir log
+    console.error("Error en getPublicCourts:", error); 
     res.status(500).json({ message: 'Server Error al obtener canchas públicas' });
   }
 };
@@ -151,27 +245,20 @@ const getAvailabilityForPublic = async (req, res) => {
   try {
     const { date, courtId } = req.params;
 
-    // Validar formato de fecha y ID
      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return res.status(400).json({ message: 'Formato de fecha inválido. Usar YYYY-MM-DD.' });
      }
-     // Mongoose validará el courtId automáticamente al buscar
-
+     
     const targetDate = parseISO(date);
-    // Definir zona horaria explícitamente (ej: Argentina)
     const timeZone = 'America/Argentina/Buenos_Aires'; 
     const dayStart = startOfDay(targetDate);
     const dayEnd = endOfDay(targetDate);
 
-
-    // 1. Encontrar la cancha y obtener sus horarios globales si es necesario
     const court = await Court.findById(courtId);
     if (!court || court.status !== 'available') {
       return res.status(404).json({ message: 'Cancha no encontrada o no disponible.' });
     }
 
-    // --- Obtener horarios globales (¡IMPORTANTE!) ---
-    // Necesitamos openTime, closeTime, slotDuration de la configuración general
     const settingsArray = await Setting.find({ key: { $in: ['openTime', 'closeTime', 'slotDuration'] } });
     const settings = settingsArray.reduce((acc, setting) => {
         acc[setting.key] = setting.value;
@@ -189,40 +276,27 @@ const getAvailabilityForPublic = async (req, res) => {
         return res.status(500).json({ message: 'Duración de slot inválida en la configuración.' });
     }
     
-    // Generar TODOS los slots posibles para el día según la config global
     const allPossibleSlots = generateTimeSlots(settings.openTime, settings.closeTime, slotDurationMinutes);
     if (!allPossibleSlots || allPossibleSlots.length === 0) {
         console.error("No se pudieron generar slots con:", settings);
         return res.status(500).json({ message: 'Error al generar horarios según la configuración.' });
     }
-    // --- Fin obtención horarios globales ---
 
-
-    // 2. Encontrar reservas (Bookings) para esa cancha en ese día
     const bookings = await Booking.find({
       court: courtId,
-      startTime: {
-        $gte: dayStart,
-        $lte: dayEnd,
-      },
-      status: { $in: ['confirmed', 'paid', 'pending'] }, // Estados que ocupan el slot
+      startTime: { $gte: dayStart, $lte: dayEnd },
+      status: { $in: ['confirmed', 'paid', 'pending'] }, 
     });
 
-    // 3. Crear la lista de disponibilidad comparando con TODOS los slots posibles
-    // Obtener solo la hora HH:mm de las reservas existentes
     const bookedStartTimes = bookings.map(b => format(b.startTime, 'HH:mm', { timeZone })); 
     
-    const availability = allPossibleSlots.map(slotTime => {
-      const isBooked = bookedStartTimes.includes(slotTime);
-      return {
-        startTime: slotTime,
-        isAvailable: !isBooked,
-      };
-    });
+    const availability = allPossibleSlots.map(slotTime => ({
+      startTime: slotTime,
+      isAvailable: !bookedStartTimes.includes(slotTime),
+    }));
 
     res.json(availability);
   } catch (error) {
-     // Capturar CastError si el courtId es inválido
      if (error.name === 'CastError') {
        return res.status(400).json({ message: `ID de cancha inválido: ${req.params.courtId}` });
      }
@@ -235,44 +309,30 @@ const getAvailabilityForPublic = async (req, res) => {
 // --- Función Helper para generar slots ---
 function generateTimeSlots(openTime, closeTime, slotDurationMinutes) {
     if (!openTime || !closeTime || !slotDurationMinutes) return [];
-
     const slots = [];
     try {
         const [openHour, openMinute] = openTime.split(':').map(Number);
         const [closeHour, closeMinute] = closeTime.split(':').map(Number);
-
         let currentHour = openHour;
         let currentMinute = openMinute;
-
-        // Crear objeto Date para comparar (usamos una fecha fija, solo importan las horas/minutos)
         const closeDateTime = new Date(2000, 0, 1, closeHour, closeMinute);
 
         while (true) {
             const currentDateTime = new Date(2000, 0, 1, currentHour, currentMinute);
-            
-            // Si la hora actual es >= hora de cierre, parar
-            if (currentDateTime >= closeDateTime) {
-                break;
-            }
-
-            // Formatear HH:mm
+            if (currentDateTime >= closeDateTime) break;
             const formattedTime = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
             slots.push(formattedTime);
-
-            // Calcular siguiente slot
             currentMinute += slotDurationMinutes;
             currentHour += Math.floor(currentMinute / 60);
             currentMinute %= 60;
-
-            // Seguridad anti-bucle infinito (más de 24 horas de slots)
-            if (slots.length > (24 * 60 / slotDurationMinutes)) {
-                 console.error("Bucle infinito detectado en generateTimeSlots");
-                 return []; // Devolver vacío en caso de error
+            if (slots.length > (1440 / slotDurationMinutes)) { // 1440 minutos en un día
+                 console.error("Bucle potencialmente infinito detectado en generateTimeSlots");
+                 return []; 
             }
         }
     } catch (e) {
         console.error("Error generando slots:", e, { openTime, closeTime, slotDurationMinutes });
-        return []; // Devolver vacío en caso de error
+        return []; 
     }
     return slots;
 }
