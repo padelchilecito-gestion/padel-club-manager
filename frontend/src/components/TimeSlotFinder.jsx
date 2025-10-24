@@ -25,15 +25,13 @@ const TimeSlotFinder = ({ settings }) => {
         setLoading(true);
         setError(null);
         
-        // --- CORRECCIÓN DE ERROR .map N°1 ---
-        // Asumimos que getPublicCourts() también devuelve la respuesta completa de Axios.
-        // Extraemos .data de la respuesta.
-        const response = await getPublicCourts();
-        const data = Array.isArray(response.data) ? response.data : [];
+        // --- CORRECCIÓN ---
+        // Ahora getPublicCourts() devuelve el array directamente (gracias al fix en courtService.js).
+        // Mi última corrección (response.data) era incorrecta.
+        const data = await getPublicCourts(); 
         // --- FIN DE CORRECCIÓN ---
 
         setCourts(data);
-        
         if (data.length > 0) {
           setSelectedCourt(data[0]._id);
         } else {
@@ -58,21 +56,17 @@ const TimeSlotFinder = ({ settings }) => {
       setLoading(true);
       setError(null);
       
-      // --- CORRECCIÓN DE ERROR .map N°2 (El error que reportaste) ---
-      // El error 'a.map is not a function' indica que 'availableData' 
-      // en el fix anterior era un objeto (la respuesta de Axios) y no un array.
-      // La solución es extraer la propiedad .data de la respuesta.
-      const response = await getAvailability(selectedDate, selectedCourt);
+      // --- CORRECCIÓN ---
+      // Ahora getAvailability() devuelve el array directamente (gracias al fix en courtService.js).
+      const availableData = await getAvailability(selectedDate, selectedCourt);
       
-      // Verificamos que response.data sea un array antes de establecerlo
-      const availableData = Array.isArray(response.data) ? response.data : [];
+      // El backend ya nos dio la lista procesada. 
+      // La establecemos directamente.
       setAvailability(availableData);
-      // --- FIN DE LA CORRECCIÓN ---
+      // --- FIN DE CORRECCIÓN ---
 
     } catch (err) {
       console.error("Error en fetchAvailability:", err);
-      // Si la API falla (ej. 404), err.response.data puede ser un objeto de error
-      // Nos aseguramos de setear un array vacío.
       setError(err.message || 'Error al cargar la disponibilidad');
       setAvailability([]); 
     } finally {
@@ -110,7 +104,7 @@ const TimeSlotFinder = ({ settings }) => {
         courtId: selectedCourt,
         courtName: courts.find(c => c._id === selectedCourt)?.name,
         date: selectedDate,
-        startTime: slot.time, 
+        startTime: slot.time,
         price: courts.find(c => c._id === selectedCourt)?.price || 0,
       });
       setIsModalOpen(true);
@@ -124,7 +118,6 @@ const TimeSlotFinder = ({ settings }) => {
     <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl mx-auto">
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
-      {/* Selector de Cancha */}
       <div className="mb-4">
         <label htmlFor="court" className="block text-sm font-medium text-gray-300 mb-2">
           Selecciona una Cancha
@@ -136,7 +129,6 @@ const TimeSlotFinder = ({ settings }) => {
           className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           disabled={loading || courts.length === 0}
         >
-          {/* Este .map ahora es seguro porque 'courts' siempre será un array */}
           {courts.map((court) => (
             <option key={court._id} value={court._id}>
               {court.name} ({court.type})
@@ -150,7 +142,6 @@ const TimeSlotFinder = ({ settings }) => {
         )}
       </div>
 
-      {/* Selector de Fecha */}
       <div className="mb-6">
         <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
           Selecciona una Fecha
@@ -188,12 +179,10 @@ const TimeSlotFinder = ({ settings }) => {
         </p>
       </div>
 
-      {/* Grilla de Turnos */}
       {loading ? (
         <InlineLoading text="Buscando turnos disponibles..." />
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {/* Este .map (el que causaba el error) ahora es seguro */}
           {availability.map((slot) => (
             <button
               key={slot.time}
@@ -219,7 +208,6 @@ const TimeSlotFinder = ({ settings }) => {
         </div>
       )}
 
-      {/* Modal de Reserva */}
       {isModalOpen && selectedSlot && (
         <BookingModal
           slot={selectedSlot}
