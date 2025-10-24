@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Se añade useCallback
 import { getPublicCourts, getAvailability } from '../services/courtService';
 import { addDays, format, isBefore, startOfToday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,42 +40,54 @@ const TimeSlotFinder = ({ settings }) => {
     fetchCourts();
   }, []);
 
-  useEffect(() => {
-    if (selectedCourt && selectedDate) {
-      const fetchAvailability = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          
-          // Llama a la API
-          
-      const availableData = await getAvailability(selectedDate, selectedCourt);
-          
-          // --- CORRECCIÓN AQUÍ ---
-          // Se cambió 'allCourts' (que no existe) por 'courts' (el estado).
-          const availableSlots = courts.find(c => c._id === selectedCourt)?.availableSlots || [];
-          // --- FIN DE CORRECCIÓN ---
-
-          // Mapeamos los slots con la info de disponibilidad
-          const combinedSlots = availableSlots.map(slotTime => {
-            const found = availableData.find(a => a.startTime === slotTime);
-            return {
-              time: slotTime,
-              isAvailable: found ? found.isAvailable : false, // Asumir no disponible si no está en la respuesta
-              bookingId: found ? found.bookingId : null
-            };
-          });
-
-          setAvailability(combinedSlots);
-        } catch (err) {
-          setError(err.message || 'Error al cargar la disponibilidad');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchAvailability();
+  // --- CORRECCIÓN 2: Mover fetchAvailability fuera del useEffect ---
+  // Se usa useCallback para optimizar y evitar re-renders innecesarios.
+  // Ahora esta función puede ser llamada desde el useEffect Y desde onBookingSuccess.
+  const fetchAvailability = useCallback(async () => {
+    // No ejecutar si falta la cancha o la fecha
+    if (!selectedCourt || !selectedDate) {
+      setAvailability([]); // Limpiar turnos si no hay selección
+      return;
     }
-  }, [selectedCourt, selectedDate, courts]); // 'courts' se añade como dependencia
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // --- CORRECCIÓN 1: El error principal ---
+      // Tu API (según la consola) devuelve un array [ ... ]
+      // El código original intentaba desestructurar { data: ... } lo cual es incorrecto.
+      const availableData = await getAvailability(selectedDate, selectedCourt);
+      // --- FIN DE CORRECCIÓN 1 ---
+
+      const availableSlots = courts.find(c => c._id === selectedCourt)?.availableSlots || [];
+
+      // Mapeamos los slots con la info de disponibilidad
+      const combinedSlots = availableSlots.map(slotTime => {
+        // availableData puede ser undefined si la API falla, aunque ya lo corregimos.
+        // El 'availableData.find' fallaba porque availableData era undefined.
+        const found = availableData.find(a => a.startTime === slotTime);
+        return {
+          time: slotTime,
+          isAvailable: found ? found.isAvailable : false, // Asumir no disponible si no está en la respuesta
+          bookingId: found ? found.bookingId : null
+        };
+      });
+
+      setAvailability(combinedSlots);
+    } catch (err) {
+      console.error("Error en fetchAvailability:", err);
+      setError(err.message || 'Error al cargar la disponibilidad');
+      setAvailability([]); // Limpiar turnos en caso de error
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCourt, selectedDate, courts]); // Dependencias de useCallback
+
+  // El useEffect ahora solo *llama* a la función
+  useEffect(() => {
+    fetchAvailability();
+  }, [fetchAvailability]); // La dependencia ahora es la función
 
   const handleDateChange = (date) => {
     const newDate = new Date(date);
@@ -218,8 +230,8 @@ const TimeSlotFinder = ({ settings }) => {
           onClose={() => setIsModalOpen(false)}
           onBookingSuccess={() => {
             setIsModalOpen(false);
-            // Refrescar disponibilidad
-            fetchAvailability(); // Asumiendo que fetchAvailability está en el scope
+            // Refrescar disponibilidad (Esto ahora funciona)
+            fetchAvailability(); 
           }}
         />
       )}
