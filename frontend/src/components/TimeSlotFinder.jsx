@@ -48,7 +48,8 @@ const TimeSlotFinder = ({ settings }) => {
           setError(null);
           
           // Llama a la API
-          const { data: availableData } = await getAvailability(selectedDate, selectedCourt);
+          
+      const availableData = await getAvailability(selectedDate, selectedCourt);
           
           // --- CORRECCIÓN AQUÍ ---
           // Se cambió 'allCourts' (que no existe) por 'courts' (el estado).
