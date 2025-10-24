@@ -2,11 +2,10 @@ const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting'); 
 // --- CORRECCIÓN DE IMPORTACIÓN ---
-// Cambiamos la forma de importar para evitar el error '...is not a constructor'
-const fnsTz = require('date-fns-tz');
-const zonedTimeToUtc = fnsTz.zonedTimeToUtc;
-const startOfDay = fnsTz.startOfDay;
-const endOfDay = fnsTz.endOfDay;
+// Esta es la forma correcta de importar estas funciones en CommonJS
+const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
+const { startOfDay } = require('date-fns-tz/startOfDay');
+const { endOfDay } = require('date-fns-tz/endOfDay');
 // --- FIN DE CORRECCIÓN ---
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 
