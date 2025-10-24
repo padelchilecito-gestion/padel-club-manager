@@ -1,11 +1,11 @@
 const express = require('express');
 // const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
-const { setupSocketIO } = require('./config/socket'); // Esto ahora debería funcionar
+const { setupSocketIO } = require('./config/socket'); 
 const { logActivity } = require('./utils/logActivity');
-// --- CORRECCIÓN 1: Comentamos la importación de RabbitMQ ---
-// const { connectToRabbitMQ } = require('./config/rabbitmq'); 
-const { setupScheduledTasks } = require('./utils/scheduler');
+// const { connectToRabbitMQ } = require('./config/rabbitmq'); // Comentado
+// --- CORRECCIÓN 1: Comentamos la importación del scheduler ---
+// const { setupScheduledTasks } = require('./utils/scheduler'); 
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
@@ -32,18 +32,17 @@ connectDB();
 
 const app = express();
 
-// Configuración de CORS (ya corregida)
+// Configuración de CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://padel-club-manager.vercel.app',
   'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app' // Añadida por si acaso
+  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app' 
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir solicitudes sin 'origin' (como Postman o apps móviles) o si está en la lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -89,7 +88,7 @@ app.use(hpp());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutos
+  windowMs: 10 * 60 * 1000, 
   max: 200, 
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
 });
@@ -129,14 +128,14 @@ app.set('socketio', io);
 server.listen(PORT, async () => {
   console.log(`Server started on port ${PORT}`);
   try {
-    // --- CORRECCIÓN 2: Comentamos la conexión a RabbitMQ ---
+    // Conexión RabbitMQ (comentada)
     // const channel = await connectToRabbitMQ();
     // app.set('rabbitMQChannel', channel);
     // console.log('RabbitMQ connected and channel set in app.');
-    // --- FIN DE CORRECCIÓN 2 ---
     
-    // Configurar tareas programadas
-    setupScheduledTasks();
+    // --- CORRECCIÓN 2: Comentamos el uso del scheduler ---
+    // setupScheduledTasks(); 
+    // --- FIN DE CORRECCIÓN 2 ---
 
   } catch (error) {
     console.error('Error during server startup:', error);
