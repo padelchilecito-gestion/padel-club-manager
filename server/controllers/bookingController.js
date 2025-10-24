@@ -2,14 +2,16 @@ const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-// --- CORRECCIÓN DE IMPORTACIÓN ---
-const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
-const { startOfDay } = require('date-fns-tz/startOfDay');
-const { endOfDay } = require('date-fns-tz/endOfDay');
-const { addMinutes } = require('date-fns-tz/addMinutes');
+// --- CORRECCIÓN DE IMPORTACIÓN (Volvemos a la original) ---
+const { 
+  zonedTimeToUtc, 
+  startOfDay, 
+  endOfDay,
+  addMinutes
+} = require('date-fns-tz');
 // --- FIN DE CORRECCIÓN ---
 
-// @desc    Create a new booking (MODIFICADO para Puntos 3, 4, 5)
+
 const createBooking = async (req, res) => {
   const { slots, user, paymentMethod } = req.body;
 
@@ -27,7 +29,6 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Court not found' });
     }
 
-    // (Esta sección ahora funcionará gracias a la corrección de importación)
     const startTime = zonedTimeToUtc(`${firstSlot.date}T${firstSlot.startTime}`, timeZone);
     
     // TODO: Esto debería venir de settings
@@ -102,8 +103,11 @@ const getBookingAvailability = async (req, res) => {
             return res.status(400).json({ message: 'La fecha es requerida' });
         }
         const timeZone = 'America/Argentina/Buenos_Aires';
-        const start = startOfDay(zonedTimeToUtc(date, timeZone));
-        const end = endOfDay(zonedTimeToUtc(date, timeZone));
+        
+        // --- CORRECCIÓN DE LÓGICA (Aplicada aquí también) ---
+        const start = startOfDay(date, { timeZone });
+        const end = endOfDay(date, { timeZone });
+
         const bookings = await Booking.find({
             startTime: {
                 $gte: start,
