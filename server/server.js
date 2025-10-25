@@ -98,18 +98,10 @@ app.use('/api', limiter);
 app.use('/api', routes);
 
 // Configuración para servir estáticos en producción
-if (process.env.NODE_ENV === 'production') {
-  const __dirname = path.resolve();
-  app.use(express.static(path.join(__dirname, '/frontend/dist')));
-
-  app.get('*', (req, res) =>
-    res.sendFile(path.resolve(__dirname, 'frontend', 'dist', 'index.html'))
-  );
-} else {
-  app.get('/', (req, res) => {
-    res.send('API is running in development mode...');
-  });
-}
+// Eliminado ya que el frontend se sirve desde Vercel
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
 
 // Middlewares de error (comentados)
 // app.use(logErrors);
