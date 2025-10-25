@@ -4,21 +4,20 @@ const routes = require('./routes');
 const { setupSocketIO } = require('./config/socket');
 const { logActivity } = require('./utils/logActivity');
 // const { connectToRabbitMQ } = require('./config/rabbitmq'); // Comentado
-// --- CORRECCIÓN 1: Comentamos la importación del scheduler ---
-// const { setupScheduledTasks } = require('./utils/scheduler');
+// const { setupScheduledTasks } = require('./utils/scheduler'); // Comentado
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
-const path = require('path');
+const path = require('path'); // Path sigue siendo necesario para otras cosas? Lo dejamos por ahora.
 const http = require('http');
-const morgan = require('morgan'); // <-- ESTA LÍNEA AHORA FUNCIONARÁ
+const morgan = require('morgan');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
-const { protect, admin } = require('./middlewares/authMiddleware');
+// const { protect, admin } = require('./middlewares/authMiddleware'); // Middleware protect/admin no usado directamente aquí
 
 // Cargar variables de entorno
 dotenv.config();
@@ -54,27 +53,14 @@ app.use(cors({
 }));
 
 // Middlewares de seguridad
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "script-src": ["'self'", "'unsafe-inline'", "https://cdn.socket.io", "https://sdk.mercadopago.com"],
-      "frame-src": ["'self'", "https://sdk.mercadopago.com"],
-      "connect-src": [
-        "'self'",
-        "https://api.mercadopago.com",
-        "https://padel-club-backend.onrender.com",
-        "wss://padel-club-backend.onrender.com",
-        ...allowedOrigins
-      ],
-    },
-  },
+app.use(helmet({ // Configuración básica de Helmet
+  contentSecurityPolicy: false, // Deshabilitar CSP por ahora para simplificar, ajustar luego si es necesario
 }));
 
-// Loggeo de peticiones en desarrollo
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
+// Loggeo de peticiones
+// Asegúrate de que NODE_ENV esté configurado en Render si quieres logs solo en desarrollo
+// O simplemente actívalo siempre:
+app.use(morgan('dev'));
 
 // Body parser, cookie parser
 app.use(express.json({ limit: '10kb' }));
@@ -89,19 +75,25 @@ app.use(hpp());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 200,
+  max: 200, // Ajusta según necesidad
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
+  // trustProxy: 1 // Descomentar si Render usa un proxy inverso confiable
 });
 app.use('/api', limiter);
 
 // Rutas API
 app.use('/api', routes);
 
-// Configuración para servir estáticos en producción
-// Eliminado ya que el frontend se sirve desde Vercel
+// --- BLOQUE ELIMINADO ---
+// Ya no intentamos servir archivos estáticos desde el backend
+// if (process.env.NODE_ENV === 'production') { ... }
+// --- FIN DEL BLOQUE ELIMINADO ---
+
+// Ruta raíz simple para verificar que la API funciona
 app.get('/', (req, res) => {
-  res.send('API is running...');
+  res.send('API Padel Club Manager está funcionando...');
 });
+
 
 // Middlewares de error (comentados)
 // app.use(logErrors);
@@ -121,14 +113,7 @@ server.listen(PORT, async () => {
   console.log(`Server started on port ${PORT}`);
   try {
     // Conexión RabbitMQ (comentada)
-    // const channel = await connectToRabbitMQ();
-    // app.set('rabbitMQChannel', channel);
-    // console.log('RabbitMQ connected and channel set in app.');
-
-    // --- CORRECCIÓN 2: Comentamos el uso del scheduler ---
-    // setupScheduledTasks();
-    // --- FIN DE CORRECCIÓN 2 ---
-
+    // Tareas programadas (comentadas)
   } catch (error) {
     console.error('Error during server startup:', error);
   }
