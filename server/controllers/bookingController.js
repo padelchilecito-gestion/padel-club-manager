@@ -122,12 +122,13 @@ const createBooking = async (req, res) => {
       date: firstSlot.date 
     });
 
-    if (createdBooking.user.phone && process.env.TWILIO_ACCOUNT_SID) {
+    if (createdBooking.user.phone) {
       try {
-        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en ${settings.clubName || 'Padel Club'} ha sido confirmada. Total: $${totalPrice}. ¡Te esperamos!`;
-        // await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
+        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva en ${settings.clubName || 'Padel Club'} ha sido confirmada.\n\nFecha: ${firstSlot.date}\nHorario: ${firstSlot.startTime}\nTotal: $${totalPrice}\n\n¡Te esperamos!`;
+
+        await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
       } catch (notificationError) {
-        console.error("Error enviando WhatsApp:", notificationError);
+        console.error("❌ Error enviando WhatsApp:", notificationError);
       }
     }
 

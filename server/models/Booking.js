@@ -45,4 +45,15 @@ const BookingSchema = new mongoose.Schema({
 // Index to prevent double booking on the same court at the same time
 BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
 
+// Índice TTL para eliminar reservas antiguas automáticamente
+BookingSchema.index(
+  { createdAt: 1 },
+  {
+    expireAfterSeconds: 864000, // 10 días
+    partialFilterExpression: {
+      status: { $in: ['Completed', 'Cancelled'] }
+    }
+  }
+);
+
 module.exports = mongoose.model('Booking', BookingSchema);

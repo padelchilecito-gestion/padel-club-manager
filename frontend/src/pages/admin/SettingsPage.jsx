@@ -315,6 +315,15 @@ const SettingsPage = () => {
                 helpText="Enviar email al confirmar un pago."
               />
             </SettingsCard>
+            <SettingsCard title="Configuración de Tienda" icon={Mail}>
+              <SwitchField
+                label="Habilitar Tienda Pública"
+                id="shopEnabled"
+                checked={settings.shopEnabled !== 'false'}
+                onChange={handleSwitchChange}
+                helpText="Mostrar u ocultar la tienda en el sitio público"
+              />
+            </SettingsCard>
             
           </div>
         </div>
