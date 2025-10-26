@@ -54,7 +54,7 @@ app.use(cors({
       callback(new Error(`Origin ${origin} Not allowed by CORS`));
     }
   },
-  credentials: true,
+  credentials: true, // Importante si usas cookies o autenticación
 }));
 
 // Middlewares de seguridad
