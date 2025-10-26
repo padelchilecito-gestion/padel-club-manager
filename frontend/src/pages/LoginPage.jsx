@@ -34,25 +34,22 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-primary via-dark-secondary to-dark-primary flex items-center justify-center px-4">
+    <div className="min-h-screen bg-dark-primary flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo and Header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center justify-center space-x-2 mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center">
-              <span className="text-white font-bold text-3xl">P</span>
+          <Link to="/" className="inline-block mb-4">
+            <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-3xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-4xl">P</span>
             </div>
           </Link>
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-2">
+          <h1 className="text-4xl font-bold text-text-primary">
             Panel de Administración
           </h1>
-          <p className="text-text-secondary">Ingresa tus credenciales para continuar</p>
+          <p className="text-text-secondary mt-2">Ingresa tus credenciales para continuar</p>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-dark-secondary rounded-2xl shadow-2xl p-8 backdrop-blur-sm border border-gray-700/50">
+        <div className="bg-dark-secondary rounded-xl shadow-2xl p-8 border border-gray-700/50">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-text-secondary mb-2">
                 Usuario
@@ -65,14 +62,13 @@ const LoginPage = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  placeholder="Ingresa tu usuario"
-                  className="w-full pl-10 pr-4 py-3 bg-dark-primary border-2 border-gray-700 rounded-lg text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-primary transition-all"
+                  placeholder="Tu usuario"
+                  className="w-full pl-10 pr-4 py-3 bg-dark-primary border-2 border-gray-700 rounded-lg text-text-primary placeholder-text-secondary/60 focus:outline-none focus:border-primary transition-all"
                   autoComplete="username"
                 />
               </div>
             </div>
 
-            {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
                 Contraseña
@@ -85,8 +81,8 @@ const LoginPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="Ingresa tu contraseña"
-                  className="w-full pl-10 pr-12 py-3 bg-dark-primary border-2 border-gray-700 rounded-lg text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-primary transition-all"
+                  placeholder="Tu contraseña"
+                  className="w-full pl-10 pr-12 py-3 bg-dark-primary border-2 border-gray-700 rounded-lg text-text-primary placeholder-text-secondary/60 focus:outline-none focus:border-primary transition-all"
                   autoComplete="current-password"
                 />
                 <button
@@ -94,27 +90,21 @@ const LoginPage = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
                 >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
             </div>
 
-            {/* Error Message */}
             {error && (
-              <div className="bg-danger/10 border border-danger rounded-lg p-3 animate-shake">
-                <p className="text-danger text-sm text-center">{error}</p>
+              <div className="bg-danger/20 border border-danger/50 rounded-lg p-3 animate-shake">
+                <p className="text-danger text-sm text-center font-semibold">{error}</p>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-bold rounded-lg hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-bold rounded-lg hover:shadow-lg hover:shadow-primary/40 hover:scale-[1.02] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -124,35 +114,31 @@ const LoginPage = () => {
                   </svg>
                   Ingresando...
                 </span>
-              ) : (
-                'Iniciar Sesión'
-              )}
+              ) : 'Iniciar Sesión'}
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-dark-primary/50 rounded-lg border border-gray-700">
-            <p className="text-xs text-text-secondary text-center mb-2">
+          <div className="mt-8 p-4 bg-dark-primary/70 rounded-lg border border-gray-700">
+            <p className="text-xs text-text-secondary text-center mb-3">
               <strong>Credenciales de prueba:</strong>
             </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex justify-around text-xs">
               <div className="text-center">
-                <p className="text-text-secondary">Admin</p>
-                <p className="text-primary font-mono">admin / admin123</p>
+                <p className="text-text-secondary font-semibold">Admin</p>
+                <p className="text-primary font-mono mt-1">admin / admin123</p>
               </div>
               <div className="text-center">
-                <p className="text-text-secondary">Operador</p>
-                <p className="text-secondary font-mono">operator / op123</p>
+                <p className="text-text-secondary font-semibold">Operador</p>
+                <p className="text-secondary font-mono mt-1">operator / op123</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Back to Home */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-8">
           <Link
             to="/"
-            className="text-text-secondary hover:text-primary transition-colors text-sm"
+            className="text-text-secondary hover:text-primary transition-colors text-sm font-medium"
           >
             ← Volver al inicio
           </Link>
@@ -162,11 +148,11 @@ const LoginPage = () => {
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-10px); }
-          75% { transform: translateX(10px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
         .animate-shake {
-          animation: shake 0.5s ease-in-out;
+          animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
         }
       `}</style>
     </div>
