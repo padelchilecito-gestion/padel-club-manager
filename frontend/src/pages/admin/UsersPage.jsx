@@ -60,50 +60,52 @@ const UsersPage = () => {
   if (error) return <div className="text-center p-8 text-danger">{error}</div>;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary">Gestión de Usuarios</h1>
+    <div className="container mx-auto p-4 md:p-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary mb-4 md:mb-0">Gestión de Usuarios</h1>
         <button
           onClick={handleOpenModal}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg transition-colors"
         >
           Añadir Usuario
         </button>
       </div>
 
-      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
-        <table className="w-full text-sm text-left text-text-secondary">
-          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
-            <tr>
-              <th scope="col" className="px-6 py-3">ID de Usuario</th>
-              <th scope="col" className="px-6 py-3">Nombre de Usuario</th>
-              <th scope="col" className="px-6 py-3">Rol</th>
-              <th scope="col" className="px-6 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                <td className="px-6 py-4 font-mono text-xs">{user._id}</td>
-                <td className="px-6 py-4 font-medium text-text-primary">{user.username}</td>
-                <td className="px-6 py-4">
-                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.role === 'Admin' ? 'bg-primary text-white' : 'bg-secondary text-dark-primary'
-                  }`}>
-                      {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  {user._id !== currentUser._id && (
-                    <button onClick={() => handleDelete(user._id)} className="text-danger hover:text-red-400" title="Eliminar Usuario">
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  )}
-                </td>
+      <div className="bg-dark-secondary shadow-2xl rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-text-secondary">
+            <thead className="text-xs text-text-primary uppercase bg-dark-primary/50">
+              <tr>
+                <th scope="col" className="px-6 py-4 hidden md:table-cell">ID de Usuario</th>
+                <th scope="col" className="px-6 py-4">Nombre de Usuario</th>
+                <th scope="col" className="px-6 py-4">Rol</th>
+                <th scope="col" className="px-6 py-4 text-center">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {users.map((user) => (
+                <tr key={user._id} className="hover:bg-dark-primary/50 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs hidden md:table-cell">{user._id}</td>
+                  <td className="px-6 py-4 font-medium text-text-primary">{user.username}</td>
+                  <td className="px-6 py-4">
+                     <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                        user.role === 'Admin' ? 'bg-primary text-white' : 'bg-secondary text-dark-primary'
+                    }`}>
+                        {user.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {user._id !== currentUser._id && (
+                      <button onClick={() => handleDelete(user._id)} className="text-danger hover:text-red-400 transition-colors" title="Eliminar Usuario">
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       
       {isModalOpen && (
