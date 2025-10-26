@@ -20,34 +20,14 @@ import AdminRoute from '../../components/auth/AdminRoute';
 
 
 const AdminLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   return (
-    <div className="flex h-screen bg-dark-primary text-text-primary overflow-hidden">
-      {/* Sidebar for Desktop */}
-      <div className="hidden md:flex md:flex-shrink-0">
-        <Sidebar />
-      </div>
-
-      {/* Mobile Sidebar */}
-      <div
-        className={`fixed inset-0 z-30 transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } transition-transform duration-300 ease-in-out md:hidden`}
-      >
-        <Sidebar />
-      </div>
-
+    <div className="flex h-screen bg-dark-primary text-text-primary">
+      <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-primary p-4 md:p-6">
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            ></div>
-          )}
+        <AdminHeader />
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-primary p-6">
           <Routes>
+            {/* Redirect /admin to /admin/dashboard */}
             <Route index element={<Navigate to="dashboard" replace />} />
 
             {/* Routes for Operator and Admin */}
