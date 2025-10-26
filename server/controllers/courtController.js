@@ -1,9 +1,10 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// --- CORRECCIÓN DE IMPORTACIÓN ---
-const { startOfDay, endOfDay, parseISO } = require('date-fns'); // Funciones base
-const { zonedTimeToUtc } = require('date-fns-tz'); // Solo para conversión TZ
+// --- CORRECCIÓN DE IMPORTACIÓN Y USO ---
+// Importar los objetos completos de las librerías
+const dateFns = require('date-fns');
+const dateFnsTz = require('date-fns-tz');
 // --- FIN DE CORRECCIÓN ---
 const { generateTimeSlots } = require('../utils/timeSlotGenerator');
 
@@ -36,10 +37,10 @@ const getAggregatedAvailability = async (req, res) => {
     }
 
     // 5. Buscar reservas del día
-    // --- CORRECCIÓN DE LÓGICA ---
-    const dateObj = parseISO(date);
-    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
-    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
+    // --- CORRECCIÓN DE USO (Accedemos a través de los objetos importados) ---
+    const dateObj = dateFns.parseISO(date);
+    const start = dateFnsTz.zonedTimeToUtc(dateFns.startOfDay(dateObj), timeZone);
+    const end = dateFnsTz.zonedTimeToUtc(dateFns.endOfDay(dateObj), timeZone);
     // --- FIN DE CORRECCIÓN ---
 
     const bookings = await Booking.find({
@@ -49,7 +50,7 @@ const getAggregatedAvailability = async (req, res) => {
     // 6. Mapear disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
       // --- CORRECCIÓN DE USO ---
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = dateFnsTz.zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
       // --- FIN DE CORRECCIÓN ---
 
       const bookedCourtIds = bookings.filter(b => b.startTime.getTime() === slotDateTimeUTC.getTime()).map(b => b.court.toString());
@@ -90,7 +91,6 @@ const createCourt = async (req, res) => {
     courtType,
     pricePerHour,
     isActive,
-    // availableSlots ya no se usa aquí
   } = req.body;
 
   try {
@@ -99,7 +99,6 @@ const createCourt = async (req, res) => {
       courtType,
       pricePerHour,
       isActive,
-      // availableSlots ya no se asigna
     });
     const createdCourt = await court.save();
     res.status(201).json(createdCourt);
@@ -126,7 +125,7 @@ const getCourtById = async (req, res) => {
 
 // @desc    (Admin) Update court
 const updateCourt = async (req, res) => {
-  const { name, courtType, pricePerHour, isActive /*, availableSlots */ } = req.body; // availableSlots comentado
+  const { name, courtType, pricePerHour, isActive } = req.body;
   try {
     const court = await Court.findById(req.params.id);
     if (court) {
@@ -134,7 +133,6 @@ const updateCourt = async (req, res) => {
       court.courtType = courtType;
       court.pricePerHour = pricePerHour;
       court.isActive = isActive;
-      // court.availableSlots = availableSlots; // Ya no se actualiza
 
       const updatedCourt = await court.save();
       res.json(updatedCourt);
@@ -183,21 +181,19 @@ const getAvailabilityForPublic = async (req, res) => {
     const court = await Court.findById(courtId);
     if (!court || !court.isActive) return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
 
-    // --- CORRECCIÓN DE LÓGICA ---
-    const dateObj = parseISO(date);
-    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
-    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
+    // --- CORRECCIÓN DE USO ---
+    const dateObj = dateFns.parseISO(date);
+    const start = dateFnsTz.zonedTimeToUtc(dateFns.startOfDay(dateObj), timeZone);
+    const end = dateFnsTz.zonedTimeToUtc(dateFns.endOfDay(dateObj), timeZone);
     // --- FIN DE CORRECCIÓN ---
 
     const bookings = await Booking.find({ court: courtId, startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' } });
-    
-    // NOTA: Esta función obsoleta aún podría referenciar availableSlots.
-    // Considera refactorizarla si la vuelves a usar.
-    const availableSlots = court.availableSlots || []; 
+
+    const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
       // --- CORRECCIÓN DE USO ---
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = dateFnsTz.zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
       // --- FIN DE CORRECCIÓN ---
       const isBooked = bookings.some(b => b.startTime.getTime() === slotDateTimeUTC.getTime());
       return { startTime: slotTime, isAvailable: !isBooked };
