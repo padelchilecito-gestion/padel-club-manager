@@ -1,11 +1,11 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// --- CORRECCIÓN DE IMPORTACIÓN Y USO ---
-// Importar los objetos completos de las librerías
-const dateFns = require('date-fns');
-const dateFnsTz = require('date-fns-tz');
-// --- FIN DE CORRECCIÓN ---
+
+// ✅ CORRECCIÓN: Importar funciones de forma nombrada
+const { parseISO, startOfDay, endOfDay } = require('date-fns');
+const { zonedTimeToUtc } = require('date-fns-tz');
+
 const { generateTimeSlots } = require('../utils/timeSlotGenerator');
 
 const getAggregatedAvailability = async (req, res) => {
@@ -37,11 +37,10 @@ const getAggregatedAvailability = async (req, res) => {
     }
 
     // 5. Buscar reservas del día
-    // --- CORRECCIÓN DE USO (Accedemos a través de los objetos importados) ---
-    const dateObj = dateFns.parseISO(date);
-    const start = dateFnsTz.zonedTimeToUtc(dateFns.startOfDay(dateObj), timeZone);
-    const end = dateFnsTz.zonedTimeToUtc(dateFns.endOfDay(dateObj), timeZone);
-    // --- FIN DE CORRECCIÓN ---
+    // ✅ Usar las funciones importadas directamente
+    const dateObj = parseISO(date);
+    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
+    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
 
     const bookings = await Booking.find({
       startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' }
@@ -49,9 +48,8 @@ const getAggregatedAvailability = async (req, res) => {
 
     // 6. Mapear disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
-      // --- CORRECCIÓN DE USO ---
-      const slotDateTimeUTC = dateFnsTz.zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
-      // --- FIN DE CORRECCIÓN ---
+      // ✅ Usar la función importada directamente
+      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
 
       const bookedCourtIds = bookings.filter(b => b.startTime.getTime() === slotDateTimeUTC.getTime()).map(b => b.court.toString());
       const availableCourts = activeCourts.filter(c => !bookedCourtIds.includes(c._id.toString()));
@@ -181,20 +179,18 @@ const getAvailabilityForPublic = async (req, res) => {
     const court = await Court.findById(courtId);
     if (!court || !court.isActive) return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
 
-    // --- CORRECCIÓN DE USO ---
-    const dateObj = dateFns.parseISO(date);
-    const start = dateFnsTz.zonedTimeToUtc(dateFns.startOfDay(dateObj), timeZone);
-    const end = dateFnsTz.zonedTimeToUtc(dateFns.endOfDay(dateObj), timeZone);
-    // --- FIN DE CORRECCIÓN ---
+    // ✅ Usar las funciones importadas directamente
+    const dateObj = parseISO(date);
+    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
+    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
 
     const bookings = await Booking.find({ court: courtId, startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' } });
 
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
-      // --- CORRECCIÓN DE USO ---
-      const slotDateTimeUTC = dateFnsTz.zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
-      // --- FIN DE CORRECCIÓN ---
+      // ✅ Usar la función importada directamente
+      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
       const isBooked = bookings.some(b => b.startTime.getTime() === slotDateTimeUTC.getTime());
       return { startTime: slotTime, isAvailable: !isBooked };
     });
