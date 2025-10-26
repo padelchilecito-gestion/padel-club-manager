@@ -77,62 +77,64 @@ const BookingsPage = () => {
   if (error) return <div className="text-center p-8 text-danger">{error}</div>;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary">Gestión de Turnos</h1>
+    <div className="container mx-auto p-4 md:p-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary mb-4 md:mb-0">Gestión de Turnos</h1>
       </div>
 
-      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
-        <table className="w-full text-sm text-left text-text-secondary">
-          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
-            <tr>
-              <th scope="col" className="px-6 py-3">Cliente</th>
-              <th scope="col" className="px-6 py-3">Cancha</th>
-              <th scope="col" className="px-6 py-3">Horario</th>
-              <th scope="col" className="px-6 py-3">Estado</th>
-              <th scope="col" className="px-6 py-3">Pago</th>
-              <th scope="col" className="px-6 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bookings.map((booking) => (
-              <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                <td className="px-6 py-4 font-medium text-text-primary">{booking.user.name}</td>
-                <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
-                <td className="px-6 py-4">
-                    {format(new Date(booking.startTime), 'dd/MM/yyyy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
-                </td>
-                <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
-                        booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
-                    }`}>
-                        {booking.status}
-                    </span>
-                </td>
-                <td className="px-6 py-4">
-                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-500 text-white'
-                    }`}>
-                        {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
-                    </span>
-                </td>
-                <td className="px-6 py-4 flex items-center gap-2">
-                    {!booking.isPaid && booking.status === 'Confirmed' && (
-                         <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-secondary hover:text-green-400" title="Marcar como Pagado">
-                            <CurrencyDollarIcon className="h-5 w-5" />
-                        </button>
-                    )}
-                    {booking.status === 'Confirmed' && (
-                         <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
-                            <XCircleIcon className="h-5 w-5" />
-                        </button>
-                    )}
-                </td>
+      <div className="bg-dark-secondary shadow-2xl rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-text-secondary">
+            <thead className="text-xs text-text-primary uppercase bg-dark-primary/50">
+              <tr>
+                <th scope="col" className="px-6 py-4">Cliente</th>
+                <th scope="col" className="px-6 py-4 hidden sm:table-cell">Cancha</th>
+                <th scope="col" className="px-6 py-4">Horario</th>
+                <th scope="col" className="px-6 py-4">Estado</th>
+                <th scope="col" className="px-6 py-4 hidden md:table-cell">Pago</th>
+                <th scope="col" className="px-6 py-4 text-center">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {bookings.map((booking) => (
+                <tr key={booking._id} className="hover:bg-dark-primary/50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-text-primary whitespace-nowrap">{booking.user.name}</td>
+                  <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/A'}</td>
+                  <td className="px-6 py-4">
+                      {format(new Date(booking.startTime), 'dd/MM/yy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
+                  </td>
+                  <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                          booking.status === 'Confirmed' ? 'bg-green-dark text-white' :
+                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-dark text-dark-primary'
+                      }`}>
+                          {booking.status}
+                      </span>
+                  </td>
+                  <td className="px-6 py-4 hidden md:table-cell">
+                       <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                          booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-light text-white'
+                      }`}>
+                          {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
+                      </span>
+                  </td>
+                  <td className="px-6 py-4 flex items-center justify-center gap-3">
+                      {!booking.isPaid && booking.status === 'Confirmed' && (
+                           <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-green-light hover:text-green-dark transition-colors" title="Marcar como Pagado">
+                              <CurrencyDollarIcon className="h-6 w-6" />
+                          </button>
+                      )}
+                      {booking.status === 'Confirmed' && (
+                           <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400 transition-colors" title="Cancelar Reserva">
+                              <XCircleIcon className="h-6 w-6" />
+                          </button>
+                      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
