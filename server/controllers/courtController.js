@@ -1,9 +1,11 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// --- CORRECCIÓN DE IMPORTACIÓN (Separamos date-fns y date-fns-tz) ---
-const { startOfDay, endOfDay, parseISO, addMinutes } = require('date-fns'); // Funciones básicas
-const { zonedTimeToUtc } = require('date-fns-tz'); // Solo para conversión TZ
+// --- CORRECCIÓN DE IMPORTACIÓN Y USO ---
+// Importar funciones base de date-fns
+const { startOfDay, endOfDay, parseISO } = require('date-fns');
+// Importar SÓLO la función específica de TZ que necesitamos
+const { zonedTimeToUtc } = require('date-fns-tz');
 // --- FIN DE CORRECCIÓN ---
 const { generateTimeSlots } = require('../utils/timeSlotGenerator');
 
@@ -35,12 +37,12 @@ const getAggregatedAvailability = async (req, res) => {
 
     // 5. Buscar reservas del día
     // --- CORRECCIÓN DE LÓGICA (Usamos date-fns + zonedTimeToUtc) ---
-    // Creamos objetos Date que representen el inicio y fin del día EN LA ZONA HORARIA local,
-    // luego los convertimos a UTC para la consulta a la BD.
     // parseISO convierte 'yyyy-MM-dd' a un objeto Date (en UTC medianoche por defecto)
-    const dateObj = parseISO(date); 
-    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone); // Inicio del día en Argentina, convertido a UTC
-    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);     // Fin del día en Argentina, convertido a UTC
+    const dateObj = parseISO(date);
+    // Usamos startOfDay/endOfDay de date-fns (no necesitan TZ aquí)
+    // Luego convertimos el resultado a UTC usando la zona horaria
+    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
+    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
     // --- FIN DE CORRECCIÓN ---
 
     const bookings = await Booking.find({
@@ -72,12 +74,12 @@ const getAggregatedAvailability = async (req, res) => {
 };
 
 /* --- CÓDIGO ORIGINAL (con corrección de uso) --- */
-const getCourts = async (req, res) => { /* ... */ };
-const createCourt = async (req, res) => { /* ... */ };
-const getCourtById = async (req, res) => { /* ... */ };
-const updateCourt = async (req, res) => { /* ... */ };
-const deleteCourt = async (req, res) => { /* ... */ };
-const getPublicCourts = async (req, res) => { /* ... */ };
+const getCourts = async (req, res) => { /* ... tu código ... */ };
+const createCourt = async (req, res) => { /* ... tu código ... */ };
+const getCourtById = async (req, res) => { /* ... tu código ... */ };
+const updateCourt = async (req, res) => { /* ... tu código ... */ };
+const deleteCourt = async (req, res) => { /* ... tu código ... */ };
+const getPublicCourts = async (req, res) => { /* ... tu código ... */ };
 
 // Corregimos esta función también
 const getAvailabilityForPublic = async (req, res) => {
@@ -94,7 +96,7 @@ const getAvailabilityForPublic = async (req, res) => {
     // --- FIN DE CORRECCIÓN ---
 
     const bookings = await Booking.find({ court: courtId, startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' } });
-    const availableSlots = court.availableSlots || [];
+    const availableSlots = court.availableSlots || []; // Lógica antigua, podría necesitar refactor
     const availability = availableSlots.map(slotTime => {
       // --- CORRECCIÓN DE USO ---
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
