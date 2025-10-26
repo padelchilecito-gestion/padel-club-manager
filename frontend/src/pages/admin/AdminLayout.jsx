@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from '../../components/admin/Sidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
 import DashboardPage from './DashboardPage';
 import BookingsPage from './BookingsPage';
 import PosPage from './PosPage';
@@ -24,10 +23,8 @@ const AdminLayout = () => {
     <div className="flex h-screen bg-dark-primary text-text-primary">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-primary p-6">
           <Routes>
-            {/* Redirect /admin to /admin/dashboard */}
             <Route index element={<Navigate to="dashboard" replace />} />
 
             {/* Routes for Operator and Admin */}
