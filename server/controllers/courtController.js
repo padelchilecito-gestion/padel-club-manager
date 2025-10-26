@@ -2,13 +2,9 @@ const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
 
-// ✅ Importar de manera diferente para mayor compatibilidad
-const dateFns = require('date-fns');
-const dateFnsTz = require('date-fns-tz');
-
-// Extraer las funciones específicas
-const { parseISO, startOfDay, endOfDay } = dateFns;
-const { zonedTimeToUtc } = dateFnsTz;
+// ✅ Importación correcta para date-fns-tz v3.x
+const { parseISO, startOfDay, endOfDay } = require('date-fns');
+const { toZonedTime, fromZonedTime } = require('date-fns-tz');
 
 const { generateTimeSlots } = require('../utils/timeSlotGenerator');
 
@@ -36,20 +32,17 @@ const getAggregatedAvailability = async (req, res) => {
       return res.status(404).json({ message: 'No se encontraron canchas activas.' });
     }
 
-    // Debug: verificar que las funciones existen
-    console.log('parseISO existe:', typeof parseISO);
-    console.log('zonedTimeToUtc existe:', typeof zonedTimeToUtc);
-
+    // ✅ Usar fromZonedTime en lugar de zonedTimeToUtc (date-fns-tz v3.x)
     const dateObj = parseISO(date);
-    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
-    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
+    const start = fromZonedTime(startOfDay(dateObj), timeZone);
+    const end = fromZonedTime(endOfDay(dateObj), timeZone);
 
     const bookings = await Booking.find({
       startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' }
     }).select('court startTime');
 
     const availability = allPossibleSlots.map(slotTime => {
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = fromZonedTime(`${date}T${slotTime}:00`, timeZone);
 
       const bookedCourtIds = bookings.filter(b => b.startTime.getTime() === slotDateTimeUTC.getTime()).map(b => b.court.toString());
       const availableCourts = activeCourts.filter(c => !bookedCourtIds.includes(c._id.toString()));
@@ -158,15 +151,15 @@ const getAvailabilityForPublic = async (req, res) => {
     if (!court || !court.isActive) return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
 
     const dateObj = parseISO(date);
-    const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
-    const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
+    const start = fromZonedTime(startOfDay(dateObj), timeZone);
+    const end = fromZonedTime(endOfDay(dateObj), timeZone);
 
     const bookings = await Booking.find({ court: courtId, startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' } });
 
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
-      const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
+      const slotDateTimeUTC = fromZonedTime(`${date}T${slotTime}:00`, timeZone);
       const isBooked = bookings.some(b => b.startTime.getTime() === slotDateTimeUTC.getTime());
       return { startTime: slotTime, isAvailable: !isBooked };
     });
