@@ -18,7 +18,8 @@ const SettingSchema = new mongoose.Schema({
       'WEEKDAY_OPENING_HOUR',
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
-      'WEEKEND_CLOSING_HOUR',
+'WEEKEND_CLOSING_HOUR',
+    'SHOP_ENABLED' // ← AGREGAR ESTA LÍNEA
     ],
   },
   value: {

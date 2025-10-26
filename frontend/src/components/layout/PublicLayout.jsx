@@ -38,9 +38,11 @@ const PublicLayout = () => {
               <Link to="/" className="text-text-secondary hover:text-text-primary transition-colors">
                 Reservar
               </Link>
-              <Link to="/shop" className="text-text-secondary hover:text-text-primary transition-colors">
-                Tienda
-              </Link>
+              {settings.shopEnabled !== 'false' && (
+                <Link to="/shop" className="text-gray-300 hover:text-white transition-colors">
+                  Tienda
+                </Link>
+              )}
               <Link
                 to="/login"
                 className="bg-indigo-dark hover:bg-indigo-light text-white px-5 py-2 rounded-lg font-medium transition-colors"

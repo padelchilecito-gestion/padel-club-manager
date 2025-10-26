@@ -1,48 +1,40 @@
 require('dotenv').config();
 
-// Placeholder for a real WhatsApp API client (like Twilio, Meta's API, etc.)
-
-const WHATSAPP_SENDER_NUMBER = process.env.WHATSAPP_SENDER_NUMBER;
-const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
+const WHATSAPP_ADMIN_NUMBER = process.env.WHATSAPP_ADMIN_NUMBER; // Ej: +5493825123456
 
 /**
- * Sends a WhatsApp message.
- * This is a placeholder function. In a real application, this would
- * make an API call to a WhatsApp Business API provider.
- * @param {string} to - The recipient's phone number (e.g., 'whatsapp:+14155238886')
- * @param {string} body - The message content.
+ * Genera un enlace de WhatsApp que abre la app con mensaje pre-escrito
  */
-const sendWhatsAppMessage = async (to, body) => {
-  if (!WHATSAPP_SENDER_NUMBER || !WHATSAPP_API_TOKEN) {
-    console.log('WhatsApp credentials not configured. Skipping message.');
+const generateWhatsAppLink = (to, message) => {
+  const encodedMessage = encodeURIComponent(message);
+  return `https://wa.me/${to.replace(/\D/g, '')}?text=${encodedMessage}`;
+};
+
+/**
+ * Notifica al admin por consola (y opcionalmente log)
+ * En un plan gratuito, el admin debe abrir el link manualmente
+ */
+const sendWhatsAppMessage = async (customerPhone, body) => {
+  if (!WHATSAPP_ADMIN_NUMBER) {
+    console.log('⚠️ WhatsApp no configurado. Agrega WHATSAPP_ADMIN_NUMBER en .env');
     return;
   }
 
-  console.log('--- SIMULATING WHATSAPP MESSAGE ---');
-  console.log(`From: ${WHATSAPP_SENDER_NUMBER}`);
-  console.log(`To: ${to}`);
-  console.log(`Body: ${body}`);
-  console.log('------------------------------------');
-  
-  // In a real implementation, you would have something like:
-  /*
-  try {
-    const client = require('twilio')(ACCOUNT_SID, AUTH_TOKEN);
-    const message = await client.messages.create({
-      from: `whatsapp:${WHATSAPP_SENDER_NUMBER}`,
-      to: `whatsapp:${to}`,
-      body: body,
-    });
-    console.log(`WhatsApp message sent successfully. SID: ${message.sid}`);
-    return message;
-  } catch (error) {
-    console.error('Failed to send WhatsApp message:', error);
-    throw error;
-  }
-  */
-  return Promise.resolve({ status: 'simulated_success' });
+  const adminMessage = `🔔 NUEVA RESERVA\n\nCliente: ${customerPhone}\n\n${body}\n\nResponder al cliente: https://wa.me/${customerPhone.replace(/\D/g, '')}`;
+
+  console.log('📱 NOTIFICACIÓN WHATSAPP AL ADMIN:');
+  console.log('═'.repeat(50));
+  console.log(adminMessage);
+  console.log('═'.repeat(50));
+  console.log(`🔗 Link directo: ${generateWhatsAppLink(WHATSAPP_ADMIN_NUMBER, adminMessage)}`);
+
+  return {
+    status: 'pending',
+    adminLink: generateWhatsAppLink(WHATSAPP_ADMIN_NUMBER, adminMessage)
+  };
 };
 
 module.exports = {
   sendWhatsAppMessage,
+  generateWhatsAppLink
 };
