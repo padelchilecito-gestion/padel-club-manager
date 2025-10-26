@@ -2,23 +2,25 @@ const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
 
-// ✅ CORRECCIÓN: Importar funciones de forma nombrada
-const { parseISO, startOfDay, endOfDay } = require('date-fns');
-const { zonedTimeToUtc } = require('date-fns-tz');
+// ✅ Importar de manera diferente para mayor compatibilidad
+const dateFns = require('date-fns');
+const dateFnsTz = require('date-fns-tz');
+
+// Extraer las funciones específicas
+const { parseISO, startOfDay, endOfDay } = dateFns;
+const { zonedTimeToUtc } = dateFnsTz;
 
 const { generateTimeSlots } = require('../utils/timeSlotGenerator');
 
 const getAggregatedAvailability = async (req, res) => {
   try {
-    const { date } = req.params; // 'date' es 'yyyy-MM-dd'
+    const { date } = req.params;
     const timeZone = 'America/Argentina/Buenos_Aires';
 
-    // 1. Buscar settings
     const settingsList = await Setting.find({});
     const settings = settingsList.reduce((acc, setting) => { acc[setting.key] = setting.value; return acc; }, {});
     console.log('CONFIGURACIÓN REDUCIDA:', settings);
 
-    // 2. Parsear y validar slotDuration
     const slotDuration = parseInt(settings.slotDuration, 10);
     if (!settings || !settings.openTime || !settings.closeTime || !slotDuration || slotDuration <= 0) {
       console.error('ERROR: Validación de settings falló. Datos:', settings);
@@ -27,17 +29,17 @@ const getAggregatedAvailability = async (req, res) => {
       });
     }
 
-    // 3. Generar slots
     const allPossibleSlots = generateTimeSlots(settings.openTime, settings.closeTime, slotDuration);
 
-    // 4. Buscar canchas activas
     const activeCourts = await Court.find({ isActive: true }).select('name pricePerHour');
     if (!activeCourts || activeCourts.length === 0) {
       return res.status(404).json({ message: 'No se encontraron canchas activas.' });
     }
 
-    // 5. Buscar reservas del día
-    // ✅ Usar las funciones importadas directamente
+    // Debug: verificar que las funciones existen
+    console.log('parseISO existe:', typeof parseISO);
+    console.log('zonedTimeToUtc existe:', typeof zonedTimeToUtc);
+
     const dateObj = parseISO(date);
     const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
     const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
@@ -46,9 +48,7 @@ const getAggregatedAvailability = async (req, res) => {
       startTime: { $gte: start, $lt: end }, status: { $ne: 'Cancelled' }
     }).select('court startTime');
 
-    // 6. Mapear disponibilidad
     const availability = allPossibleSlots.map(slotTime => {
-      // ✅ Usar la función importada directamente
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
 
       const bookedCourtIds = bookings.filter(b => b.startTime.getTime() === slotDateTimeUTC.getTime()).map(b => b.court.toString());
@@ -68,10 +68,6 @@ const getAggregatedAvailability = async (req, res) => {
   }
 };
 
-
-/* --- CÓDIGO ORIGINAL (Recuperado y corregido) --- */
-
-// @desc    (Admin) Get all courts
 const getCourts = async (req, res) => {
   try {
     const courts = await Court.find({});
@@ -82,22 +78,11 @@ const getCourts = async (req, res) => {
   }
 };
 
-// @desc    (Admin) Create a court
 const createCourt = async (req, res) => {
-  const {
-    name,
-    courtType,
-    pricePerHour,
-    isActive,
-  } = req.body;
+  const { name, courtType, pricePerHour, isActive } = req.body;
 
   try {
-    const court = new Court({
-      name,
-      courtType,
-      pricePerHour,
-      isActive,
-    });
+    const court = new Court({ name, courtType, pricePerHour, isActive });
     const createdCourt = await court.save();
     res.status(201).json(createdCourt);
   } catch (error) {
@@ -106,7 +91,6 @@ const createCourt = async (req, res) => {
   }
 };
 
-// @desc    (Admin) Get court by ID
 const getCourtById = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
@@ -121,7 +105,6 @@ const getCourtById = async (req, res) => {
   }
 };
 
-// @desc    (Admin) Update court
 const updateCourt = async (req, res) => {
   const { name, courtType, pricePerHour, isActive } = req.body;
   try {
@@ -143,7 +126,6 @@ const updateCourt = async (req, res) => {
   }
 };
 
-// @desc    (Admin) Delete court
 const deleteCourt = async (req, res) => {
   try {
     const court = await Court.findById(req.params.id);
@@ -159,8 +141,6 @@ const deleteCourt = async (req, res) => {
   }
 };
 
-
-// @desc    (Public) Get active courts
 const getPublicCourts = async (req, res) => {
   try {
     const courts = await Court.find({ isActive: true });
@@ -170,8 +150,6 @@ const getPublicCourts = async (req, res) => {
   }
 };
 
-
-// @desc    (Public) Get availability for a specific court (Lógica antigua, con corrección de fecha)
 const getAvailabilityForPublic = async (req, res) => {
   try {
     const { date, courtId } = req.params;
@@ -179,7 +157,6 @@ const getAvailabilityForPublic = async (req, res) => {
     const court = await Court.findById(courtId);
     if (!court || !court.isActive) return res.status(404).json({ message: 'Cancha no encontrada o inactiva.' });
 
-    // ✅ Usar las funciones importadas directamente
     const dateObj = parseISO(date);
     const start = zonedTimeToUtc(startOfDay(dateObj), timeZone);
     const end = zonedTimeToUtc(endOfDay(dateObj), timeZone);
@@ -189,7 +166,6 @@ const getAvailabilityForPublic = async (req, res) => {
     const availableSlots = court.availableSlots || [];
 
     const availability = availableSlots.map(slotTime => {
-      // ✅ Usar la función importada directamente
       const slotDateTimeUTC = zonedTimeToUtc(`${date}T${slotTime}:00`, timeZone);
       const isBooked = bookings.some(b => b.startTime.getTime() === slotDateTimeUTC.getTime());
       return { startTime: slotTime, isAvailable: !isBooked };
@@ -200,7 +176,6 @@ const getAvailabilityForPublic = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener la disponibilidad' });
   }
 };
-
 
 module.exports = {
   getAggregatedAvailability,
