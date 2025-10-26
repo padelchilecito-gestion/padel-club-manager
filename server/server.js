@@ -8,7 +8,7 @@ const { logActivity } = require('./utils/logActivity');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
-const path = require('path'); // Path sigue siendo necesario para otras cosas? Lo dejamos por ahora.
+const path = require('path');
 const http = require('http');
 const morgan = require('morgan');
 const helmet = require('helmet');
@@ -17,7 +17,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
-// const { protect, admin } = require('./middlewares/authMiddleware'); // Middleware protect/admin no usado directamente aquí
+// const { protect, admin } = require('./middlewares/authMiddleware');
 
 // Cargar variables de entorno
 dotenv.config();
@@ -31,35 +31,38 @@ connectDB();
 
 const app = express();
 
-// Configuración de CORS
+// --- CORRECCIÓN DE CORS ---
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://padel-club-manager.vercel.app',
-  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app'
+  'http://localhost:5173', // Para desarrollo local del frontend
+  'http://localhost:3000', // Otra posible URL local
+  'https://padel-club-manager.vercel.app', // URL Vercel anterior
+  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app', // URL Vercel anterior
+  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app', // URL Vercel anterior
+  // --- URL AÑADIDA ---
+  'https://padel-club-manager-xi.vercel.app' // La nueva URL que daba error
 ];
+// --- FIN DE CORRECCIÓN ---
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Permitir solicitudes sin 'origin' (como Postman) o si está en la lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.error(`CORS error: Origin ${origin} not allowed.`);
-      callback(new Error('Not allowed by CORS'));
+      // Enviar el error específico de CORS
+      callback(new Error(`Origin ${origin} Not allowed by CORS`));
     }
   },
   credentials: true,
 }));
 
 // Middlewares de seguridad
-app.use(helmet({ // Configuración básica de Helmet
-  contentSecurityPolicy: false, // Deshabilitar CSP por ahora para simplificar, ajustar luego si es necesario
+app.use(helmet({
+  contentSecurityPolicy: false, // Simplificado por ahora
 }));
 
 // Loggeo de peticiones
-// Asegúrate de que NODE_ENV esté configurado en Render si quieres logs solo en desarrollo
-// O simplemente actívalo siempre:
 app.use(morgan('dev'));
 
 // Body parser, cookie parser
@@ -75,25 +78,19 @@ app.use(hpp());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 200, // Ajusta según necesidad
+  max: 200,
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
-  // trustProxy: 1 // Descomentar si Render usa un proxy inverso confiable
+  // trustProxy: 1 // Considerar si Render actúa como proxy confiable
 });
 app.use('/api', limiter);
 
 // Rutas API
 app.use('/api', routes);
 
-// --- BLOQUE ELIMINADO ---
-// Ya no intentamos servir archivos estáticos desde el backend
-// if (process.env.NODE_ENV === 'production') { ... }
-// --- FIN DEL BLOQUE ELIMINADO ---
-
 // Ruta raíz simple para verificar que la API funciona
 app.get('/', (req, res) => {
   res.send('API Padel Club Manager está funcionando...');
 });
-
 
 // Middlewares de error (comentados)
 // app.use(logErrors);
