@@ -31,30 +31,31 @@ connectDB();
 
 const app = express();
 
-// --- CORRECCIÓN DE CORS ---
-const allowedOrigins = [
-  'http://localhost:5173', // Para desarrollo local del frontend
-  'http://localhost:3000', // Otra posible URL local
-  'https://padel-club-manager.vercel.app', // URL Vercel anterior
-  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app', // URL Vercel anterior
-  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app', // URL Vercel anterior
-  // --- URL AÑADIDA ---
-  'https://padel-club-manager-xi.vercel.app' // La nueva URL que daba error
-];
+// --- CORRECCIÓN PARA RATE LIMITER (Advertencia X-Forwarded-For) ---
+// Indicar a Express que confíe en el primer proxy (Render usa uno)
+app.set('trust proxy', 1);
 // --- FIN DE CORRECCIÓN ---
+
+// Configuración de CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://padel-club-manager.vercel.app',
+  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
+  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app',
+  'https://padel-club-manager-xi.vercel.app'
+];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir solicitudes sin 'origin' (como Postman) o si está en la lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.error(`CORS error: Origin ${origin} not allowed.`);
-      // Enviar el error específico de CORS
       callback(new Error(`Origin ${origin} Not allowed by CORS`));
     }
   },
-  credentials: true, // Importante si usas cookies o autenticación
+  credentials: true,
 }));
 
 // Middlewares de seguridad
@@ -75,12 +76,11 @@ app.use(mongoSanitize());
 app.use(xss());
 app.use(hpp());
 
-// Rate limiting
+// Rate limiting (Ahora usará la IP correcta gracias a 'trust proxy')
 const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 200,
+  windowMs: 10 * 60 * 1000, // 10 minutos
+  max: 200, // Límite de 200 peticiones por IP cada 10 min
   message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
-  // trustProxy: 1 // Considerar si Render actúa como proxy confiable
 });
 app.use('/api', limiter);
 
