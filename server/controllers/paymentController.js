@@ -3,9 +3,9 @@ const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
-const Setting = require('../models/Setting'); // <-- IMPORTAR SETTING
+const Setting = require('../models/Setting');
 const mongoose = require('mongoose');
-const { format } = require('date-fns'); // <-- IMPORTAR FORMAT
+const { format } = require('date-fns'); // Importar format
 
 // @desc    Create a Mercado Pago payment preference (PARA CHECKOUT WEB)
 // @route   POST /api/payments/create-preference
@@ -46,17 +46,20 @@ const createPaymentPreference = async (req, res) => {
   }
 };
 
-// --- NUEVA FUNCIÓN PARA CREAR QR DINÁMICO ---
+// --- FUNCIÓN DE QR CORREGIDA (YA NO USA client.post) ---
 // @desc    Create a Mercado Pago QR Order for a specific booking
 // @route   POST /api/payments/create-qr-order
 // @access  Private/Admin
 const createBookingQROrder = async (req, res) => {
   const { bookingId } = req.body;
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  const mpUserId = process.env.MERCADOPAGO_USER_ID;
+  const mpStoreId = process.env.MERCADOPAGO_STORE_ID;
 
   // Validar IDs de entorno
-  if (!process.env.MERCADOPAGO_USER_ID || !process.env.MERCADOPAGO_STORE_ID) {
-    console.error('Error: MERCADOPAGO_USER_ID y MERCADOPAGO_STORE_ID deben estar configurados.');
+  if (!mpAccessToken || !mpUserId || !mpStoreId) {
+    console.error('Error: Faltan variables de entorno de Mercado Pago (TOKEN, USER_ID, STORE_ID).');
     return res.status(500).json({ message: 'Error de configuración del servidor.' });
   }
 
@@ -76,7 +79,7 @@ const createBookingQROrder = async (req, res) => {
 
     // 3. Crear la Orden QR en Mercado Pago
     const orderData = {
-      external_reference: bookingId, // Usamos external_reference para identificar la reserva
+      external_reference: bookingId,
       title: `Reserva de Turno - ${clubName}`,
       description: `Pago de la reserva para ${booking.user.name} ${booking.user.lastName || ''}`,
       notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
@@ -90,25 +93,41 @@ const createBookingQROrder = async (req, res) => {
           currency_id: 'ARS',
         }
       ],
-      // Definir un tiempo de expiración para el QR (ej. 30 minutos)
       expiration_date: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     };
     
-    // Usamos la API de Órdenes de Tienda (In-Store)
-    const url = `/instore/orders/qr/seller/collectors/${process.env.MERCADOPAGO_USER_ID}/stores/${process.env.MERCADOPAGO_STORE_ID}/pos/1/orders`;
+    // 4. --- ESTA ES LA PARTE CORREGIDA ---
+    // Usamos fetch (nativo de Node.js) en lugar de client.post
+    const url = `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${mpUserId}/stores/${mpStoreId}/pos/1/orders`;
     
-    const mpResponse = await client.post(url, orderData);
+    const mpResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${mpAccessToken}`
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    const mpResult = await mpResponse.json();
+
+    if (!mpResponse.ok) {
+      // Si Mercado Pago dio un error, lo mostramos en el log
+      console.error('Error de Mercado Pago al crear QR:', mpResult);
+      throw new Error(mpResult.message || 'Error al contactar con Mercado Pago');
+    }
+    // --- FIN DE LA CORRECCIÓN ---
 
     // Devolvemos la data del QR al frontend
-    res.json({ qr_data: mpResponse.qr_data });
+    res.json({ qr_data: mpResult.qr_data });
 
   } catch (error) {
-    console.error('Error creating Mercado Pago QR order:', error?.data || error.message);
+    console.error('Error creating Mercado Pago QR order:', error.message);
     res.status(500).json({ message: 'Failed to create QR order.' });
   }
 };
 
-// --- WEBHOOK MODIFICADO ---
+// --- WEBHOOK (Sin cambios, pero incluido por completitud) ---
 // @desc    Receive Mercado Pago webhook notifications
 // @route   POST /api/payments/webhook
 // @access  Public
@@ -117,35 +136,32 @@ const receiveWebhook = async (req, res) => {
 
   if (type === 'payment') {
     try {
-      const paymentClient = new Payment(client);
+      const paymentClient = new Payment(client); // <-- Esto usa el client v3 (config)
       const payment = await paymentClient.get({ id: data.id });
 
       if (payment && payment.status === 'approved') {
         let booking;
         let paymentMethod;
 
-        // --- LÓGICA MEJORADA ---
         // A. Chequear si es un PAGO QR (identificado por external_reference)
         if (payment.external_reference) {
           booking = await Booking.findById(payment.external_reference);
-          paymentMethod = 'QR Mercado Pago'; // El método de pago que querías
+          paymentMethod = 'QR Mercado Pago';
         
         // B. Chequear si es un PAGO WEB (identificado por metadata)
         } else if (payment.metadata && payment.metadata.booking_id) {
           booking = await Booking.findById(payment.metadata.booking_id);
-          paymentMethod = 'Mercado Pago Web'; // Diferenciamos del QR
+          paymentMethod = 'Mercado Pago Web';
         }
-        // --- FIN LÓGICA ---
 
         // Si encontramos una reserva por cualquiera de los métodos
-        if (booking && !booking.isPaid) { // Solo actualizar si no estaba paga
+        if (booking && !booking.isPaid) {
           booking.isPaid = true;
           booking.status = 'Confirmed';
           booking.paymentMethod = paymentMethod;
           await booking.save();
           console.log(`✅ Booking ${booking._id} confirmed and paid via ${paymentMethod}.`);
           
-          // Emitir evento por socket
           const io = req.app.get('socketio');
           io.emit('booking_update', booking);
         }
@@ -182,7 +198,6 @@ const receiveWebhook = async (req, res) => {
             session.endSession();
           }
         }
-        // --- Fin Lógica Venta POS ---
       }
       res.status(200).send('Webhook received');
     } catch (error) {
@@ -197,5 +212,5 @@ const receiveWebhook = async (req, res) => {
 module.exports = {
   createPaymentPreference,
   receiveWebhook,
-  createBookingQROrder, // <-- EXPORTAR NUEVA FUNCIÓN
+  createBookingQROrder,
 };
