@@ -3,25 +3,24 @@ const router = express.Router();
 const { 
   createPaymentPreference, 
   receiveWebhook, 
-  createBookingQROrder // <-- 1. IMPORTAR LA NUEVA FUNCIÓN
+  createBookingPreferenceQR // <-- 1. IMPORTAR NUEVA FUNCIÓN
 } = require('../controllers/paymentController');
 const { protect, admin } = require('../middlewares/authMiddleware'); // <-- 2. IMPORTAR MIDDLEWARE
 
-// @route   POST /api/payments/create-preference
-// @desc    Create a Mercado Pago payment preference (Checkout Web)
-// @access  Public / Operator
+// Ruta original para checkout web general
 router.post('/create-preference', createPaymentPreference);
 
-// --- 3. AÑADIR LA RUTA PARA EL QR ---
-// @route   POST /api/payments/create-qr-order
-// @desc    Create a Mercado Pago QR Order for a specific booking
+// --- 3. NUEVA RUTA para generar QR desde Preferencia ---
+// @route   POST /api/payments/create-booking-preference-qr
+// @desc    Create a MP Preference focused on QR for a specific booking
 // @access  Private/Admin
-router.post('/create-qr-order', protect, admin, createBookingQROrder);
+router.post('/create-booking-preference-qr', protect, admin, createBookingPreferenceQR);
 // --- FIN NUEVA RUTA ---
 
-// @route   POST /api/payments/webhook
-// @desc    Receive Mercado Pago webhook notifications
-// @access  Public
+// Ruta para recibir webhooks
 router.post('/webhook', receiveWebhook);
+
+// --- RUTA ANTIGUA de QR (In-Store) ELIMINADA o COMENTADA ---
+// router.post('/create-qr-order', protect, admin, createBookingQROrder); // Ya no se usa
 
 module.exports = router;
