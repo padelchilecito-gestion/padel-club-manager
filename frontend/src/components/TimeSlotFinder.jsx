@@ -1,13 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// --- CORRECCIÓN DE RUTA Y SOCKET ---
-import socket from '../services/socketService'; // 1. Ruta corregida (un solo ../)
+import socket from '../services/socketService';
 import { getAggregatedAvailability } from '../services/courtService';
 import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns'; 
-// --- FIN CORRECCIÓN ---
 import { es } from 'date-fns/locale';
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
 import BookingModal from './BookingModal';
 import { Calendar, Clock, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+
+// --- NUEVA FUNCIÓN HELPER ---
+// Parsea "HH:mm" a minutos totales. Ej: "17:30" -> 1050
+const parseTimeToMinutes = (timeStr) => {
+  try {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) {
+      return NaN;
+    }
+    return (hours * 60) + minutes;
+  } catch (e) {
+    console.error('Error parsing time:', timeStr);
+    return NaN;
+  }
+};
+// --- FIN FUNCIÓN HELPER ---
 
 const TimeSlotFinder = ({ settings }) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -21,14 +35,13 @@ const TimeSlotFinder = ({ settings }) => {
   const maxBookingDays = settings.bookingLeadTime || 7;
   const slotDurationMinutes = parseInt(settings.slotDuration, 10) || 30;
 
-  // 2. fetchAvailability ahora se usa para recargar
   const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await getAggregatedAvailability(selectedDate);
       setAvailability(Array.isArray(data) ? data : []);
-      setSelectedSlots([]); // Limpiar selección al recargar
+      setSelectedSlots([]);
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Error al cargar la disponibilidad';
       setError(errorMsg);
@@ -36,35 +49,25 @@ const TimeSlotFinder = ({ settings }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]); // Depende de selectedDate
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchAvailability();
   }, [fetchAvailability]);
 
-  // --- 3. LÓGICA DE SOCKET.IO SIMPLIFICADA (del colaborador) ---
   useEffect(() => {
-    // 1. Conectar al socket
     socket.connect();
 
-    // 2. Definir el manejador de actualizaciones
     const handleBookingUpdate = async (newBooking) => {
       console.log('🔔 Reserva recibida por Socket.IO:', newBooking);
-
-      // Verificar si la reserva es para la fecha que estamos viendo
       const bookingDate = format(parseISO(newBooking.startTime), 'yyyy-MM-dd');
       
       if (bookingDate !== selectedDate) {
         console.log('📅 Reserva es de otra fecha, ignorando');
         return;
       }
-
-      // IMPORTANTE: Recargar disponibilidad completa del servidor
-      // Esto asegura que se recalcule correctamente la disponibilidad agregada
-      console.log('🔄 Recargando disponibilidad por socket...');
       
-      // Usamos getAggregatedAvailability directamente para evitar el setLoading(true)
-      // que podría parpadear la UI.
+      console.log('🔄 Recargando disponibilidad por socket...');
       try {
         const data = await getAggregatedAvailability(selectedDate);
         setAvailability(Array.isArray(data) ? data : []);
@@ -74,19 +77,14 @@ const TimeSlotFinder = ({ settings }) => {
       }
     };
 
-    // 3. Escuchar el evento 'booking_update'
     socket.on('booking_update', handleBookingUpdate);
 
-    // 4. Limpieza: dejar de escuchar y desconectar al salir
     return () => {
       socket.off('booking_update', handleBookingUpdate);
       socket.disconnect();
     };
     
-    // Depende de selectedDate (para la comparación)
   }, [selectedDate]); 
-  // --- FIN LÓGICA DE SOCKET.IO ---
-
 
   const handleDateChange = (date) => {
     const newDate = new Date(date);
@@ -111,13 +109,10 @@ const TimeSlotFinder = ({ settings }) => {
   const handleSlotClick = (slot) => {
     setError(null);
     
-    // Comprobación extra por si el socket actualizó pero el usuario fue más rápido
-    // Usar 'availableCount' si existe, si no, 'isAvailable'
     const isTrulyAvailable = slot.availableCount !== undefined ? slot.availableCount > 0 : slot.isAvailable;
-
     if (!isTrulyAvailable) {
         setError("Este turno ya no está disponible.");
-        fetchAvailability(); // Forzar refresco
+        fetchAvailability();
         return;
     }
 
@@ -133,8 +128,10 @@ const TimeSlotFinder = ({ settings }) => {
     const sortedNewSlots = sortSlots(newSlots);
 
     if (sortedNewSlots.length > 1) {
+      // Usamos la duración en minutos
       if (!areSlotsConsecutive(sortedNewSlots, slotDurationMinutes)) {
         setError('Solo puedes seleccionar turnos consecutivos.');
+        // No actualizamos selectedSlots si la validación falla al añadir
         if (!isSelected) return; 
       }
     }
@@ -146,7 +143,10 @@ const TimeSlotFinder = ({ settings }) => {
     return slots.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
   };
 
+  // --- FUNCIÓN areSlotsConsecutive CORREGIDA ---
+  // (Usa la nueva función helper y evita usar new Date())
   const areSlotsConsecutive = (sortedSlots, duration) => {
+    // 1. Asegurar que 'duration' sea un número
     const numericDuration = typeof duration === 'number' ? duration : parseInt(duration, 10);
     
     if (isNaN(numericDuration) || numericDuration <= 0) {
@@ -156,23 +156,30 @@ const TimeSlotFinder = ({ settings }) => {
     }
 
     for (let i = 1; i < sortedSlots.length; i++) {
-      const prevTime = new Date(`1970-01-01T${sortedSlots[i-1].startTime}`);
-      const currTime = new Date(`1970-01-01T${sortedSlots[i].startTime}`);
+      // 2. Convertir "HH:mm" a minutos
+      const prevMinutes = parseTimeToMinutes(sortedSlots[i-1].startTime);
+      const currMinutes = parseTimeToMinutes(sortedSlots[i].startTime);
       
-      if (isNaN(prevTime) || isNaN(currTime)) {
+      // 3. Validar que la conversión fue exitosa
+      if (isNaN(prevMinutes) || isNaN(currMinutes)) {
           console.error('Fechas inválidas para comparar:', sortedSlots[i-1].startTime, sortedSlots[i].startTime);
           setError('Error interno: Formato de hora inválido.');
           return false;
       }
       
-      const diffMinutes = (currTime - prevTime) / 60000;
+      // 4. Restar los minutos (matemática simple)
+      const diffMinutes = currMinutes - prevMinutes;
       
+      // 5. Comparar números
       if (diffMinutes !== numericDuration) {
+        console.log(`Slots no consecutivos. Diferencia: ${diffMinutes}, Esperada: ${numericDuration}`);
         return false;
       }
     }
+    // Si el bucle termina, son todos consecutivos
     return true;
   };
+  // --- FIN DE LA CORRECCIÓN ---
 
   const handleOpenModal = () => {
     if (selectedSlots.length > 0) {
@@ -244,7 +251,6 @@ const TimeSlotFinder = ({ settings }) => {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                 {availability.map((slot) => {
                     const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
-                    // Usar 'availableCount' si existe, si no, 'isAvailable'
                     const isTrulyAvailable = slot.availableCount !== undefined ? slot.availableCount > 0 : slot.isAvailable;
                     
                     return (
