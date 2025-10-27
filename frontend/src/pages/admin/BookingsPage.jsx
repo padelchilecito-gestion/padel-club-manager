@@ -3,20 +3,25 @@ import { useLocation } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
 import { format } from 'date-fns';
-// --- CAMBIO: Importar nuevos iconos ---
 import { 
   XCircleIcon, 
   CurrencyDollarIcon, 
   ChatBubbleBottomCenterTextIcon,
-  BanknotesIcon, // Para Transferencia
-  QrCodeIcon      // Para QR
+  BanknotesIcon,
+  QrCodeIcon 
 } from '@heroicons/react/24/solid';
+// --- 1. IMPORTAR EL NUEVO MODAL ---
+import PaymentQRModal from '../../components/admin/PaymentQRModal';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const location = useLocation();
+
+  // --- 2. AÑADIR ESTADOS PARA EL MODAL ---
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   useEffect(() => {
     socket.connect();
@@ -62,15 +67,13 @@ const BookingsPage = () => {
     };
   }, [location.pathname]);
 
-  // --- CAMBIO: La función ahora acepta el método de pago ---
-  const handleUpdateStatus = async (id, paymentMethod) => {
+  // Esta función ahora solo maneja pagos MANUALES (Efectivo, Transferencia)
+  const handleManualPayment = async (id, paymentMethod) => {
     if (!paymentMethod) {
       alert('Error: Método de pago no especificado.');
       return;
     }
     try {
-        // Al marcar el pago, forzamos el estado 'Confirmed' (si estaba Pendiente),
-        // marcamos 'isPaid: true' y pasamos el método de pago.
         await bookingService.updateBookingStatus(id, { 
           status: 'Confirmed', 
           isPaid: true, 
@@ -80,7 +83,6 @@ const BookingsPage = () => {
         alert('Error al actualizar el pago.');
     }
   };
-  // --- FIN DEL CAMBIO ---
 
   const handleCancel = async (id) => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
@@ -90,6 +92,19 @@ const BookingsPage = () => {
               alert('Error al cancelar la reserva.');
           }
       }
+  };
+
+  // --- 3. FUNCIÓN PARA ABRIR EL MODAL QR ---
+  const handleOpenQrModal = (booking) => {
+    setSelectedBooking(booking);
+    setQrModalOpen(true);
+  };
+  
+  // Función para cerrar el modal
+  const handleCloseQrModal = (paymentSuccess) => {
+    setQrModalOpen(false);
+    setSelectedBooking(null);
+    // (No necesitamos refrescar, el socket.io ya actualizó la lista en 'handleBookingUpdate')
   };
 
   if (loading) return <div className="text-center p-8">Cargando reservas...</div>;
@@ -131,7 +146,7 @@ const BookingsPage = () => {
                     </a>
                   </td>
 
-                  <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/A'}</td>
+                  <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/a'}</td>
                   <td className="px-6 py-4">
                       {format(new Date(booking.startTime), 'dd/MM/yy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
                   </td>
@@ -150,39 +165,48 @@ const BookingsPage = () => {
                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
                           booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-light text-white'
                       }`}>
-                          {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
-                      </span>
+                          {/* --- 4. TEXTO DE PAGO MEJORADO --- */}
+                          {booking.isPaid ? `Pagado (${booking.paymentMethod || 'N/A'})` : 'Pendiente'}
+                       </span>
                   </td>
                   
-                  {/* --- CAMBIO: Grupo de botones de pago --- */}
                   <td className="px-6 py-4 flex items-center justify-center gap-3">
                       {!booking.isPaid && (booking.status === 'Confirmed' || booking.status === 'Pending') && (
                            <>
-                            <button onClick={() => handleUpdateStatus(booking._id, 'Efectivo')} className="text-green-light hover:text-green-dark transition-colors" title="Pagar con Efectivo">
+                            {/* Botón Efectivo (Manual) */}
+                            <button onClick={() => handleManualPayment(booking._id, 'Efectivo')} className="text-green-light hover:text-green-dark transition-colors" title="Pagar con Efectivo">
                                 <CurrencyDollarIcon className="h-6 w-6" />
                             </button>
-                             <button onClick={() => handleUpdateStatus(booking._id, 'Transferencia')} className="text-blue-400 hover:text-blue-300 transition-colors" title="Pagar con Transferencia">
+                            {/* Botón Transferencia (Manual) */}
+                             <button onClick={() => handleManualPayment(booking._id, 'Transferencia')} className="text-blue-400 hover:text-blue-300 transition-colors" title="Pagar con Transferencia">
                                 <BanknotesIcon className="h-6 w-6" />
                             </button>
-                             <button onClick={() => handleUpdateStatus(booking._id, 'QR Mercado Pago')} className="text-cyan-400 hover:text-cyan-300 transition-colors" title="Pagar con QR Mercado Pago">
+                            {/* --- 5. BOTÓN QR ABRE EL MODAL --- */}
+                             <button onClick={() => handleOpenQrModal(booking)} className="text-cyan-400 hover:text-cyan-300 transition-colors" title="Pagar con QR Mercado Pago">
                                 <QrCodeIcon className="h-6 w-6" />
                             </button>
                            </>
                       )}
-                      {/* El botón de cancelar solo debe aparecer si la reserva NO está ya cancelada */}
                       {booking.status !== 'Cancelled' && (
                            <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400 transition-colors" title="Cancelar Reserva">
                               <XCircleIcon className="h-6 w-6" />
                           </button>
                       )}
                   </td>
-                  {/* --- FIN DEL CAMBIO --- */}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+      
+      {/* --- 6. RENDERIZAR EL MODAL --- */}
+      {qrModalOpen && selectedBooking && (
+        <PaymentQRModal 
+          booking={selectedBooking} 
+          onClose={handleCloseQrModal} 
+        />
+      )}
     </div>
   );
 };
