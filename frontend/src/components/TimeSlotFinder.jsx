@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// --- CORRECCIÓN: La ruta es '../' no '../../' ---
-import socket from '../services/socketService';
-// --- FIN CORRECCIÓN ---
+// --- CORRECCIÓN DE RUTA Y SOCKET ---
+import socket from '../services/socketService'; // 1. Ruta corregida (un solo ../)
 import { getAggregatedAvailability } from '../services/courtService';
-import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns';
+import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns'; 
+// --- FIN CORRECCIÓN ---
 import { es } from 'date-fns/locale';
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
 import BookingModal from './BookingModal';
@@ -21,13 +21,14 @@ const TimeSlotFinder = ({ settings }) => {
   const maxBookingDays = settings.bookingLeadTime || 7;
   const slotDurationMinutes = parseInt(settings.slotDuration, 10) || 30;
 
+  // 2. fetchAvailability ahora se usa para recargar
   const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await getAggregatedAvailability(selectedDate);
       setAvailability(Array.isArray(data) ? data : []);
-      setSelectedSlots([]);
+      setSelectedSlots([]); // Limpiar selección al recargar
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Error al cargar la disponibilidad';
       setError(errorMsg);
@@ -35,51 +36,43 @@ const TimeSlotFinder = ({ settings }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate]); // Depende de selectedDate
 
   useEffect(() => {
     fetchAvailability();
   }, [fetchAvailability]);
 
-  // --- useEffect para Socket.IO (con la lógica de la vez pasada) ---
+  // --- 3. LÓGICA DE SOCKET.IO SIMPLIFICADA (del colaborador) ---
   useEffect(() => {
     // 1. Conectar al socket
     socket.connect();
 
     // 2. Definir el manejador de actualizaciones
-    const handleBookingUpdate = (newBooking) => {
-      // newBooking es el objeto de la BD:
-      // { startTime: "2025-10-27T20:00:00Z", endTime: "2025-10-27T21:00:00Z", ... }
+    const handleBookingUpdate = async (newBooking) => {
+      console.log('🔔 Reserva recibida por Socket.IO:', newBooking);
 
-      const bookingStart = parseISO(newBooking.startTime);
-      const bookingEnd = parseISO(newBooking.endTime);
+      // Verificar si la reserva es para la fecha que estamos viendo
+      const bookingDate = format(parseISO(newBooking.startTime), 'yyyy-MM-dd');
+      
+      if (bookingDate !== selectedDate) {
+        console.log('📅 Reserva es de otra fecha, ignorando');
+        return;
+      }
 
-      // Actualizar el estado 'availability'
-      setAvailability(prevAvailability => {
-        return prevAvailability.map(slot => {
-          
-          if (!slot.isAvailable) {
-            return slot;
-          }
-
-          // Convertir el 'startTime' del slot (ej: "17:30") a un objeto Date
-          // usando la fecha que el usuario está viendo (selectedDate)
-          const slotDateTime = parseISO(`${selectedDate}T${slot.startTime}`);
-
-          // Comprobar si la hora de este slot (ej: 17:30)
-          // cae DENTRO del rango de la nueva reserva (ej: 17:00 a 18:00)
-          const isBooked = (
-            slotDateTime >= bookingStart &&
-            slotDateTime < bookingEnd
-          );
-
-          if (isBooked) {
-            return { ...slot, isAvailable: false };
-          }
-          
-          return slot;
-        });
-      });
+      // IMPORTANTE: Recargar disponibilidad completa del servidor
+      // Esto asegura que se recalcule correctamente la disponibilidad agregada
+      console.log('🔄 Recargando disponibilidad por socket...');
+      
+      // Reutilizamos la función de fetch
+      // Usamos getAggregatedAvailability directamente para evitar el setLoading(true)
+      // que podría parpadear la UI.
+      try {
+        const data = await getAggregatedAvailability(selectedDate);
+        setAvailability(Array.isArray(data) ? data : []);
+        console.log('✅ Disponibilidad actualizada desde el servidor');
+      } catch (err) {
+        console.error('❌ Error recargando disponibilidad:', err);
+      }
     };
 
     // 3. Escuchar el evento 'booking_update'
@@ -91,8 +84,9 @@ const TimeSlotFinder = ({ settings }) => {
       socket.disconnect();
     };
     
+    // Depende de selectedDate (para la comparación) y la función de fetch
   }, [selectedDate]); 
-  // --- FIN Socket.IO ---
+  // --- FIN LÓGICA DE SOCKET.IO ---
 
 
   const handleDateChange = (date) => {
@@ -118,8 +112,10 @@ const TimeSlotFinder = ({ settings }) => {
   const handleSlotClick = (slot) => {
     setError(null);
     
+    // Comprobación extra por si el socket actualizó pero el usuario fue más rápido
     if (!slot.isAvailable) {
         setError("Este turno ya no está disponible.");
+        fetchAvailability(); // Forzar refresco
         return;
     }
 
@@ -246,14 +242,17 @@ const TimeSlotFinder = ({ settings }) => {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                 {availability.map((slot) => {
                     const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
+                    // Usar 'availableCount' si existe, si no, 'isAvailable'
+                    const isTrulyAvailable = slot.availableCount !== undefined ? slot.availableCount > 0 : slot.isAvailable;
+                    
                     return (
                     <button
                         key={slot.startTime}
                         onClick={() => handleSlotClick(slot)}
-                        disabled={!slot.isAvailable}
+                        disabled={!isTrulyAvailable}
                         className={`p-3 rounded-md text-center font-semibold transition-all
                         ${
-                            !slot.isAvailable
+                            !isTrulyAvailable
                             ? 'bg-gray-700 text-gray-500 cursor-not-allowed line-through'
                             : isSelected
                             ? 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 ring-2 ring-white'
