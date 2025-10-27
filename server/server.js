@@ -1,3 +1,4 @@
+// Force cache invalidation for Render deployment
 const express = require('express');
 // const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
