@@ -10,12 +10,6 @@ const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
-const morgan = require('morgan');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
-const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 // const { protect, admin } = require('./middlewares/authMiddleware');
 
@@ -58,31 +52,10 @@ app.use(cors({
   credentials: true,
 }));
 
-// Middlewares de seguridad
-app.use(helmet({
-  contentSecurityPolicy: false, // Simplificado por ahora
-}));
-
-// Loggeo de peticiones
-app.use(morgan('dev'));
-
 // Body parser, cookie parser
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
-
-// Sanitización de datos
-app.use(mongoSanitize());
-app.use(xss());
-app.use(hpp());
-
-// Rate limiting (Ahora usará la IP correcta gracias a 'trust proxy')
-const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutos
-  max: 200, // Límite de 200 peticiones por IP cada 10 min
-  message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 10 minutos.',
-});
-app.use('/api', limiter);
 
 // Rutas API
 app.use('/api', routes);
