@@ -3,7 +3,7 @@ const router = express.Router();
 const { 
   createPaymentPreference, 
   receiveWebhook, 
-  createBookingQROrder // <-- 1. IMPORTAR NUEVA FUNCIÓN
+  createBookingQROrder // <-- 1. IMPORTAR LA NUEVA FUNCIÓN
 } = require('../controllers/paymentController');
 const { protect, admin } = require('../middlewares/authMiddleware'); // <-- 2. IMPORTAR MIDDLEWARE
 
@@ -12,7 +12,7 @@ const { protect, admin } = require('../middlewares/authMiddleware'); // <-- 2. I
 // @access  Public / Operator
 router.post('/create-preference', createPaymentPreference);
 
-// --- 3. AÑADIR NUEVA RUTA PARA QR ---
+// --- 3. AÑADIR LA RUTA PARA EL QR ---
 // @route   POST /api/payments/create-qr-order
 // @desc    Create a Mercado Pago QR Order for a specific booking
 // @access  Private/Admin
