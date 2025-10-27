@@ -3,9 +3,11 @@ const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
+const Setting = require('../models/Setting'); // <-- IMPORTAR SETTING
 const mongoose = require('mongoose');
+const { format } = require('date-fns'); // <-- IMPORTAR FORMAT
 
-// @desc    Create a Mercado Pago payment preference
+// @desc    Create a Mercado Pago payment preference (PARA CHECKOUT WEB)
 // @route   POST /api/payments/create-preference
 // @access  Public / Operator
 const createPaymentPreference = async (req, res) => {
@@ -31,7 +33,7 @@ const createPaymentPreference = async (req, res) => {
     },
     auto_return: 'approved',
     notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
-    metadata: metadata,
+    metadata: metadata, // metadata: { booking_id: "..." }
   };
 
   try {
@@ -44,6 +46,69 @@ const createPaymentPreference = async (req, res) => {
   }
 };
 
+// --- NUEVA FUNCIÓN PARA CREAR QR DINÁMICO ---
+// @desc    Create a Mercado Pago QR Order for a specific booking
+// @route   POST /api/payments/create-qr-order
+// @access  Private/Admin
+const createBookingQROrder = async (req, res) => {
+  const { bookingId } = req.body;
+  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+
+  // Validar IDs de entorno
+  if (!process.env.MERCADOPAGO_USER_ID || !process.env.MERCADOPAGO_STORE_ID) {
+    console.error('Error: MERCADOPAGO_USER_ID y MERCADOPAGO_STORE_ID deben estar configurados.');
+    return res.status(500).json({ message: 'Error de configuración del servidor.' });
+  }
+
+  try {
+    // 1. Obtener datos de la reserva
+    const booking = await Booking.findById(bookingId).populate('user');
+    if (!booking) {
+      return res.status(404).json({ message: 'Reserva no encontrada' });
+    }
+    if (booking.isPaid) {
+      return res.status(400).json({ message: 'Esta reserva ya fue pagada.' });
+    }
+    
+    // 2. Obtener nombre del club desde Settings
+    const settings = await Setting.findOne({ key: 'clubName' });
+    const clubName = settings ? settings.value : 'Padel Club';
+
+    // 3. Crear la Orden QR en Mercado Pago
+    const orderData = {
+      external_reference: bookingId, // Usamos external_reference para identificar la reserva
+      title: `Reserva de Turno - ${clubName}`,
+      description: `Pago de la reserva para ${booking.user.name} ${booking.user.lastName || ''}`,
+      notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
+      total_amount: booking.price,
+      items: [
+        {
+          title: `Turno ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
+          unit_price: booking.price,
+          quantity: 1,
+          total_amount: booking.price,
+          currency_id: 'ARS',
+        }
+      ],
+      // Definir un tiempo de expiración para el QR (ej. 30 minutos)
+      expiration_date: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    };
+    
+    // Usamos la API de Órdenes de Tienda (In-Store)
+    const url = `/instore/orders/qr/seller/collectors/${process.env.MERCADOPAGO_USER_ID}/stores/${process.env.MERCADOPAGO_STORE_ID}/pos/1/orders`;
+    
+    const mpResponse = await client.post(url, orderData);
+
+    // Devolvemos la data del QR al frontend
+    res.json({ qr_data: mpResponse.qr_data });
+
+  } catch (error) {
+    console.error('Error creating Mercado Pago QR order:', error?.data || error.message);
+    res.status(500).json({ message: 'Failed to create QR order.' });
+  }
+};
+
+// --- WEBHOOK MODIFICADO ---
 // @desc    Receive Mercado Pago webhook notifications
 // @route   POST /api/payments/webhook
 // @access  Public
@@ -56,36 +121,45 @@ const receiveWebhook = async (req, res) => {
       const payment = await paymentClient.get({ id: data.id });
 
       if (payment && payment.status === 'approved') {
-        const metadata = payment.metadata;
+        let booking;
+        let paymentMethod;
 
-        // Check if it's a booking payment
-        if (metadata && metadata.booking_id) {
-          const booking = await Booking.findById(metadata.booking_id);
-          if (booking) {
-            booking.isPaid = true;
-            booking.status = 'Confirmed';
-            booking.paymentMethod = 'Mercado Pago';
-            await booking.save();
-            console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
-            
-            // Emit a real-time event
-            const io = req.app.get('socketio');
-            io.emit('booking_update', booking);
-          }
+        // --- LÓGICA MEJORADA ---
+        // A. Chequear si es un PAGO QR (identificado por external_reference)
+        if (payment.external_reference) {
+          booking = await Booking.findById(payment.external_reference);
+          paymentMethod = 'QR Mercado Pago'; // El método de pago que querías
+        
+        // B. Chequear si es un PAGO WEB (identificado por metadata)
+        } else if (payment.metadata && payment.metadata.booking_id) {
+          booking = await Booking.findById(payment.metadata.booking_id);
+          paymentMethod = 'Mercado Pago Web'; // Diferenciamos del QR
+        }
+        // --- FIN LÓGICA ---
+
+        // Si encontramos una reserva por cualquiera de los métodos
+        if (booking && !booking.isPaid) { // Solo actualizar si no estaba paga
+          booking.isPaid = true;
+          booking.status = 'Confirmed';
+          booking.paymentMethod = paymentMethod;
+          await booking.save();
+          console.log(`✅ Booking ${booking._id} confirmed and paid via ${paymentMethod}.`);
+          
+          // Emitir evento por socket
+          const io = req.app.get('socketio');
+          io.emit('booking_update', booking);
         }
 
-        // Check if it's a POS sale payment
-        if (metadata && metadata.sale_items) {
-          // This is a simplified flow. A real-world scenario might pre-create the sale as 'Pending'.
-          // Here, we create the sale and update stock upon payment confirmation.
+        // --- Lógica de Venta POS (Tu código original) ---
+        if (payment.metadata && payment.metadata.sale_items) {
+          console.log('Procesando pago de Venta POS...');
           const saleData = {
-            items: metadata.sale_items,
+            items: payment.metadata.sale_items,
             total: payment.transaction_amount,
             paymentMethod: 'Mercado Pago',
-            user: metadata.user_id, // We must pass the operator's ID in metadata
+            user: payment.metadata.user_id,
           };
           
-          // Using the same atomic transaction logic as in saleController
           const session = await mongoose.startSession();
           session.startTransaction();
           try {
@@ -108,6 +182,7 @@ const receiveWebhook = async (req, res) => {
             session.endSession();
           }
         }
+        // --- Fin Lógica Venta POS ---
       }
       res.status(200).send('Webhook received');
     } catch (error) {
@@ -122,4 +197,5 @@ const receiveWebhook = async (req, res) => {
 module.exports = {
   createPaymentPreference,
   receiveWebhook,
+  createBookingQROrder, // <-- EXPORTAR NUEVA FUNCIÓN
 };
