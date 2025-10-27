@@ -3,7 +3,14 @@ import { useLocation } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
 import { format } from 'date-fns';
-import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/solid'; // <-- Importé un ícono de chat (opcional)
+// --- CAMBIO: Importar nuevos iconos ---
+import { 
+  XCircleIcon, 
+  CurrencyDollarIcon, 
+  ChatBubbleBottomCenterTextIcon,
+  BanknotesIcon, // Para Transferencia
+  QrCodeIcon      // Para QR
+} from '@heroicons/react/24/solid';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -36,7 +43,6 @@ const BookingsPage = () => {
                 newBookings[index] = updatedBooking;
                 return newBookings;
             } else {
-                // Ordenar por fecha de inicio al añadir nuevas
                 return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
             }
         });
@@ -54,15 +60,27 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, [location.pathname]); // location.pathname es correcto aquí
+  }, [location.pathname]);
 
-  const handleUpdateStatus = async (id, newStatus, isPaid) => {
+  // --- CAMBIO: La función ahora acepta el método de pago ---
+  const handleUpdateStatus = async (id, paymentMethod) => {
+    if (!paymentMethod) {
+      alert('Error: Método de pago no especificado.');
+      return;
+    }
     try {
-        await bookingService.updateBookingStatus(id, { status: newStatus, isPaid });
+        // Al marcar el pago, forzamos el estado 'Confirmed' (si estaba Pendiente),
+        // marcamos 'isPaid: true' y pasamos el método de pago.
+        await bookingService.updateBookingStatus(id, { 
+          status: 'Confirmed', 
+          isPaid: true, 
+          paymentMethod: paymentMethod 
+        });
     } catch (err) {
-        alert('Error al actualizar la reserva.');
+        alert('Error al actualizar el pago.');
     }
   };
+  // --- FIN DEL CAMBIO ---
 
   const handleCancel = async (id) => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
@@ -100,10 +118,9 @@ const BookingsPage = () => {
               {bookings.map((booking) => (
                 <tr key={booking._id} className="hover:bg-dark-primary/50 transition-colors">
                   
-                  {/* --- CAMBIO (Peticiones 1 y 2) --- */}
                   <td className="px-6 py-4 font-medium text-text-primary whitespace-nowrap">
                     <a
-                      href={`https://wa.me/${booking.user.phone.replace(/\D/g, '')}`} // Link de WhatsApp (limpia el nro por si acaso)
+                      href={`https://wa.me/${booking.user.phone.replace(/\D/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title={`Enviar WhatsApp a ${booking.user.name}`}
@@ -113,7 +130,6 @@ const BookingsPage = () => {
                       {`${booking.user.name} ${booking.user.lastName || ''}`}
                     </a>
                   </td>
-                  {/* --- FIN DEL CAMBIO --- */}
 
                   <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/A'}</td>
                   <td className="px-6 py-4">
@@ -137,18 +153,30 @@ const BookingsPage = () => {
                           {booking.isPaid ? `Pagado (${booking.paymentMethod})` : 'Pendiente'}
                       </span>
                   </td>
+                  
+                  {/* --- CAMBIO: Grupo de botones de pago --- */}
                   <td className="px-6 py-4 flex items-center justify-center gap-3">
-                      {!booking.isPaid && booking.status === 'Confirmed' && (
-                           <button onClick={() => handleUpdateStatus(booking._id, 'Confirmed', true)} className="text-green-light hover:text-green-dark transition-colors" title="Marcar como Pagado">
-                              <CurrencyDollarIcon className="h-6 w-6" />
-                          </button>
+                      {!booking.isPaid && (booking.status === 'Confirmed' || booking.status === 'Pending') && (
+                           <>
+                            <button onClick={() => handleUpdateStatus(booking._id, 'Efectivo')} className="text-green-light hover:text-green-dark transition-colors" title="Pagar con Efectivo">
+                                <CurrencyDollarIcon className="h-6 w-6" />
+                            </button>
+                             <button onClick={() => handleUpdateStatus(booking._id, 'Transferencia')} className="text-blue-400 hover:text-blue-300 transition-colors" title="Pagar con Transferencia">
+                                <BanknotesIcon className="h-6 w-6" />
+                            </button>
+                             <button onClick={() => handleUpdateStatus(booking._id, 'QR Mercado Pago')} className="text-cyan-400 hover:text-cyan-300 transition-colors" title="Pagar con QR Mercado Pago">
+                                <QrCodeIcon className="h-6 w-6" />
+                            </button>
+                           </>
                       )}
-                      {booking.status === 'Confirmed' && (
+                      {/* El botón de cancelar solo debe aparecer si la reserva NO está ya cancelada */}
+                      {booking.status !== 'Cancelled' && (
                            <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400 transition-colors" title="Cancelar Reserva">
                               <XCircleIcon className="h-6 w-6" />
                           </button>
                       )}
                   </td>
+                  {/* --- FIN DEL CAMBIO --- */}
                 </tr>
               ))}
             </tbody>
