@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+// --- NUEVO: Importar socket y parseISO ---
+import socket from '../../services/socketService';
 import { getAggregatedAvailability } from '../services/courtService';
-import { addDays, format, isBefore, startOfToday } from 'date-fns';
+import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns'; 
+// --- FIN NUEVO ---
 import { es } from 'date-fns/locale';
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
 import BookingModal from './BookingModal';
@@ -16,15 +19,14 @@ const TimeSlotFinder = ({ settings }) => {
 
   const today = startOfToday();
   const maxBookingDays = settings.bookingLeadTime || 7;
-  // Convertir slotDuration a número una sola vez
-  const slotDurationMinutes = parseInt(settings.slotDuration, 10) || 30; // Usar 30 como default si falla
+  const slotDurationMinutes = parseInt(settings.slotDuration, 10) || 30;
 
   const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await getAggregatedAvailability(selectedDate);
-      setAvailability(Array.isArray(data) ? data : []); // Asegurar que sea array
+      setAvailability(Array.isArray(data) ? data : []);
       setSelectedSlots([]);
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Error al cargar la disponibilidad';
@@ -38,6 +40,68 @@ const TimeSlotFinder = ({ settings }) => {
   useEffect(() => {
     fetchAvailability();
   }, [fetchAvailability]);
+
+  // --- NUEVO: useEffect para Socket.IO ---
+  // Este efecto maneja las actualizaciones en tiempo real.
+  useEffect(() => {
+    // 1. Conectar al socket
+    socket.connect();
+
+    // 2. Definir el manejador de actualizaciones
+    const handleBookingUpdate = (newBooking) => {
+      // newBooking es el objeto de la BD:
+      // { startTime: "2025-10-27T20:00:00Z", endTime: "2025-10-27T21:00:00Z", ... }
+
+      // Convertir las horas de la reserva (que vienen en UTC/ISO) a objetos Date
+      const bookingStart = parseISO(newBooking.startTime);
+      const bookingEnd = parseISO(newBooking.endTime);
+
+      // Actualizar el estado 'availability'
+      setAvailability(prevAvailability => {
+        // Mapear sobre los slots (casillas) existentes en la grilla
+        return prevAvailability.map(slot => {
+          
+          // Solo actualizamos slots que aún están marcados como disponibles
+          if (!slot.isAvailable) {
+            return slot;
+          }
+
+          // Convertir el 'startTime' del slot (ej: "17:30") a un objeto Date
+          // usando la fecha que el usuario está viendo (selectedDate)
+          const slotDateTime = parseISO(`${selectedDate}T${slot.startTime}`);
+
+          // Comprobar si la hora de este slot (ej: 17:30)
+          // cae DENTRO del rango de la nueva reserva (ej: 17:00 a 18:00)
+          const isBooked = (
+            slotDateTime >= bookingStart &&
+            slotDateTime < bookingEnd
+          );
+
+          if (isBooked) {
+            // Si está reservado, devolver el slot modificado
+            return { ...slot, isAvailable: false };
+          }
+          
+          // Si no, devolver el slot tal cual
+          return slot;
+        });
+      });
+    };
+
+    // 3. Escuchar el evento 'booking_update'
+    socket.on('booking_update', handleBookingUpdate);
+
+    // 4. Limpieza: dejar de escuchar y desconectar al salir
+    return () => {
+      socket.off('booking_update', handleBookingUpdate);
+      socket.disconnect();
+    };
+    
+    // Este efecto debe reiniciarse si el usuario cambia de día,
+    // para que la lógica de comparación use la 'selectedDate' correcta.
+  }, [selectedDate]); 
+  // --- FIN NUEVO ---
+
 
   const handleDateChange = (date) => {
     const newDate = new Date(date);
@@ -60,91 +124,77 @@ const TimeSlotFinder = ({ settings }) => {
   };
 
   const handleSlotClick = (slot) => {
-    // Limpiar errores anteriores al hacer clic
     setError(null);
     
+    // No permitir seleccionar un slot que ya no está disponible
+    // (por si acaso el socket lo actualizó justo antes del clic)
+    if (!slot.isAvailable) {
+        setError("Este turno ya no está disponible.");
+        // Opcional: Refrescar la disponibilidad
+        // fetchAvailability(); 
+        return;
+    }
+
     const isSelected = selectedSlots.some(s => s.startTime === slot.startTime);
 
     let newSlots;
     if (isSelected) {
-      // Deseleccionar
       newSlots = selectedSlots.filter(s => s.startTime !== slot.startTime);
     } else {
-      // Seleccionar
-      newSlots = [...selectedSlots, { ...slot, date: selectedDate }]; // Añadir fecha aquí
+      newSlots = [...selectedSlots, { ...slot, date: selectedDate }];
     }
 
-    // Ordenar SIEMPRE antes de validar consecutividad
     const sortedNewSlots = sortSlots(newSlots);
 
-    // Validar consecutividad SOLO si hay más de un slot
     if (sortedNewSlots.length > 1) {
-      // Pasamos la duración como NÚMERO
       if (!areSlotsConsecutive(sortedNewSlots, slotDurationMinutes)) {
         setError('Solo puedes seleccionar turnos consecutivos.');
-        // No actualizamos selectedSlots si la validación falla al añadir
         if (!isSelected) return; 
       }
     }
 
-    // Actualizar estado solo si pasa la validación (o si estamos deseleccionando)
     setSelectedSlots(sortedNewSlots);
   };
 
   const sortSlots = (slots) => {
-    // Asegurarse de que startTime sea string antes de comparar
     return slots.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
   };
 
-  // --- FUNCIÓN areSlotsConsecutive CORREGIDA (con logs) ---
   const areSlotsConsecutive = (sortedSlots, duration) => {
-    // CORRECCIÓN: Asegurar que duration sea un número
     const numericDuration = typeof duration === 'number' ? duration : parseInt(duration, 10);
     
-    console.log('🔍 Validando slots:', sortedSlots.map(s => s.startTime));
-    console.log('📏 Duración esperada (número):', numericDuration); // Log del número
-    
     if (isNaN(numericDuration) || numericDuration <= 0) {
-        console.error('❌ Duración inválida:', duration);
+        console.error('Duración inválida:', duration);
         setError('Error interno: Duración del turno inválida en la configuración.');
-        return false; // No continuar si la duración no es válida
+        return false;
     }
 
     for (let i = 1; i < sortedSlots.length; i++) {
-      // Usar fecha base para evitar problemas de cambio de día
       const prevTime = new Date(`1970-01-01T${sortedSlots[i-1].startTime}`);
       const currTime = new Date(`1970-01-01T${sortedSlots[i].startTime}`);
       
-      // Validar que las fechas sean válidas
       if (isNaN(prevTime) || isNaN(currTime)) {
-          console.error('❌ Fechas inválidas para comparar:', sortedSlots[i-1].startTime, sortedSlots[i].startTime);
+          console.error('Fechas inválidas para comparar:', sortedSlots[i-1].startTime, sortedSlots[i].startTime);
           setError('Error interno: Formato de hora inválido.');
           return false;
       }
       
       const diffMinutes = (currTime - prevTime) / 60000;
       
-      console.log(`⏰ Diferencia entre ${sortedSlots[i-1].startTime} y ${sortedSlots[i].startTime}: ${diffMinutes} minutos`);
-      
-      // Comparamos números
       if (diffMinutes !== numericDuration) {
-        console.log(`❌ No son consecutivos! (Esperado: ${numericDuration}, Obtenido: ${diffMinutes})`);
         return false;
       }
     }
-    console.log('✅ Todos los slots son consecutivos');
     return true;
   };
-  // --- FIN DE FUNCIÓN CORREGIDA ---
 
   const handleOpenModal = () => {
     if (selectedSlots.length > 0) {
-      // Revalidar antes de abrir, por si acaso
       if (selectedSlots.length > 1 && !areSlotsConsecutive(selectedSlots, slotDurationMinutes)) {
          setError('Los turnos seleccionados deben ser consecutivos.');
          return;
       }
-      setError(null); // Limpiar error si todo OK
+      setError(null);
       setIsModalOpen(true);
     }
   };
@@ -157,7 +207,6 @@ const TimeSlotFinder = ({ settings }) => {
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-xl max-w-3xl mx-auto">
-      {/* Mostramos el error de consecutividad aquí */}
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
       {/* Selector de Fecha */}
@@ -165,7 +214,6 @@ const TimeSlotFinder = ({ settings }) => {
         <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
           1. Selecciona una Fecha
         </label>
-        {/* ... (código del selector de fecha sin cambios) ... */}
          <div className="flex items-center space-x-2">
           <button
             onClick={() => handleDayShift(-1)}
@@ -199,13 +247,11 @@ const TimeSlotFinder = ({ settings }) => {
         </p>       
       </div>
 
-      {/* Solo mostramos la grilla si no hay error de carga inicial */}
       {!error && (
           <>
             <label className="block text-sm font-medium text-gray-300 mb-2">
                 2. Selecciona uno o más turnos (consecutivos)
             </label>
-            {/* Grilla de Turnos */}
             {loading ? (
                 <InlineLoading text="Buscando turnos disponibles..." />
             ) : (
@@ -222,8 +268,8 @@ const TimeSlotFinder = ({ settings }) => {
                             !slot.isAvailable
                             ? 'bg-gray-700 text-gray-500 cursor-not-allowed line-through'
                             : isSelected
-                            ? 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 ring-2 ring-white' // Estilo seleccionado
-                            : 'bg-green-600 hover:bg-green-500 text-white cursor-pointer' // Estilo disponible
+                            ? 'bg-yellow-500 hover:bg-yellow-400 text-gray-900 ring-2 ring-white'
+                            : 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
                         }
                         `}
                     >
@@ -243,7 +289,7 @@ const TimeSlotFinder = ({ settings }) => {
       )}
 
       {/* Resumen de Reserva */}
-      {selectedSlots.length > 0 && !error && ( // Ocultar si hay error
+      {selectedSlots.length > 0 && !error && (
         <div className="mt-6 p-4 bg-gray-900 rounded-lg">
           <h3 className="text-lg font-semibold text-white mb-3">Tu Reserva</h3>
           <div className="flex justify-between items-center text-gray-300 mb-2">
@@ -272,11 +318,11 @@ const TimeSlotFinder = ({ settings }) => {
       {isModalOpen && (
         <BookingModal
           slots={selectedSlots}
-          settings={settings} // Pasar settings al modal
+          settings={settings}
           onClose={() => setIsModalOpen(false)}
           onBookingSuccess={() => {
             setIsModalOpen(false);
-            fetchAvailability(); // Refresca la lista de turnos
+            fetchAvailability(); // Refresca la lista de turnos para el usuario actual
           }}
         />
       )}
