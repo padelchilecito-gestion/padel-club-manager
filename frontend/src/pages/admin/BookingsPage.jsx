@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import socket from '../../services/socketService';
 import { format } from 'date-fns';
-import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, XCircleIcon, CurrencyDollarIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/solid'; // <-- Importé un ícono de chat (opcional)
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -36,6 +36,7 @@ const BookingsPage = () => {
                 newBookings[index] = updatedBooking;
                 return newBookings;
             } else {
+                // Ordenar por fecha de inicio al añadir nuevas
                 return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
             }
         });
@@ -53,7 +54,7 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, [location.pathname]);
+  }, [location.pathname]); // location.pathname es correcto aquí
 
   const handleUpdateStatus = async (id, newStatus, isPaid) => {
     try {
@@ -98,7 +99,22 @@ const BookingsPage = () => {
             <tbody className="divide-y divide-gray-700">
               {bookings.map((booking) => (
                 <tr key={booking._id} className="hover:bg-dark-primary/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-text-primary whitespace-nowrap">{booking.user.name}</td>
+                  
+                  {/* --- CAMBIO (Peticiones 1 y 2) --- */}
+                  <td className="px-6 py-4 font-medium text-text-primary whitespace-nowrap">
+                    <a
+                      href={`https://wa.me/${booking.user.phone.replace(/\D/g, '')}`} // Link de WhatsApp (limpia el nro por si acaso)
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Enviar WhatsApp a ${booking.user.name}`}
+                      className="flex items-center gap-2 hover:text-secondary transition-colors"
+                    >
+                      <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-green-light" />
+                      {`${booking.user.name} ${booking.user.lastName || ''}`}
+                    </a>
+                  </td>
+                  {/* --- FIN DEL CAMBIO --- */}
+
                   <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/A'}</td>
                   <td className="px-6 py-4">
                       {format(new Date(booking.startTime), 'dd/MM/yy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
@@ -106,7 +122,10 @@ const BookingsPage = () => {
                   <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
                           booking.status === 'Confirmed' ? 'bg-green-dark text-white' :
-                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-dark text-dark-primary'
+                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 
+                          booking.status === 'Completed' ? 'bg-blue-dark text-white' : 
+                          booking.status === 'NoShow' ? 'bg-gray-light text-dark-primary' : 
+                          'bg-yellow-dark text-dark-primary' // Pending
                       }`}>
                           {booking.status}
                       </span>
