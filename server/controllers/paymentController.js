@@ -3,12 +3,13 @@ const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
-const Setting = require('../models/Setting');
+const Setting = require('../models/Setting'); // Importar Setting
 const mongoose = require('mongoose');
-const { format } = require('date-fns');
+const { format } = require('date-fns'); // Importar format
 
-// --- createPaymentPreference (sin cambios) ---
+// --- createPaymentPreference (SIN CAMBIOS, para checkout web general si lo usas) ---
 const createPaymentPreference = async (req, res) => {
+  // ... (tu código existente)
   const { items, payer, metadata } = req.body;
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
   const preferenceBody = {
@@ -33,107 +34,158 @@ const createPaymentPreference = async (req, res) => {
   }
 };
 
-// --- FUNCIÓN DE QR MODIFICADA ---
-const createBookingQROrder = async (req, res) => {
+
+// --- NUEVA FUNCIÓN: Crear Preferencia específica para QR de Reserva ---
+// @desc    Create a Mercado Pago Preference focused on QR for a specific booking
+// @route   POST /api/payments/create-booking-preference-qr
+// @access  Private/Admin
+const createBookingPreferenceQR = async (req, res) => {
   const { bookingId } = req.body;
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
-  const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  const mpUserId = process.env.MERCADOPAGO_USER_ID;
-  const mpStoreId = process.env.MERCADOPAGO_STORE_ID;
-  // --- NUEVO: Leer POS ID, default a '1' ---
-  const mpPosId = process.env.MERCADOPAGO_POS_ID || '1'; 
-
-  // Validar IDs de entorno
-  if (!mpAccessToken || !mpUserId || !mpStoreId) {
-    console.error('❌ Error: Faltan variables de entorno de Mercado Pago (TOKEN, USER_ID, STORE_ID).');
-    return res.status(500).json({ message: 'Error de configuración del servidor.' });
-  }
-  // Log para verificar IDs leídos
-  console.log(`ℹ️ Usando MP IDs -> User: ${mpUserId}, Store: ${mpStoreId}, POS: ${mpPosId}`);
 
   try {
+    // 1. Obtener datos de la reserva
     const booking = await Booking.findById(bookingId).populate('user');
     if (!booking) return res.status(404).json({ message: 'Reserva no encontrada' });
     if (booking.isPaid) return res.status(400).json({ message: 'Esta reserva ya fue pagada.' });
-    
+
+    // 2. Obtener nombre del club desde Settings
     const settings = await Setting.findOne({ key: 'clubName' });
     const clubName = settings ? settings.value : 'Padel Club';
 
-    const orderData = {
-      external_reference: bookingId,
-      title: `Reserva de Turno - ${clubName}`,
-      description: `Pago de la reserva para ${booking.user.name} ${booking.user.lastName || ''}`,
+    // 3. Crear el cuerpo de la Preferencia
+    const preferenceBody = {
+      items: [
+        {
+          title: `Reserva Turno ${format(new Date(booking.startTime), 'dd/MM HH:mm')} - ${clubName}`,
+          description: `Pago para ${booking.user.name} ${booking.user.lastName || ''}`,
+          unit_price: booking.price,
+          quantity: 1,
+          currency_id: 'ARS',
+        }
+      ],
+      // Asociamos la reserva en metadata para identificarla en el webhook
+      metadata: { 
+        booking_id: bookingId,
+        payment_type: 'qr_preference' // Indicador opcional
+      }, 
       notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
-      total_amount: booking.price,
-      items: [{
-        title: `Turno ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
-        unit_price: booking.price, quantity: 1, total_amount: booking.price, currency_id: 'ARS',
-      }],
-      expiration_date: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      // Definimos que el único método de pago sea QR
+      // (Esto es una pista para MP, pero puede mostrar otros si el usuario elige)
+      payment_methods: {
+        excluded_payment_types: [ // Excluimos todo MENOS point_of_interaction con QR
+             { id: "credit_card" },
+             { id: "debit_card" },
+             { id: "prepaid_card" },
+             { id: "bank_transfer" },
+             { id: "ticket" },
+             { id: "atm" }
+        ],
+        // installments: 1 // Opcional: forzar 1 cuota
+      },
+      // Expira en 30 minutos (similar a la API In-Store)
+      expires: true,
+      expiration_date_from: new Date().toISOString(),
+      expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     };
-    
-    // --- URL CON POS ID VARIABLE ---
-    const url = `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${mpUserId}/stores/${mpStoreId}/pos/${mpPosId}/orders`;
-    
-    // --- Log de la URL exacta ---
-    console.log(`📞 Llamando a MP API: POST ${url}`);
-    
-    const mpResponse = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mpAccessToken}` },
-      body: JSON.stringify(orderData)
+
+    // 4. Crear la preferencia usando el SDK v3
+    const preference = new Preference(client);
+    const result = await preference.create({ body: preferenceBody });
+
+    // 5. Extraer la información del QR del resultado
+    // El SDK v3 suele devolverlo aquí:
+    const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
+    const qrCode = result.point_of_interaction?.transaction_data?.qr_code; // String para escanear
+
+    if (!qrCodeBase64 && !qrCode) {
+      console.error('MP Preference created, but QR data not found in response:', result);
+      throw new Error('No se encontró información del QR en la respuesta de Mercado Pago.');
+    }
+
+    console.log(`✅ Preferencia QR creada para booking ${bookingId}.`);
+    // Devolvemos ambos formatos si existen, el frontend usará el que prefiera
+    res.json({ 
+        qr_code_base64: qrCodeBase64, // Imagen lista para mostrar
+        qr_code: qrCode // String para el componente qrcode.react
     });
 
-    const mpResult = await mpResponse.json();
-
-    if (!mpResponse.ok) {
-      console.error('❌ Error de Mercado Pago al crear QR:', mpResult); // Log más detallado
-      throw new Error(mpResult.message || 'Error al contactar con Mercado Pago');
-    }
-    
-    console.log('✅ QR Creado exitosamente por MP.');
-    res.json({ qr_data: mpResult.qr_data });
-
   } catch (error) {
-    console.error(`❌ Error creating Mercado Pago QR order for booking ${bookingId}:`, error.message);
-    res.status(500).json({ message: 'Failed to create QR order.' });
+    console.error(`❌ Error creating Mercado Pago Preference QR for booking ${bookingId}:`, error?.response?.data || error.message);
+    res.status(500).json({ message: 'Failed to create QR preference.' });
   }
 };
 
-// --- receiveWebhook (sin cambios) ---
+
+// --- WEBHOOK Ligeramente Modificado ---
+// @desc    Receive Mercado Pago webhook notifications
+// @route   POST /api/payments/webhook
+// @access  Public
 const receiveWebhook = async (req, res) => {
   const { type, data } = req.body;
+
   if (type === 'payment') {
     try {
       const paymentClient = new Payment(client);
       const payment = await paymentClient.get({ id: data.id });
+
       if (payment && payment.status === 'approved') {
         let booking;
-        let paymentMethod;
-        if (payment.external_reference) {
-          booking = await Booking.findById(payment.external_reference);
-          paymentMethod = 'QR Mercado Pago';
-        } else if (payment.metadata && payment.metadata.booking_id) {
+        let paymentMethod = 'Mercado Pago'; // Default
+
+        // Identificar la reserva usando metadata (como antes)
+        if (payment.metadata && payment.metadata.booking_id) {
           booking = await Booking.findById(payment.metadata.booking_id);
-          paymentMethod = 'Mercado Pago Web';
+          // Intentar determinar si fue QR basado en la info del pago
+          if (payment.payment_method_id === 'account_money' || payment.point_of_interaction?.type === 'POINT_OF_INTERACTION') {
+             paymentMethod = 'QR Mercado Pago'; // O un nombre más específico si prefieres
+          } else {
+             paymentMethod = 'MP (' + (payment.payment_method_id || 'Web') + ')'; // Ej: MP (credit_card)
+          }
         }
+        
+        // --- Lógica de Venta POS (Tu código original - OJO con metadata!) ---
+        // Si usas metadata también para POS, asegúrate que booking_id no interfiera
+        else if (payment.metadata && payment.metadata.sale_items) { 
+            console.log('Procesando pago de Venta POS...');
+             // ... (Tu lógica existente para ventas POS, asegurando que use metadata distinta a booking_id) ...
+            const saleData = { /* ... */ };
+            const session = await mongoose.startSession();
+            session.startTransaction();
+            try { /* ... Tu lógica de stock y save ... */
+               await session.commitTransaction();
+            } catch (saleError) { /* ... Tu manejo de error ... */
+               await session.abortTransaction();
+            } finally { session.endSession(); }
+            // IMPORTANTE: Asegúrate de NO intentar buscar un booking aquí si es una venta POS
+            booking = null; // Para evitar que entre en el if de abajo
+        }
+
+
+        // Actualizar la reserva si se encontró y no estaba pagada
         if (booking && !booking.isPaid) {
           booking.isPaid = true;
           booking.status = 'Confirmed';
-          booking.paymentMethod = paymentMethod;
+          booking.paymentMethod = paymentMethod; // Método de pago detectado
           await booking.save();
           console.log(`✅ Booking ${booking._id} confirmed and paid via ${paymentMethod}.`);
+          
           const io = req.app.get('socketio');
           io.emit('booking_update', booking);
         }
-        if (payment.metadata && payment.metadata.sale_items) { /* Tu lógica POS */ }
       }
       res.status(200).send('Webhook received');
     } catch (error) {
       console.error('Error processing webhook:', error);
       res.status(500).send('Error processing webhook');
     }
-  } else { res.status(200).send('Event type not "payment", ignored.'); }
+  } else {
+    res.status(200).send('Event type not "payment", ignored.');
+  }
 };
 
-module.exports = { createPaymentPreference, receiveWebhook, createBookingQROrder };
+module.exports = {
+  createPaymentPreference,     // La original
+  createBookingPreferenceQR, // La nueva para QR
+  receiveWebhook,
+};
