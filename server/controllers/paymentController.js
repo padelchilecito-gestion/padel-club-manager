@@ -3,9 +3,9 @@ const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
-const Setting = require('../models/Setting'); // <-- Importar Setting
+const Setting = require('../models/Setting'); // <-- Asegúrate de que Setting esté importado
 const mongoose = require('mongoose');
-const { format } = require('date-fns'); // <-- Importar format
+const { format } = require('date-fns'); // <-- Asegúrate de que format de date-fns esté importado
 
 // @desc    Create a Mercado Pago payment preference (PARA CHECKOUT WEB)
 // @route   POST /api/payments/create-preference
@@ -213,5 +213,5 @@ const receiveWebhook = async (req, res) => {
 module.exports = {
   createPaymentPreference,
   receiveWebhook,
-  createBookingQROrder, // <-- Exportar la nueva función
+  createBookingQROrder, // <-- Asegúrate de exportar la función
 };
