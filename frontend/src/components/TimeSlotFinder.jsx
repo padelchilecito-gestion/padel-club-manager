@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// --- NUEVO: Importar socket y parseISO ---
-import socket from '../../services/socketService';
+// --- CORRECCIÓN: La ruta es '../' no '../../' ---
+import socket from '../services/socketService';
+// --- FIN CORRECCIÓN ---
 import { getAggregatedAvailability } from '../services/courtService';
-import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns'; 
-// --- FIN NUEVO ---
+import { addDays, format, isBefore, startOfToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
 import BookingModal from './BookingModal';
@@ -41,8 +41,7 @@ const TimeSlotFinder = ({ settings }) => {
     fetchAvailability();
   }, [fetchAvailability]);
 
-  // --- NUEVO: useEffect para Socket.IO ---
-  // Este efecto maneja las actualizaciones en tiempo real.
+  // --- useEffect para Socket.IO (con la lógica de la vez pasada) ---
   useEffect(() => {
     // 1. Conectar al socket
     socket.connect();
@@ -52,16 +51,13 @@ const TimeSlotFinder = ({ settings }) => {
       // newBooking es el objeto de la BD:
       // { startTime: "2025-10-27T20:00:00Z", endTime: "2025-10-27T21:00:00Z", ... }
 
-      // Convertir las horas de la reserva (que vienen en UTC/ISO) a objetos Date
       const bookingStart = parseISO(newBooking.startTime);
       const bookingEnd = parseISO(newBooking.endTime);
 
       // Actualizar el estado 'availability'
       setAvailability(prevAvailability => {
-        // Mapear sobre los slots (casillas) existentes en la grilla
         return prevAvailability.map(slot => {
           
-          // Solo actualizamos slots que aún están marcados como disponibles
           if (!slot.isAvailable) {
             return slot;
           }
@@ -78,11 +74,9 @@ const TimeSlotFinder = ({ settings }) => {
           );
 
           if (isBooked) {
-            // Si está reservado, devolver el slot modificado
             return { ...slot, isAvailable: false };
           }
           
-          // Si no, devolver el slot tal cual
           return slot;
         });
       });
@@ -97,10 +91,8 @@ const TimeSlotFinder = ({ settings }) => {
       socket.disconnect();
     };
     
-    // Este efecto debe reiniciarse si el usuario cambia de día,
-    // para que la lógica de comparación use la 'selectedDate' correcta.
   }, [selectedDate]); 
-  // --- FIN NUEVO ---
+  // --- FIN Socket.IO ---
 
 
   const handleDateChange = (date) => {
@@ -126,12 +118,8 @@ const TimeSlotFinder = ({ settings }) => {
   const handleSlotClick = (slot) => {
     setError(null);
     
-    // No permitir seleccionar un slot que ya no está disponible
-    // (por si acaso el socket lo actualizó justo antes del clic)
     if (!slot.isAvailable) {
         setError("Este turno ya no está disponible.");
-        // Opcional: Refrescar la disponibilidad
-        // fetchAvailability(); 
         return;
     }
 
@@ -322,7 +310,7 @@ const TimeSlotFinder = ({ settings }) => {
           onClose={() => setIsModalOpen(false)}
           onBookingSuccess={() => {
             setIsModalOpen(false);
-            fetchAvailability(); // Refresca la lista de turnos para el usuario actual
+            fetchAvailability();
           }}
         />
       )}
