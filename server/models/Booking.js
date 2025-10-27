@@ -34,8 +34,8 @@ const BookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    // --- ACTUALIZADO ---
-    enum: ['Efectivo', 'Mercado Pago', 'Transferencia', 'QR Mercado Pago', 'Otro'],
+    // --- ACTUALIZADO: Simplificado a 'QR' ---
+    enum: ['Efectivo', 'Mercado Pago', 'Transferencia', 'QR', 'Otro'],
     default: 'Efectivo',
   },
   createdAt: {
