@@ -8,7 +8,7 @@ const BookingSchema = new mongoose.Schema({
   },
   user: {
     name: { type: String, required: true },
-    lastName: { type: String, required: false }, // <-- AÑADIDO (lo ponemos opcional por si hay reservas antiguas)
+    lastName: { type: String, required: false },
     phone: { type: String, required: true },
   },
   startTime: {
@@ -25,7 +25,6 @@ const BookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    // --- ACTUALIZADO: Lista completa de estados ---
     enum: ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'NoShow'],
     default: 'Pending',
   },
@@ -35,7 +34,8 @@ const BookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Efectivo', 'Mercado Pago', 'Otro'],
+    // --- ACTUALIZADO ---
+    enum: ['Efectivo', 'Mercado Pago', 'Transferencia', 'QR Mercado Pago', 'Otro'],
     default: 'Efectivo',
   },
   createdAt: {
@@ -48,7 +48,6 @@ const BookingSchema = new mongoose.Schema({
 BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
 
 // Índice TTL para eliminar reservas antiguas automáticamente
-// (Ahora 'Completed' sí está en el enum y funcionará)
 BookingSchema.index(
   { createdAt: 1 },
   {
