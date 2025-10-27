@@ -99,7 +99,7 @@ const createBooking = async (req, res) => {
       court: firstSlot.courtId,
       user: {
         name: user.name,
-        lastName: user.lastName,
+        lastName: user.lastName, // Guardando el apellido
         phone: user.phone,
       },
       startTime: startTime,
@@ -200,16 +200,25 @@ const updateBookingStatus = async (req, res) => {
       }
       
       booking.status = req.body.status || booking.status;
+      
       if (req.body.isPaid === true || req.body.isPaid === false) {
         booking.isPaid = req.body.isPaid;
       }
+
+      // --- CAMBIO AQUÍ ---
+      // Si se está marcando como pagado y se envía un método de pago, actualizarlo.
+      if (req.body.isPaid === true && req.body.paymentMethod) {
+        // (Validación extra opcional: verificar si req.body.paymentMethod está en el enum)
+        booking.paymentMethod = req.body.paymentMethod;
+      }
+      // --- FIN DEL CAMBIO ---
       
       const updatedBooking = await booking.save();
       
       const io = req.app.get('socketio');
       if (io) io.emit('booking_update', updatedBooking);
       
-      await logActivity('Booking', updatedBooking._id, 'update', { status: updatedBooking.status });
+      await logActivity('Booking', updatedBooking._id, 'update', { status: updatedBooking.status, isPaid: updatedBooking.isPaid });
       
       res.json(updatedBooking);
     } else {
