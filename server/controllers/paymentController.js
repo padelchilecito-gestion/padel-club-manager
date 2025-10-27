@@ -3,9 +3,9 @@ const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
-const Setting = require('../models/Setting');
+const Setting = require('../models/Setting'); // <-- Importar Setting
 const mongoose = require('mongoose');
-const { format } = require('date-fns'); // Importar format
+const { format } = require('date-fns'); // <-- Importar format
 
 // @desc    Create a Mercado Pago payment preference (PARA CHECKOUT WEB)
 // @route   POST /api/payments/create-preference
@@ -46,7 +46,7 @@ const createPaymentPreference = async (req, res) => {
   }
 };
 
-// --- FUNCIÓN DE QR CORREGIDA (YA NO USA client.post) ---
+// --- FUNCIÓN DE QR CORREGIDA (USA FETCH) ---
 // @desc    Create a Mercado Pago QR Order for a specific booking
 // @route   POST /api/payments/create-qr-order
 // @access  Private/Admin
@@ -122,12 +122,13 @@ const createBookingQROrder = async (req, res) => {
     res.json({ qr_data: mpResult.qr_data });
 
   } catch (error) {
+    // Este log es el que viste en Render
     console.error('Error creating Mercado Pago QR order:', error.message);
     res.status(500).json({ message: 'Failed to create QR order.' });
   }
 };
 
-// --- WEBHOOK (Sin cambios, pero incluido por completitud) ---
+// --- WEBHOOK MODIFICADO ---
 // @desc    Receive Mercado Pago webhook notifications
 // @route   POST /api/payments/webhook
 // @access  Public
@@ -212,5 +213,5 @@ const receiveWebhook = async (req, res) => {
 module.exports = {
   createPaymentPreference,
   receiveWebhook,
-  createBookingQROrder,
+  createBookingQROrder, // <-- Exportar la nueva función
 };
