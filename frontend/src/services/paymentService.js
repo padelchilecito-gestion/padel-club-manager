@@ -1,13 +1,14 @@
 import api from './api';
 
-// Función para generar el QR dinámico para una reserva
+// Función para generar el QR dinámico para una reserva (usando Preferencia)
 const generateQR = async (bookingId) => {
   try {
-    const { data } = await api.post('/payments/create-qr-order', { bookingId });
-    // data contendrá { qr_data: "string_largo_del_qr" }
+    // Llamar a la NUEVA ruta del backend
+    const { data } = await api.post('/payments/create-booking-preference-qr', { bookingId });
+    // data contendrá { qr_code_base64: "...", qr_code: "..." }
     return data;
   } catch (error) {
-    console.error('Error generating QR:', error.response?.data?.message || error.message);
+    console.error('Error generating Preference QR:', error.response?.data?.message || error.message);
     throw new Error(error.response?.data?.message || 'Error al generar el QR');
   }
 };
