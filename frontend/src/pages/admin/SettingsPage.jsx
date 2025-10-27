@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../../services/settingService';
 import { FullPageLoading as Loading, ErrorMessage as Error, SuccessMessage as Success } from '../../components/ui/Feedback';
-import { Settings, Save, Info, Clock, BookOpen, CreditCard, Mail } from 'lucide-react';
+// --- CAMBIO: Se eliminaron CreditCard y Mail de la importación ---
+import { Settings, Save, Info, Clock, BookOpen } from 'lucide-react';
 
 // Componente reutilizable para las tarjetas de configuración
 const SettingsCard = ({ title, icon: Icon, children }) => (
@@ -156,11 +157,6 @@ const SettingsPage = () => {
       {successMessage && <Success message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* --- CAMBIO REALIZADO AQUÍ ---
-          Cambié 'md:grid-cols-2' por 'lg:grid-cols-2'.
-          Esto hace que la grilla sea vertical (1 columna) en móviles Y tablets,
-          y solo se divida en 2 columnas en pantallas grandes (lg: 1024px+).
-        */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Columna Izquierda */}
           <div className="space-y-6">
@@ -257,69 +253,16 @@ const SettingsPage = () => {
               />
             </SettingsCard>
 
-            {/* Configuración de Pagos */}
-            <SettingsCard title="Configuración de Pagos (Mercado Pago)" icon={CreditCard}>
-              <SwitchField
-                label="Habilitar Pagos Online"
-                id="enablePayments"
-                checked={!!settings.enablePayments}
-                onChange={handleSwitchChange}
-                helpText="Permitir que los usuarios paguen al reservar."
-              />
-              <InputField
-                label="Mercado Pago - Public Key"
-                id="mpPublicKey"
-                value={settings.mpPublicKey}
-                onChange={handleChange}
-                placeholder="APP_USR-..."
-              />
-              <InputField
-                label="Mercado Pago - Access Token"
-                id="mpAccessToken"
-                type="password"
-                value={settings.mpAccessToken}
-                onChange={handleChange}
-                placeholder="APP_USR-..."
-              />
-              <InputField
-                label="Mercado Pago - Webhook Secret"
-                id="mpWebhookSecret"
-                type="password"
-                value={settings.mpWebhookSecret}
-                onChange={handleChange}
-                helpText="Opcional, para validación de Webhooks."
-              />
-            </SettingsCard>
+            {/* --- BLOQUE DE PAGOS ELIMINADO --- */}
 
-            {/* Notificaciones */}
-            <SettingsCard title="Notificaciones (Email)" icon={Mail}>
-              <SwitchField
-                label="Confirmación de Reserva"
-                id="enableEmailBookingConfirmation"
-                checked={!!settings.enableEmailBookingConfirmation}
-                onChange={handleSwitchChange}
-                helpText="Enviar email al crear una reserva."
-              />
-              <SwitchField
-                label="Confirmación de Cancelación"
-                id="enableEmailBookingCancellation"
-                checked={!!settings.enableEmailBookingCancellation}
-                onChange={handleSwitchChange}
-                helpText="Enviar email al cancelar una reserva."
-              />
-              <SwitchField
-                label="Confirmación de Pago Exitoso"
-                id="enableEmailPaymentSuccess"
-                checked={!!settings.enableEmailPaymentSuccess}
-                onChange={handleSwitchChange}
-                helpText="Enviar email al confirmar un pago."
-              />
-            </SettingsCard>
-            <SettingsCard title="Configuración de Tienda" icon={Mail}>
+            {/* --- BLOQUE DE NOTIFICACIONES ELIMINADO --- */}
+
+            {/* Configuración de Tienda */}
+            <SettingsCard title="Configuración de Tienda" icon={Info}>
               <SwitchField
                 label="Habilitar Tienda Pública"
                 id="shopEnabled"
-                checked={settings.shopEnabled !== 'false'}
+                checked={settings.shopEnabled !== 'false' && settings.shopEnabled !== false}
                 onChange={handleSwitchChange}
                 helpText="Mostrar u ocultar la tienda en el sitio público"
               />
