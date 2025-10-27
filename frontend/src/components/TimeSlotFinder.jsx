@@ -63,7 +63,6 @@ const TimeSlotFinder = ({ settings }) => {
       // Esto asegura que se recalcule correctamente la disponibilidad agregada
       console.log('🔄 Recargando disponibilidad por socket...');
       
-      // Reutilizamos la función de fetch
       // Usamos getAggregatedAvailability directamente para evitar el setLoading(true)
       // que podría parpadear la UI.
       try {
@@ -84,7 +83,7 @@ const TimeSlotFinder = ({ settings }) => {
       socket.disconnect();
     };
     
-    // Depende de selectedDate (para la comparación) y la función de fetch
+    // Depende de selectedDate (para la comparación)
   }, [selectedDate]); 
   // --- FIN LÓGICA DE SOCKET.IO ---
 
@@ -113,7 +112,10 @@ const TimeSlotFinder = ({ settings }) => {
     setError(null);
     
     // Comprobación extra por si el socket actualizó pero el usuario fue más rápido
-    if (!slot.isAvailable) {
+    // Usar 'availableCount' si existe, si no, 'isAvailable'
+    const isTrulyAvailable = slot.availableCount !== undefined ? slot.availableCount > 0 : slot.isAvailable;
+
+    if (!isTrulyAvailable) {
         setError("Este turno ya no está disponible.");
         fetchAvailability(); // Forzar refresco
         return;
