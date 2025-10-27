@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
-import { paymentService } from '../../services/paymentService'; // El servicio que creamos
-import socket from '../../services/socketService'; // Para escuchar la confirmación
+import { paymentService } from '../../services/paymentService';
+import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
-import { QRCodeSVG } from 'qrcode.react'; // La librería que "instalaste" en Paso 1
+import { QRCodeSVG } from 'qrcode.react'; // Mantenemos esta librería
 
 const PaymentQRModal = ({ booking, onClose }) => {
-  const [qrData, setQrData] = useState(null);
+  // --- CAMBIO: Usaremos qrCode (string) como principal ---
+  const [qrCode, setQrCode] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending' | 'success'
+  const [paymentStatus, setPaymentStatus] = useState('pending');
 
-  // 1. Efecto para generar el QR al abrir el modal
   useEffect(() => {
     if (!booking) return;
 
@@ -20,7 +20,20 @@ const PaymentQRModal = ({ booking, onClose }) => {
         setLoading(true);
         setError(null);
         const data = await paymentService.generateQR(booking._id);
-        setQrData(data.qr_data);
+        // --- CAMBIO: Priorizar qr_code (string) ---
+        if (data.qr_code) {
+           setQrCode(data.qr_code); 
+        } else if (data.qr_code_base64) {
+            // Si solo viene base64 (menos común con Preferencias), podrías intentar mostrarlo
+            // como imagen, pero QRCodeSVG es más estándar. Vamos a mostrar un error si
+            // qr_code (string) no está.
+             console.warn("QR Code string not found, received base64 instead. Display might fail.");
+             setError("Formato de QR no compatible recibido desde Mercado Pago.");
+             // setQrCode(data.qr_code_base64); // O intentar usarlo si tienes un <img>
+        } else {
+            throw new Error('No se recibió información válida del QR.');
+        }
+
       } catch (err) {
         setError(err.message || 'No se pudo generar el QR.');
       } finally {
@@ -31,24 +44,15 @@ const PaymentQRModal = ({ booking, onClose }) => {
     generate();
   }, [booking]);
 
-  // 2. Efecto para escuchar la confirmación de pago por Socket.IO
   useEffect(() => {
     socket.connect();
-
     const handleBookingUpdate = (updatedBooking) => {
-      // Chequear si la actualización es de ESTA reserva y si FUE pagada
       if (updatedBooking._id === booking._id && updatedBooking.isPaid) {
         setPaymentStatus('success');
-        
-        // Esperar 2 segundos y cerrar el modal
-        setTimeout(() => {
-          onClose(true); // Enviar 'true' para indicar que se pagó
-        }, 2000);
+        setTimeout(() => { onClose(true); }, 2000);
       }
     };
-
     socket.on('booking_update', handleBookingUpdate);
-
     return () => {
       socket.off('booking_update', handleBookingUpdate);
       socket.disconnect();
@@ -65,17 +69,17 @@ const PaymentQRModal = ({ booking, onClose }) => {
         
         <div className="p-4 bg-gray-900 rounded-lg flex flex-col items-center justify-center min-h-[300px]">
           {loading && <InlineLoading text="Generando QR..." />}
-          
           {error && <ErrorMessage message={error} />}
           
-          {qrData && paymentStatus === 'pending' && (
+          {/* --- CAMBIO: Usar qrCode (string) con QRCodeSVG --- */}
+          {qrCode && paymentStatus === 'pending' && (
             <>
               <p className="text-lg font-semibold text-center">Escanee para pagar:</p>
               <p className="text-3xl font-bold text-secondary text-center mb-4">${booking.price}</p>
               <div className="bg-white p-4 rounded-lg">
-                <QRCodeSVG value={qrData} size={200} />
+                <QRCodeSVG value={qrCode} size={200} /> 
               </div>
-              <p className="text-sm text-gray-400 mt-3 text-center">El QR expira en 30 minutos.</p>
+              <p className="text-sm text-gray-400 mt-3 text-center">El QR expira pronto.</p>
               <p className="text-md text-yellow-dark mt-2 text-center">Esperando confirmación de pago...</p>
             </>
           )}
