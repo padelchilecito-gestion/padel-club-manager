@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, CheckCircleIcon, QrCodeIcon } from '@heroicons/react/24/solid';
-import { paymentService } from '../../services/paymentService'; // Importa el servicio actualizado
+import { paymentService } from '../../services/paymentService'; // Servicio actualizado
 import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
 // Necesitamos qrcode.react para mostrar el QR
-import { QRCodeSVG } from 'qrcode.react'; // Asegúrate que esté en package.json
+import { QRCodeSVG } from 'qrcode.react'; // Asegúrate que esté en frontend/package.json
 
 const PaymentQRModal = ({ booking, onClose }) => {
   // Estado para guardar el string EMVCo del QR
@@ -22,19 +22,20 @@ const PaymentQRModal = ({ booking, onClose }) => {
       try {
         setLoading(true);
         setError(null);
-        
+        console.log(`Modal: Solicitando QR para booking ${booking._id}`); // Log
         // Llamar a la función correcta del servicio
         const data = await paymentService.generateBookingQR(booking._id); 
         
         if (data.qr_data) {
           setQrDataString(data.qr_data); // Guardar el string EMVCo
           setAmount(data.amount || booking.price); // Guardar el monto
-          console.log('✅ QR Dinámico (String EMVCo) recibido:', data.qr_data);
+          console.log('✅ Modal: QR Dinámico (String EMVCo) recibido:', data.qr_data); // Log
         } else {
+          console.error('❌ Modal: No se recibió qr_data del backend', data); // Log
           throw new Error('No se recibió el código QR desde el backend.');
         }
       } catch (err) {
-        console.error('❌ Error generando QR en el modal:', err);
+        console.error('❌ Modal: Error generando QR:', err); // Log
         setError(err.message || 'No se pudo generar el código QR.');
       } finally {
         setLoading(false);
@@ -48,18 +49,21 @@ const PaymentQRModal = ({ booking, onClose }) => {
   useEffect(() => {
     socket.connect();
     const handleBookingUpdate = (updatedBooking) => {
-      if (updatedBooking._id === booking._id && updatedBooking.isPaid) {
-        console.log('💰 Pago confirmado por webhook/socket');
+      // Importante: Chequea si la reserva actualizada es la MISMA que está en el modal
+      if (booking && updatedBooking._id === booking._id && updatedBooking.isPaid) {
+        console.log(`💰 Modal: Pago confirmado via Socket para booking ${booking._id}`); // Log
         setPaymentStatus('success');
-        setTimeout(() => { onClose(true); }, 2500);
+        setTimeout(() => { onClose(true); }, 2500); // Cierra después de mostrar éxito
       }
     };
     socket.on('booking_update', handleBookingUpdate);
+    // Limpieza al desmontar o si cambia el booking/onClose
     return () => {
+      console.log("Modal: Desconectando listener de socket"); // Log
       socket.off('booking_update', handleBookingUpdate);
-      socket.disconnect();
+      socket.disconnect(); // Considera si realmente quieres desconectar aquí
     };
-  }, [booking, onClose]);
+  }, [booking, onClose]); // Dependencias correctas
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
@@ -70,6 +74,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
           <button 
             onClick={() => onClose(false)} 
             className="absolute top-4 right-4 text-white hover:text-gray-200 transition-colors"
+            aria-label="Cerrar modal"
           >
             <XMarkIcon className="h-7 w-7" />
           </button>
@@ -83,34 +88,33 @@ const PaymentQRModal = ({ booking, onClose }) => {
         <div className="p-6">
           {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
           
-          {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-12">
               <InlineLoading text="Generando código QR..." />
             </div>
           )}
 
-          {/* QR Code Display */}
           {!loading && qrDataString && paymentStatus === 'pending' && (
             <div className="space-y-6">
-              {/* Información */}
+              {/* Info Reserva */}
               <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-cyan-400 mb-3">Detalles de la Reserva</h3>
-                <div className="space-y-2 text-gray-300">
-                  <p><span className="text-gray-400">Cliente:</span> {booking.user.name} {booking.user.lastName || ''}</p>
-                  <p className="text-3xl font-bold text-white mt-3">
+                <h3 className="text-lg font-semibold text-cyan-400 mb-3">Detalles</h3>
+                <div className="space-y-1 text-gray-300 text-sm">
+                  <p><span className="text-gray-400">Cliente:</span> {booking?.user?.name || 'N/A'} {booking?.user?.lastName || ''}</p>
+                   <p><span className="text-gray-400">Cancha:</span> {booking?.court?.name || 'N/A'}</p> 
+                  <p><span className="text-gray-400">Horario:</span> {format(new Date(booking.startTime), 'dd/MM HH:mm')}</p> 
+                </div>
+                 <p className="text-3xl font-bold text-white mt-3 text-center border-t border-gray-700 pt-3">
                     <span className="text-gray-400 text-lg">Total:</span> ${amount}
                   </p>
-                </div>
               </div>
 
               {/* QR Code */}
               <div className="bg-white p-6 md:p-8 rounded-lg flex flex-col items-center">
-                 {/* Usamos QRCodeSVG con el string qrDataString */}
                 <QRCodeSVG 
                   value={qrDataString} 
-                  size={256} // Tamaño ajustado para pantallas
-                  level="H" // Alta corrección de errores
+                  size={256} 
+                  level="H" 
                   includeMargin={true}
                   className="shadow-xl"
                 />
@@ -130,7 +134,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
                  </ol>
                </div>
 
-              {/* Estado de espera */}
+              {/* Espera */}
               <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-center">
                 <div className="animate-pulse">
                   <p className="text-yellow-300 font-semibold">⏳ Esperando confirmación de pago...</p>
@@ -140,23 +144,19 @@ const PaymentQRModal = ({ booking, onClose }) => {
             </div>
           )}
 
-          {/* Estado de éxito */}
+          {/* Éxito */}
           {paymentStatus === 'success' && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
                <CheckCircleIcon className="h-24 w-24 text-green-500 mb-4 animate-bounce" />
                <h3 className="text-3xl font-bold text-green-400 mb-2">¡Pago Confirmado!</h3>
-               <p className="text-gray-300 mb-4">La reserva ha sido marcada como pagada</p>
-               <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 w-full">
-                 <p className="text-green-300 font-semibold">✓ Pago procesado correctamente</p>
-                 <p className="text-sm text-gray-400 mt-1">ID Reserva: {booking._id}</p>
-               </div>
+               <p className="text-gray-300 mb-4">La reserva ha sido marcada como pagada.</p>
              </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer (solo si está pendiente) */}
         {!loading && paymentStatus === 'pending' && (
-          <div className="bg-gray-750 px-6 py-4 border-t border-gray-700 flex justify-end">
+          <div className="bg-gray-750 px-6 py-4 border-t border-gray-700 flex justify-end rounded-b-xl">
             <button
               onClick={() => onClose(false)}
               className="px-6 py-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-colors"
