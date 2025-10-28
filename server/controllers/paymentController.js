@@ -22,45 +22,37 @@ const createBookingPreference = async (req, res) => {
       return res.status(400).json({ message: 'Esta reserva ya fue pagada' });
     }
 
-    const settings = await Setting.findOne({ key: 'clubName' });
-    const clubName = settings ? settings.value : 'Padel Club';
-
     const preference = new Preference(client);
     const preferenceData = {
       items: [
         {
-          title: `Turno ${booking.court?.name || 'Cancha'} - ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
+          title: `Reserva de cancha para el ${format(new Date(booking.startTime), 'dd/MM/yyyy HH:mm')}hs`,
           quantity: 1,
           unit_price: booking.price,
           currency_id: 'ARS'
         }
       ],
       back_urls: {
-        success: `${baseUrl}/payment-success`,
-        failure: `${baseUrl}/payment-failure`,
-        pending: `${baseUrl}/payment-pending`
+        success: `${process.env.FRONTEND_URL}/payment-success`,
+        failure: `${process.env.FRONTEND_URL}/payment-failure`,
+        pending: ''
       },
       auto_return: 'approved',
-      external_reference: bookingId,
+      external_reference: bookingId.toString(),
       notification_url: `${baseUrl}/api/payments/webhook`,
-      metadata: {
-        booking_id: bookingId,
-        club_name: clubName
-      }
     };
 
     const response = await preference.create({ body: preferenceData });
     
     res.json({
       id: response.id,
-      init_point: response.init_point,
-      sandbox_init_point: response.sandbox_init_point
+      init_point: response.init_point
     });
 
   } catch (error) {
-    console.error('❌ Error creating preference:', error);
+    console.error('Error al crear la preferencia de pago:', error);
     res.status(500).json({ 
-      message: 'Error al crear preferencia de pago',
+      message: 'Error al procesar el pago',
       error: error.message 
     });
   }
@@ -150,142 +142,45 @@ const createBookingQRDynamic = async (req, res) => {
   }
 };
 
-// ==========================================
-// 3. WEBHOOK PARA CHECKOUT PRO (payment)
-// ==========================================
 const receiveWebhook = async (req, res) => {
-  const { type, data } = req.body;
+  const { body, query } = req;
+  const topic = body?.topic || query?.topic;
 
-  console.log('🔔 Webhook recibido:', { type, data });
-
-  if (type !== 'payment' || !data?.id) {
-    return res.status(200).send('Ignored');
-  }
-
-  try {
-    const payment = new Payment(client);
-    const paymentData = await payment.get({ id: data.id });
-
-    console.log('💳 Pago encontrado:', {
-      id: paymentData.id,
-      status: paymentData.status,
-      external_reference: paymentData.external_reference
-    });
-
-    if (paymentData.status !== 'approved') {
-      return res.status(200).send('Payment not approved yet');
+  if (topic === 'payment') {
+    const paymentId = body?.data?.id || query?.id;
+    if (!paymentId) {
+      return res.status(200).send('No payment ID provided');
     }
 
-    const bookingId = paymentData.external_reference;
-    if (!bookingId) {
-      return res.status(200).send('No external_reference');
+    try {
+      const payment = new Payment(client);
+      const paymentData = await payment.get({ id: paymentId });
+
+      if (paymentData.status === 'approved') {
+        const bookingId = paymentData.external_reference;
+        const booking = await Booking.findById(bookingId);
+
+        if (booking && !booking.isPaid) {
+          booking.isPaid = true;
+          booking.status = 'Confirmed';
+          booking.paymentMethod = 'Mercado Pago';
+          await booking.save();
+
+          const io = req.app.get('socketio');
+          io.emit('booking_update', booking);
+        }
+      }
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('Error processing payment webhook:', error);
+      res.status(500).send('Error processing payment');
     }
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      return res.status(200).send('Booking not found');
-    }
-
-    if (booking.isPaid) {
-      return res.status(200).send('Already paid');
-    }
-
-    booking.isPaid = true;
-    booking.status = 'Confirmed';
-    booking.paymentMethod = 'Mercado Pago Web';
-    await booking.save();
-
-    console.log(`✅ Booking ${bookingId} marcado como pagado (Web)`);
-
-    const io = req.app.get('socketio');
-    if (io) {
-      io.emit('booking_update', booking);
-    }
-
-    res.status(200).send('OK');
-
-  } catch (error) {
-    console.error('❌ Error processing webhook:', error);
-    res.status(200).send('Error');
+  } else {
+    res.status(200).send('Unhandled topic');
   }
 };
 
-// ==========================================
-// 4. WEBHOOK PARA QR DINÁMICO (merchant_order)
-// ==========================================
-const receiveWebhookQR = async (req, res) => {
-  const notificationData = req.body;
-  const topic = notificationData?.topic || req.query?.topic;
-  
-  let orderId = null;
-  if (notificationData?.resource) {
-    const urlParts = notificationData.resource.split('/');
-    orderId = urlParts[urlParts.length - 1];
-  } else if (req.query?.id) {
-    orderId = req.query.id;
-  }
-  
-  console.log('🔔 Webhook QR:', { topic, orderId });
-
-  if (topic !== 'merchant_order' || !orderId) {
-    return res.status(200).send('Ignored');
-  }
-
-  try {
-    const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    const orderResponse = await axios.get(
-      `https://api.mercadopago.com/merchant_orders/${orderId}`,
-      { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
-    );
-    
-    const order = orderResponse.data;
-
-    if (order.status !== 'closed' || order.paid_amount < order.total_amount) {
-      return res.status(200).send('Order not fully paid');
-    }
-
-    const externalRef = order.external_reference;
-    if (!externalRef) {
-      return res.status(200).send('No external_reference');
-    }
-
-    const booking = await Booking.findById(externalRef);
-    if (!booking) {
-      return res.status(200).send('Booking not found');
-    }
-
-    if (booking.isPaid) {
-      return res.status(200).send('Already paid');
-    }
-
-    let paymentMethod = 'QR Mercado Pago';
-    const firstPayment = order.payments?.find(p => p.status === 'approved');
-    if (firstPayment) {
-      const type = firstPayment.payment_type_id || 'unknown';
-      if (type === 'account_money') paymentMethod = 'QR MP Saldo';
-      else if (type === 'credit_card') paymentMethod = 'QR MP Crédito';
-      else if (type === 'debit_card') paymentMethod = 'QR MP Débito';
-    }
-
-    booking.isPaid = true;
-    booking.status = 'Confirmed';
-    booking.paymentMethod = paymentMethod;
-    await booking.save();
-
-    console.log(`✅ Booking ${booking._id} pagado vía ${paymentMethod}`);
-
-    const io = req.app.get('socketio');
-    if (io) {
-      io.emit('booking_update', booking);
-    }
-
-    res.status(200).send('OK');
-
-  } catch (error) {
-    console.error('❌ Error processing QR webhook:', error);
-    res.status(200).send('Error');
-  }
-};
+const receiveWebhookQR = receiveWebhook;
 
 module.exports = {
   createBookingPreference,    // Para botón web
