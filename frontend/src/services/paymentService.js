@@ -1,28 +1,39 @@
+// frontend/src/services/paymentService.js - SERVICIO COMPLETO
 import api from './api';
 
-// --- Función para generar QR dinámico de Reserva ---
+/**
+ * Genera QR dinámico para cobrar en persona
+ * @param {string} bookingId - ID de la reserva
+ * @returns {Promise<{qr_data: string, amount: number}>}
+ */
 const generateBookingQR = async (bookingId) => {
   try {
-    // Llama a la NUEVA ruta del backend
     const { data } = await api.post('/payments/create-booking-qr', { bookingId });
-    // data contendrá { qr_data: "string_EMVCo...", amount: XXX }
-    console.log("Servicio: QR data recibida del backend", data); // Log para debug
-    return data; 
+    console.log("✅ QR data recibida:", data);
+    return data;
   } catch (error) {
-    console.error('Error en service/generateBookingQR:', error.response?.data?.message || error.message);
+    console.error('❌ Error generando QR:', error.response?.data?.message || error.message);
     throw new Error(error.response?.data?.message || 'Error al generar el QR de pago');
   }
 };
 
-// --- Función para link de pago (la dejamos por si acaso) ---
+/**
+ * Genera link de pago web (Checkout Pro)
+ * @param {string} bookingId - ID de la reserva
+ * @returns {Promise<{id: string, init_point: string}>}
+ */
 const generatePaymentLink = async (bookingId) => {
   try {
-    const { data } = await api.post('/payments/create-booking-preference-qr', { bookingId }); // Ruta anterior
-    return data; // { init_point: "https://" }
-  } catch (error) { /* ... */ }
+    const { data } = await api.post('/payments/create-preference', { bookingId });
+    console.log("✅ Link de pago recibido:", data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error generando link:', error.response?.data?.message || error.message);
+    throw new Error(error.response?.data?.message || 'Error al generar el link de pago');
+  }
 };
 
 export const paymentService = {
-  generateBookingQR,      // La que usaremos
-  generatePaymentLink,    // Opcional
+  generateBookingQR,
+  generatePaymentLink
 };
