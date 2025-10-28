@@ -23,8 +23,8 @@
     "react-router-dom": "^6.23.1",
     "recharts": "^2.12.7", 
     "socket.io-client": "^4.7.5",
-    "qrcode.react": "latest"
-    
+    "qrcode.react": "latest",
+    "react-hot-toast": "^2.4.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",
