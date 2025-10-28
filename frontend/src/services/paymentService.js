@@ -1,18 +1,18 @@
 import api from './api';
 
-// Función para generar el QR dinámico para una reserva (usando Preferencia)
-const generateQR = async (bookingId) => {
+// Función para generar el link de pago para una reserva
+const generatePaymentLink = async (bookingId) => {
   try {
-    // Llamar a la NUEVA ruta del backend
+    // Llamar a la ruta que crea la preferencia web
     const { data } = await api.post('/payments/create-booking-preference-qr', { bookingId });
-    // data contendrá { qr_code_base64: "...", qr_code: "..." }
+    // data contendrá { init_point: "https://..." }
     return data;
   } catch (error) {
-    console.error('Error generating Preference QR:', error.response?.data?.message || error.message);
-    throw new Error(error.response?.data?.message || 'Error al generar el QR');
+    console.error('Error generating payment link:', error.response?.data?.message || error.message);
+    throw new Error(error.response?.data?.message || 'Error al generar el link de pago');
   }
 };
 
 export const paymentService = {
-  generateQR,
+  generatePaymentLink, // Renombramos la función para claridad
 };
