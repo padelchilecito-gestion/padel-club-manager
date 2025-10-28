@@ -1,105 +1,148 @@
-// --- IMPORTACIONES ---
-const { Preference, Payment } = require('mercadopago'); // Para Webhooks de Preferencias (si aún se usan)
-const client = require('../config/mercadopago-config'); // Configuración SDK v3 (usado por Payment)
+// server/controllers/paymentController.js - VERSIÓN CORREGIDA
+const { Preference, Payment } = require('mercadopago');
+const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
-// const Sale = require('../models/Sale'); // Comentado - No implementamos QR de POS ahora
-// const Product = require('../models/Product'); // Comentado - No implementamos QR de POS ahora
 const Setting = require('../models/Setting');
-const axios = require('axios'); // <--- NECESARIO
+const axios = require('axios');
 const { format } = require('date-fns');
-const mongoose = require('mongoose');
 
 // ==========================================
-// GENERAR QR DINÁMICO PARA RESERVA (TURNOS) - MÉTODO CORRECTO
+// 1. CHECKOUT PRO - BOTÓN WEB (Preference)
+// ==========================================
+const createBookingPreference = async (req, res) => {
+  const { bookingId } = req.body;
+  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+
+  try {
+    const booking = await Booking.findById(bookingId).populate('court');
+    if (!booking) {
+      return res.status(404).json({ message: 'Reserva no encontrada' });
+    }
+    if (booking.isPaid) {
+      return res.status(400).json({ message: 'Esta reserva ya fue pagada' });
+    }
+
+    const settings = await Setting.findOne({ key: 'clubName' });
+    const clubName = settings ? settings.value : 'Padel Club';
+
+    const preference = new Preference(client);
+    const preferenceData = {
+      items: [
+        {
+          title: `Turno ${booking.court?.name || 'Cancha'} - ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
+          quantity: 1,
+          unit_price: booking.price,
+          currency_id: 'ARS'
+        }
+      ],
+      back_urls: {
+        success: `${baseUrl}/payment-success`,
+        failure: `${baseUrl}/payment-failure`,
+        pending: `${baseUrl}/payment-pending`
+      },
+      auto_return: 'approved',
+      external_reference: bookingId,
+      notification_url: `${baseUrl}/api/payments/webhook`,
+      metadata: {
+        booking_id: bookingId,
+        club_name: clubName
+      }
+    };
+
+    const response = await preference.create({ body: preferenceData });
+    
+    res.json({
+      id: response.id,
+      init_point: response.init_point,
+      sandbox_init_point: response.sandbox_init_point
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating preference:', error);
+    res.status(500).json({ 
+      message: 'Error al crear preferencia de pago',
+      error: error.message 
+    });
+  }
+};
+
+// ==========================================
+// 2. QR DINÁMICO SIMPLIFICADO (Sin Store/POS)
 // ==========================================
 const createBookingQRDynamic = async (req, res) => {
   const { bookingId } = req.body;
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
   try {
-    // 1. Validar reserva
-    const booking = await Booking.findById(bookingId).populate('court').populate('user');
+    const booking = await Booking.findById(bookingId).populate('court');
     if (!booking) {
       return res.status(404).json({ message: 'Reserva no encontrada' });
     }
     if (booking.isPaid) {
-      return res.status(400).json({ message: 'Esta reserva ya fue pagada.' });
+      return res.status(400).json({ message: 'Esta reserva ya fue pagada' });
     }
 
-    // 2. Obtener USER_ID y Access Token de Mercado Pago
-    const userId = process.env.MERCADOPAGO_USER_ID;
     const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-
-    if (!userId || !mpAccessToken) {
-      console.error('❌ Error: MERCADOPAGO_USER_ID y MERCADOPAGO_ACCESS_TOKEN deben estar configurados en variables de entorno.');
-      throw new Error('Credenciales de Mercado Pago incompletas en el servidor.');
+    if (!mpAccessToken) {
+      throw new Error('Access Token de Mercado Pago no configurado');
     }
 
-    // 3. Obtener settings (nombre del club)
+    // Obtener USER_ID desde el Access Token (método público)
+    const meResponse = await axios.get('https://api.mercadopago.com/users/me', {
+      headers: { 'Authorization': `Bearer ${mpAccessToken}` }
+    });
+    const userId = meResponse.data.id;
+
     const settings = await Setting.findOne({ key: 'clubName' });
     const clubName = settings ? settings.value : 'Padel Club';
 
-    // 4. Definir external_pos_id (ID fijo para identificar este punto de venta virtual)
-    const externalPosId = 'TURNOS01'; // Puedes mantener este o cambiarlo por algo como 'PADELCLUB_ADMIN'
-    console.log(`ℹ️ Usando external_pos_id fijo para QR: ${externalPosId}`);
+    // Usar un external_pos_id fijo y único para tu club
+    const externalPosId = 'TURNOS_PADEL_01';
 
-    // 5. Crear cuerpo de la orden QR dinámica
     const qrOrderData = {
-      external_reference: bookingId, // ID único de la reserva para identificarla en el webhook
-      title: `Reserva ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
-      description: `Cancha: ${booking.court?.name || 'N/A'} | ${booking.user?.name || 'Cliente'} - ${clubName}`,
-      // USA EL NUEVO WEBHOOK para merchant_order
-      notification_url: `${baseUrl}/api/payments/webhook-qr`, 
+      external_reference: bookingId,
+      title: `Turno ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
+      description: `${booking.court?.name || 'Cancha'} - ${clubName}`,
+      notification_url: `${baseUrl}/api/payments/webhook-qr`,
       total_amount: booking.price,
       items: [
         {
           sku_number: `BOOKING_${bookingId}`,
-          category: 'sports_service',
+          category: 'marketplace',
           title: `Turno ${booking.court?.name || 'Cancha'}`,
-          description: `Reserva para ${booking.user?.name || 'Cliente'}`,
+          description: `Reserva ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
           unit_price: booking.price,
           quantity: 1,
           unit_measure: 'unit',
           total_amount: booking.price
         }
-      ],
+      ]
     };
 
-    // 6. Llamar a la API de Mercado Pago correcta para crear QR sin Store ID
+    // API simplificada que NO requiere Store ID
     const url = `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}/qrs`;
-    console.log(`📞 Llamando a MP API (QR Dinámico Simplificado): POST ${url}`);
     
-    const qrResponse = await axios.post(
-      url,
-      qrOrderData,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${mpAccessToken}`
-        }
+    const qrResponse = await axios.post(url, qrOrderData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${mpAccessToken}`
       }
-    );
+    });
 
-    // Verificar si la respuesta contiene qr_data
     if (!qrResponse.data || !qrResponse.data.qr_data) {
-        console.error('❌ Respuesta de MP no contiene qr_data:', qrResponse.data);
-        throw new Error('Mercado Pago no devolvió los datos del QR.');
+      throw new Error('Mercado Pago no devolvió los datos del QR');
     }
 
-    const qrData = qrResponse.data.qr_data; // String EMVCo
-    // const inStoreOrderId = qrResponse.data.in_store_order_id; // Útil para debug
+    console.log(`✅ QR generado para booking: ${bookingId}`);
 
-    console.log(`✅ QR Dinámico generado para booking: ${bookingId}`);
-    // console.log('📱 QR Data:', qrData); // Opcional: loguear el string largo
-
-    // 7. Retornar data del QR al frontend
     res.json({
-      qr_data: qrData,
-      amount: booking.price
+      qr_data: qrResponse.data.qr_data,
+      amount: booking.price,
+      in_store_order_id: qrResponse.data.in_store_order_id
     });
 
   } catch (error) {
-    console.error('❌ Error creating QR dynamic:', error.response?.data || error.message);
+    console.error('❌ Error creating QR:', error.response?.data || error.message);
     res.status(500).json({ 
       message: 'Error al generar QR dinámico',
       error: error.response?.data?.message || error.message 
@@ -108,119 +151,145 @@ const createBookingQRDynamic = async (req, res) => {
 };
 
 // ==========================================
-// WEBHOOK PARA QR DINÁMICO (merchant_order) - CORRECTO PARA ESTA API
+// 3. WEBHOOK PARA CHECKOUT PRO (payment)
+// ==========================================
+const receiveWebhook = async (req, res) => {
+  const { type, data } = req.body;
+
+  console.log('🔔 Webhook recibido:', { type, data });
+
+  if (type !== 'payment' || !data?.id) {
+    return res.status(200).send('Ignored');
+  }
+
+  try {
+    const payment = new Payment(client);
+    const paymentData = await payment.get({ id: data.id });
+
+    console.log('💳 Pago encontrado:', {
+      id: paymentData.id,
+      status: paymentData.status,
+      external_reference: paymentData.external_reference
+    });
+
+    if (paymentData.status !== 'approved') {
+      return res.status(200).send('Payment not approved yet');
+    }
+
+    const bookingId = paymentData.external_reference;
+    if (!bookingId) {
+      return res.status(200).send('No external_reference');
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(200).send('Booking not found');
+    }
+
+    if (booking.isPaid) {
+      return res.status(200).send('Already paid');
+    }
+
+    booking.isPaid = true;
+    booking.status = 'Confirmed';
+    booking.paymentMethod = 'Mercado Pago Web';
+    await booking.save();
+
+    console.log(`✅ Booking ${bookingId} marcado como pagado (Web)`);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('booking_update', booking);
+    }
+
+    res.status(200).send('OK');
+
+  } catch (error) {
+    console.error('❌ Error processing webhook:', error);
+    res.status(200).send('Error');
+  }
+};
+
+// ==========================================
+// 4. WEBHOOK PARA QR DINÁMICO (merchant_order)
 // ==========================================
 const receiveWebhookQR = async (req, res) => {
   const notificationData = req.body;
   const topic = notificationData?.topic || req.query?.topic;
+  
   let orderId = null;
-
-  // Extraer ID de la URL 'resource' o del query param 'id'
   if (notificationData?.resource) {
-      try {
-          const urlParts = notificationData.resource.split('/');
-          orderId = urlParts[urlParts.length - 1];
-      } catch (e) { console.error("Error parsing resource URL:", notificationData.resource); }
+    const urlParts = notificationData.resource.split('/');
+    orderId = urlParts[urlParts.length - 1];
   } else if (req.query?.id) {
-      orderId = req.query.id;
+    orderId = req.query.id;
   }
   
-  console.log('🔔 Webhook QR Recibido:', { topic, orderId, body: req.body, query: req.query });
+  console.log('🔔 Webhook QR:', { topic, orderId });
 
   if (topic !== 'merchant_order' || !orderId) {
-    console.log(`ℹ️ Webhook QR Ignorado (topic: ${topic}, orderId: ${orderId})`);
-    return res.status(200).send('Notification ignored (invalid topic or missing ID)');
+    return res.status(200).send('Ignored');
   }
 
   try {
-    // 1. Obtener la Merchant Order
     const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    if (!mpAccessToken) throw new Error("Access Token no configurado");
-
     const orderResponse = await axios.get(
       `https://api.mercadopago.com/merchant_orders/${orderId}`,
       { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
     );
-    const order = orderResponse.data;
     
-    console.log('📦 Detalles Merchant Order:', { /* ... datos relevantes ... */ });
+    const order = orderResponse.data;
 
-    // 2. Solo procesar órdenes cerradas y pagadas
     if (order.status !== 'closed' || order.paid_amount < order.total_amount) {
-      console.log(`⏳ Orden ${orderId} no cerrada/pagada completamente.`);
-      return res.status(200).send('Order not fully paid or closed yet');
+      return res.status(200).send('Order not fully paid');
     }
 
-    // 3. Usar external_reference para encontrar el Booking
     const externalRef = order.external_reference;
     if (!externalRef) {
-      console.log(`⚠️ Orden ${orderId} sin external_reference`);
-      return res.status(200).send('No external_reference found');
+      return res.status(200).send('No external_reference');
     }
 
-    console.log(`🔄 Procesando pago QR para booking con external_reference: ${externalRef}`);
     const booking = await Booking.findById(externalRef);
-        
     if (!booking) {
-      console.error(`❌ Booking no encontrado para external_reference: ${externalRef} (Order ID: ${orderId})`);
-      return res.status(200).send('Booking not found'); 
+      return res.status(200).send('Booking not found');
     }
 
     if (booking.isPaid) {
-      console.log(`ℹ️ Booking ${externalRef} ya estaba pagado. Ignorando webhook.`);
-      return res.status(200).send('Booking already paid');
+      return res.status(200).send('Already paid');
     }
 
-    // Determinar método de pago (mejorado)
     let paymentMethod = 'QR Mercado Pago';
-    const firstApprovedPayment = order.payments?.find(p => p.status === 'approved');
-    if (firstApprovedPayment) {
-        const paymentType = firstApprovedPayment.payment_type_id || 'unknown';
-        if (paymentType === 'account_money') { paymentMethod = 'QR MP Saldo'; }
-        else if (paymentType === 'credit_card') { paymentMethod = 'QR MP Crédito'; }
-        else if (paymentType === 'debit_card') { paymentMethod = 'QR MP Débito'; }
-        else { paymentMethod = `QR MP (${paymentType})`; }
+    const firstPayment = order.payments?.find(p => p.status === 'approved');
+    if (firstPayment) {
+      const type = firstPayment.payment_type_id || 'unknown';
+      if (type === 'account_money') paymentMethod = 'QR MP Saldo';
+      else if (type === 'credit_card') paymentMethod = 'QR MP Crédito';
+      else if (type === 'debit_card') paymentMethod = 'QR MP Débito';
     }
 
-    // Marcar reserva como pagada
     booking.isPaid = true;
     booking.status = 'Confirmed';
     booking.paymentMethod = paymentMethod;
     await booking.save();
 
-    console.log(`✅ Booking ${booking._id} (Order ID: ${orderId}) pagado vía ${paymentMethod}`);
+    console.log(`✅ Booking ${booking._id} pagado vía ${paymentMethod}`);
 
-    // Emitir Socket.IO
     const io = req.app.get('socketio');
     if (io) {
       io.emit('booking_update', booking);
-      console.log(`📡 Socket.IO: booking_update emitido para ${booking._id}`);
     }
 
-    res.status(200).send('Booking payment processed via QR webhook');
+    res.status(200).send('OK');
 
   } catch (error) {
-    console.error('❌ Error processing webhook QR:', error.response?.data || error.message);
-    res.status(200).send('Error processing webhook internally'); 
+    console.error('❌ Error processing QR webhook:', error);
+    res.status(200).send('Error');
   }
 };
 
-// ==========================================
-// WEBHOOK ORIGINAL (Para Preferencias Web - si aún se usan)
-// ==========================================
-const receiveWebhook = async (req, res) => {
-  // ... (Tu código para el webhook /webhook, si lo sigues necesitando para otros pagos) ...
-  // Es importante que este webhook NO intente procesar los pagos que ya manejó receiveWebhookQR
-  // Puedes diferenciar usando metadata distinta o simplemente ignorar si no usas pagos web.
-  console.log('🔔 Webhook Preference Recibido (General):', req.body);
-  // ... (Lógica simplificada o completa si es necesario) ...
-  res.status(200).send('Webhook Preference endpoint reached');
-};
-
-
 module.exports = {
-  createBookingQRDynamic, // La función correcta para QR de Turnos
-  receiveWebhookQR,       // El webhook para QR de Turnos
-  receiveWebhook,         // El webhook para otros pagos (si aplica)
-  // ... (otras funciones exportadas como createPaymentPreference si las usas)
+  createBookingPreference,    // Para botón web
+  createBookingQRDynamic,     // Para QR turnos
+  receiveWebhook,             // Webhook checkout web
+  receiveWebhookQR            // Webhook QR
 };
