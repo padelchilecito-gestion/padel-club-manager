@@ -1,3 +1,4 @@
+// padelchilecito-gestion/padel-club-manager/padel-club-manager-e1b54ee9b27c8f286a95c978589cf18147777fb5/server/server.js
 const express = require('express');
 // const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
@@ -37,7 +38,10 @@ const allowedOrigins = [
   'https://padel-club-manager.vercel.app',
   'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
   'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-xi.vercel.app'
+  'https://padel-club-manager-xi.vercel.app',
+  // --- AÑADIDO PARA SOLUCIONAR ERROR DE CORS ---
+  'https://padel-club-manager-gjz2ekj5a-eduardo-miguel-riccis-projects.vercel.app'
+  // ---------------------------------------------
 ];
 
 app.use(cors({
