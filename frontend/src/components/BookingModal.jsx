@@ -128,8 +128,8 @@ const BookingModal = ({ slots, settings, onClose, onBookingSuccess }) => {
                 <input type="radio" name="paymentMethod" value="Efectivo" checked={paymentMethod === 'Efectivo'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
                 <span className="text-white font-bold">Efectivo en el Club</span>
               </label>
-              <label className={`flex-1 p-4 rounded-lg border-2 cursor-pointer ${paymentMethod === 'MercadoPago' ? 'border-indigo-500 bg-indigo-900' : 'border-gray-700 bg-gray-900'}`}>
-                <input type="radio" name="paymentMethod" value="MercadoPago" checked={paymentMethod === 'MercadoPago'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
+              <label className={`flex-1 p-4 rounded-lg border-2 cursor-pointer ${paymentMethod === 'Mercado Pago' ? 'border-indigo-500 bg-indigo-900' : 'border-gray-700 bg-gray-900'}`}>
+                <input type="radio" name="paymentMethod" value="Mercado Pago" checked={paymentMethod === 'Mercado Pago'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
                 <span className="text-white font-bold">Mercado Pago</span>
               </label>
             </div>
