@@ -185,7 +185,7 @@ const receiveWebhook = async (req, res) => {
 };
 
 
-// ==========================================
+
 // 4. WEBHOOK PARA QR DINÁMICO (merchant_order) - Obsoleto, se mantiene por seguridad
 // ==========================================
 const receiveWebhookQR = async (req, res) => {
