@@ -1,41 +1,26 @@
-// server/routes/payments.js - RUTAS CORREGIDAS
+// server/routes/payments.js
 const express = require('express');
 const router = express.Router();
-const { 
-  createBookingPreference,   // Botón web
-  createBookingQRDynamic,    // QR turnos
-  receiveWebhook,            // Webhook web
-  receiveWebhookQR           // Webhook QR
+const {
+  createBookingPreference,
+  createBookingQRDynamic,
+  receiveWebhook,
+  receiveWebhookQR,
+  createPosPreference // <-- AÑADIR ESTO
 } = require('../controllers/paymentController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
-// ==========================================
-// BOTÓN WEB - CHECKOUT PRO
-// ==========================================
-// @route   POST /api/payments/create-preference
-// @desc    Crea preferencia para botón web que abre Mercado Pago
-// @access  Private/Admin
-router.post('/create-preference', protect, admin, createBookingPreference);
+// Para reservas (botón web y QR)
+router.post('/create-booking-preference', protect, createBookingPreference);
+router.post('/create-booking-qr', protect, createBookingQRDynamic);
 
-// ==========================================
-// QR DINÁMICO - TURNOS Y POS
-// ==========================================
-// @route   POST /api/payments/create-booking-qr
-// @desc    Genera QR dinámico para cobrar en persona
-// @access  Private/Admin
-router.post('/create-booking-qr', protect, admin, createBookingQRDynamic);
+// --- AÑADIR ESTA NUEVA RUTA ---
+// Para ventas del POS
+router.post('/create-pos-preference', protect, createPosPreference);
+// ------------------------------
 
-// ==========================================
-// WEBHOOKS
-// ==========================================
-// @route   POST /api/payments/webhook
-// @desc    Recibe notificaciones de pagos web (payment)
-// @access  Public (Mercado Pago)
+// Webhooks
 router.post('/webhook', receiveWebhook);
-
-// @route   POST /api/payments/webhook-qr
-// @desc    Recibe notificaciones de QR (merchant_order)
-// @access  Public (Mercado Pago)
-router.post('/webhook-qr', receiveWebhookQR);
+router.post('/webhook-qr', receiveWebhookQR); // Mantenido por si acaso
 
 module.exports = router;
