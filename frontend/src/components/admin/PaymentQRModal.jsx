@@ -1,15 +1,18 @@
-// frontend/src/components/admin/PaymentQRModal.jsx - VERSIÓN COMPLETA
+// frontend/src/components/admin/PaymentQRModal.jsx - VERSIÓN CORREGIDA
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, CheckCircleIcon, QrCodeIcon, CreditCardIcon } from '@heroicons/react/24/solid';
 import { paymentService } from '../../services/paymentService';
 import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react'; // Esta librería ya convierte un string (la URL) en QR
 import { format } from 'date-fns';
 
 const PaymentQRModal = ({ booking, onClose }) => {
   const [paymentMode, setPaymentMode] = useState(null); // null | 'qr' | 'web'
-  const [qrDataString, setQrDataString] = useState(null);
+  
+  // --- CAMBIO 1: Cambiamos el nombre del estado para que sea más claro ---
+  const [qrValueString, setQrValueString] = useState(null); // Ya no es 'qr_data', es la URL 'init_point'
+  
   const [webPaymentUrl, setWebPaymentUrl] = useState(null);
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -42,13 +45,14 @@ const PaymentQRModal = ({ booking, onClose }) => {
       
       const data = await paymentService.generateBookingQR(booking._id);
       
-      if (data.qr_data) {
-        setQrDataString(data.qr_data);
+      // --- CAMBIO 2: Buscamos 'init_point' en lugar de 'qr_data' ---
+      if (data.init_point) {
+        setQrValueString(data.init_point); // Guardamos la URL
         setAmount(data.amount || booking.price);
         setPaymentMode('qr');
-        console.log('✅ QR generado exitosamente');
+        console.log('✅ URL de pago (para QR) generada exitosamente');
       } else {
-        throw new Error('No se recibió el código QR');
+        throw new Error('No se recibió el link de pago (init_point) desde el backend');
       }
     } catch (err) {
       console.error('❌ Error generando QR:', err);
@@ -88,7 +92,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
 
   const handleBack = () => {
     setPaymentMode(null);
-    setQrDataString(null);
+    setQrValueString(null); // Usar el nuevo nombre de estado
     setWebPaymentUrl(null);
     setError(null);
   };
@@ -162,12 +166,13 @@ const PaymentQRModal = ({ booking, onClose }) => {
           )}
 
           {/* Modo QR */}
-          {paymentMode === 'qr' && qrDataString && paymentStatus === 'pending' && (
+          {/* --- CAMBIO 3: Usamos qrValueString --- */}
+          {paymentMode === 'qr' && qrValueString && paymentStatus === 'pending' && (
             <div className="space-y-6">
               {/* QR Code */}
               <div className="bg-white p-8 rounded-lg flex flex-col items-center">
                 <QRCodeSVG 
-                  value={qrDataString} 
+                  value={qrValueString} // <--- El valor es la URL
                   size={256} 
                   level="H" 
                   includeMargin={true}
