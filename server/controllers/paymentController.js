@@ -3,7 +3,7 @@ const { Preference, Payment } = require('mercadopago');
 const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-const axios = require('axios');
+const axios = require('axios'); // Aunque axios ya no se usa aquí, lo mantenemos por si acaso
 const { format } = require('date-fns');
 
 // ==========================================
@@ -102,16 +102,13 @@ const createBookingQRDynamic = async (req, res) => {
     // Crear la preferencia
     const response = await preference.create({ body: preferenceData });
 
-    // Verificar que la respuesta contiene los datos del QR
-    if (!response.point_of_interaction?.transaction_data?.qr_code) {
-      console.error("Respuesta de MP no contiene QR:", response);
-      throw new Error('No se pudo obtener el código QR desde la preferencia de pago.');
-    }
-
-    console.log(`✅ QR (desde Preference) generado para booking: ${bookingId}`);
+    // ¡ESTE ES EL CAMBIO!
+    // No buscamos un QR, solo devolvemos el link de pago (init_point)
+    // El frontend se encargará de convertir este link en un QR.
+    console.log(`✅ Preferencia (para QR) generada para booking: ${bookingId}`);
 
     res.json({
-      qr_data: response.point_of_interaction.transaction_data.qr_code,
+      init_point: response.init_point, // Devolvemos la URL
       amount: booking.price,
     });
 
@@ -185,7 +182,7 @@ const receiveWebhook = async (req, res) => {
 };
 
 
-
+// ==========================================
 // 4. WEBHOOK PARA QR DINÁMICO (merchant_order) - Obsoleto, se mantiene por seguridad
 // ==========================================
 const receiveWebhookQR = async (req, res) => {
