@@ -1,49 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
-import { paymentService } from '../../services/paymentService';
+import { XMarkIcon, CheckCircleIcon, CreditCardIcon } from '@heroicons/react/24/solid'; // Cambiamos ícono
+import { paymentService } from '../../services/paymentService'; // Actualizado
 import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
-import { QRCodeSVG } from 'qrcode.react'; // Mantenemos esta librería
+// Ya no necesitamos qrcode.react
+// import { QRCodeSVG } from 'qrcode.react'; 
 
 const PaymentQRModal = ({ booking, onClose }) => {
-  // --- CAMBIO: Usaremos qrCode (string) como principal ---
-  const [qrCode, setQrCode] = useState(null); 
+  // --- CAMBIO: Guardaremos el init_point ---
+  const [initPoint, setInitPoint] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending' | 'success'
 
+  // 1. Efecto para generar el LINK de pago
   useEffect(() => {
     if (!booking) return;
 
-    const generate = async () => {
+    const generateLink = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await paymentService.generateQR(booking._id);
-        // --- CAMBIO: Priorizar qr_code (string) ---
-        if (data.qr_code) {
-           setQrCode(data.qr_code); 
-        } else if (data.qr_code_base64) {
-            // Si solo viene base64 (menos común con Preferencias), podrías intentar mostrarlo
-            // como imagen, pero QRCodeSVG es más estándar. Vamos a mostrar un error si
-            // qr_code (string) no está.
-             console.warn("QR Code string not found, received base64 instead. Display might fail.");
-             setError("Formato de QR no compatible recibido desde Mercado Pago.");
-             // setQrCode(data.qr_code_base64); // O intentar usarlo si tienes un <img>
+        // Llamamos a la función renombrada del servicio
+        const data = await paymentService.generatePaymentLink(booking._id);
+        if (data.init_point) {
+           setInitPoint(data.init_point); 
         } else {
-            throw new Error('No se recibió información válida del QR.');
+            throw new Error('No se recibió el link de pago.');
         }
-
       } catch (err) {
-        setError(err.message || 'No se pudo generar el QR.');
+        setError(err.message || 'No se pudo generar el link de pago.');
       } finally {
         setLoading(false);
       }
     };
 
-    generate();
+    generateLink();
   }, [booking]);
 
+  // 2. Efecto para escuchar la confirmación (SIN CAMBIOS)
   useEffect(() => {
     socket.connect();
     const handleBookingUpdate = (updatedBooking) => {
@@ -59,29 +54,45 @@ const PaymentQRModal = ({ booking, onClose }) => {
     };
   }, [booking, onClose]);
 
+  // --- Función para abrir el link en nueva pestaña ---
+  const handlePayClick = () => {
+    if (initPoint) {
+      window.open(initPoint, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm relative text-white">
         <button onClick={() => onClose(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
           <XMarkIcon className="h-7 w-7" />
         </button>
-        <h2 className="text-2xl font-bold text-white mb-4 text-center">Cobrar con QR</h2>
+        {/* Cambiamos el título */}
+        <h2 className="text-2xl font-bold text-white mb-4 text-center">Cobrar con Mercado Pago</h2>
         
         <div className="p-4 bg-gray-900 rounded-lg flex flex-col items-center justify-center min-h-[300px]">
-          {loading && <InlineLoading text="Generando QR..." />}
+          {loading && <InlineLoading text="Generando link de pago..." />}
           {error && <ErrorMessage message={error} />}
           
-          {/* --- CAMBIO: Usar qrCode (string) con QRCodeSVG --- */}
-          {qrCode && paymentStatus === 'pending' && (
-            <>
-              <p className="text-lg font-semibold text-center">Escanee para pagar:</p>
-              <p className="text-3xl font-bold text-secondary text-center mb-4">${booking.price}</p>
-              <div className="bg-white p-4 rounded-lg">
-                <QRCodeSVG value={qrCode} size={200} /> 
-              </div>
-              <p className="text-sm text-gray-400 mt-3 text-center">El QR expira pronto.</p>
-              <p className="text-md text-yellow-dark mt-2 text-center">Esperando confirmación de pago...</p>
-            </>
+          {/* --- CAMBIO: Mostrar botón en lugar de QR --- */}
+          {initPoint && paymentStatus === 'pending' && (
+            <div className='text-center'>
+              <p className="text-lg font-semibold">Reserva para:</p>
+              <p className='text-md mb-2'>{`${booking.user.name} ${booking.user.lastName || ''}`}</p>
+              <p className="text-lg font-semibold">Monto a pagar:</p>
+              <p className="text-3xl font-bold text-secondary mb-6">${booking.price}</p>
+              
+              <button
+                onClick={handlePayClick}
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-md transition-colors flex items-center justify-center text-lg"
+              >
+                <CreditCardIcon className="h-6 w-6 mr-2" />
+                Ir a Pagar con Mercado Pago
+              </button>
+              
+              <p className="text-sm text-gray-400 mt-4">Se abrirá una nueva pestaña.</p>
+              <p className="text-md text-yellow-dark mt-2">Esperando confirmación de pago aquí...</p>
+            </div>
           )}
 
           {paymentStatus === 'success' && (
