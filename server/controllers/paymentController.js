@@ -81,6 +81,7 @@ const createBookingQRDynamic = async (req, res) => {
       headers: { 'Authorization': `Bearer ${mpAccessToken}` }
     });
     const userId = meResponse.data.id;
+// <<<<<<< feature-mercado-pago-integration
 
     // 2. Obtener la lista de POS para ese User ID
     const posListResponse = await axios.get(`https://api.mercadopago.com/pos?user_id=${userId}`, {
@@ -98,6 +99,11 @@ const createBookingQRDynamic = async (req, res) => {
     }
 
     console.log(`Usando POS externo encontrado: ${externalPosId}`);
+//=======
+    console.log('VERIFICANDO CUENTA MP:', meResponse.data);
+    const settings = await Setting.findOne({ key: 'clubName' });
+    const clubName = settings ? settings.value : 'Padel Club';
+//>>>>>>> main
 
     const clubName = (await Setting.findOne({ key: 'clubName' }))?.value || 'Padel Club';
 
