@@ -58,9 +58,6 @@ const createBookingPreference = async (req, res) => {
   }
 };
 
-// ==========================================
-// 2. QR DINÁMICO SIMPLIFICADO (Sin Store/POS)
-// ==========================================
 const createBookingQRDynamic = async (req, res) => {
   const { bookingId } = req.body;
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
@@ -79,30 +76,41 @@ const createBookingQRDynamic = async (req, res) => {
       throw new Error('Access Token de Mercado Pago no configurado');
     }
 
-    // Obtener USER_ID desde el Access Token (método público)
+    // 1. Obtener USER_ID del vendedor
     const meResponse = await axios.get('https://api.mercadopago.com/users/me', {
       headers: { 'Authorization': `Bearer ${mpAccessToken}` }
     });
     const userId = meResponse.data.id;
 
-    const settings = await Setting.findOne({ key: 'clubName' });
-    const clubName = settings ? settings.value : 'Padel Club';
+    // 2. Obtener la lista de POS para ese User ID
+    const posListResponse = await axios.get(`https://api.mercadopago.com/pos?user_id=${userId}`, {
+        headers: { 'Authorization': `Bearer ${mpAccessToken}` }
+    });
 
-    // Usar un external_pos_id fijo y único para tu club
-    const externalPosId = 'TURNOS_PADEL_01';
+    if (!posListResponse.data || posListResponse.data.results.length === 0) {
+        throw new Error('No se encontraron Puntos de Venta (POS) configurados en la cuenta de Mercado Pago.');
+    }
+
+    // 3. Usar el ID del primer POS disponible
+    const externalPosId = posListResponse.data.results[0].external_id;
+    if (!externalPosId) {
+        throw new Error('El primer Punto de Venta encontrado no tiene un ID externo configurado.');
+    }
+
+    console.log(`Usando POS externo encontrado: ${externalPosId}`);
+
+    const clubName = (await Setting.findOne({ key: 'clubName' }))?.value || 'Padel Club';
 
     const qrOrderData = {
-      external_reference: bookingId,
-      title: `Turno ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
-      description: `${booking.court?.name || 'Cancha'} - ${clubName}`,
-      notification_url: `${baseUrl}/api/payments/webhook-qr`,
+      external_reference: bookingId.toString(),
+      title: `Reserva de Turno`,
+      description: `Turno para ${booking.court?.name || 'cancha'} el ${format(new Date(booking.startTime), 'dd/MM HH:mm')} - ${clubName}`,
+      notification_url: `${baseUrl}/api/payments/webhook`,
       total_amount: booking.price,
       items: [
         {
-          sku_number: `BOOKING_${bookingId}`,
-          category: 'marketplace',
           title: `Turno ${booking.court?.name || 'Cancha'}`,
-          description: `Reserva ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
+          description: `Reserva para el ${format(new Date(booking.startTime), 'dd/MM HH:mm')}`,
           unit_price: booking.price,
           quantity: 1,
           unit_measure: 'unit',
@@ -111,7 +119,7 @@ const createBookingQRDynamic = async (req, res) => {
       ]
     };
 
-    // API simplificada que NO requiere Store ID
+    // 4. Crear la orden QR usando el POS ID dinámico
     const url = `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}/qrs`;
     
     const qrResponse = await axios.post(url, qrOrderData, {
@@ -122,21 +130,20 @@ const createBookingQRDynamic = async (req, res) => {
     });
 
     if (!qrResponse.data || !qrResponse.data.qr_data) {
-      throw new Error('Mercado Pago no devolvió los datos del QR');
+      throw new Error('La respuesta de Mercado Pago no incluyó los datos del QR.');
     }
 
-    console.log(`✅ QR generado para booking: ${bookingId}`);
+    console.log(`✅ QR generado exitosamente para booking: ${bookingId}`);
 
     res.json({
       qr_data: qrResponse.data.qr_data,
-      amount: booking.price,
-      in_store_order_id: qrResponse.data.in_store_order_id
+      amount: booking.price
     });
 
   } catch (error) {
-    console.error('❌ Error creating QR:', error.response?.data || error.message);
+    console.error('❌ Error al crear QR dinámico:', error.response?.data || error.message);
     res.status(500).json({ 
-      message: 'Error al generar QR dinámico',
+      message: 'Error al generar el código QR',
       error: error.response?.data?.message || error.message 
     });
   }
