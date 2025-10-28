@@ -1,26 +1,45 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  createPaymentPreference, 
-  receiveWebhook, 
-  createBookingPreferenceQR // <-- 1. IMPORTAR NUEVA FUNCIÓN
+  // --- Importar las funciones que AHORA usamos ---
+  createBookingQRDynamic,   // Nueva para QR real de Turnos
+  receiveWebhookQR,         // Nuevo Webhook para QR real
+  receiveWebhook,           // Webhook original para pagos web (si aplica)
+  // createPaymentPreference, // Si tienes checkout web general
+  // createSaleQRDynamic,     // Comentada - No la implementamos ahora
 } = require('../controllers/paymentController');
-const { protect, admin } = require('../middlewares/authMiddleware'); // <-- 2. IMPORTAR MIDDLEWARE
+const { protect, admin } = require('../middlewares/authMiddleware');
 
-// Ruta original para checkout web general
-router.post('/create-preference', createPaymentPreference);
+// ==========================================
+// RUTAS PARA QR DINÁMICO REAL (API In-Store simplificada)
+// ==========================================
 
-// --- 3. NUEVA RUTA para generar QR desde Preferencia ---
-// @route   POST /api/payments/create-booking-preference-qr
-// @desc    Create a MP Preference focused on QR for a specific booking
+// @route   POST /api/payments/create-booking-qr
+// @desc    Genera QR dinámico para una reserva específica
 // @access  Private/Admin
-router.post('/create-booking-preference-qr', protect, admin, createBookingPreferenceQR);
-// --- FIN NUEVA RUTA ---
+router.post('/create-booking-qr', protect, admin, createBookingQRDynamic);
 
-// Ruta para recibir webhooks
+// @route   POST /api/payments/webhook-qr
+// @desc    Recibe notificaciones de QR dinámico (merchant_order)
+// @access  Public (Mercado Pago)
+router.post('/webhook-qr', receiveWebhookQR);
+
+
+// ==========================================
+// RUTAS PARA PAGOS WEB (PREFERENCIAS) - Si todavía las usas
+// ==========================================
+
+// @route   POST /api/payments/webhook
+// @desc    Recibe notificaciones de preferencias web (payment)
+// @access  Public (Mercado Pago)
 router.post('/webhook', receiveWebhook);
 
-// --- RUTA ANTIGUA de QR (In-Store) ELIMINADA o COMENTADA ---
-// router.post('/create-qr-order', protect, admin, createBookingQROrder); // Ya no se usa
+// Si tienes un checkout web general que usa createPaymentPreference:
+// router.post('/create-preference', createPaymentPreference);
+
+
+// --- RUTAS ANTIGUAS (Comentadas o Eliminadas) ---
+// router.post('/create-qr-order', protect, admin, /* función eliminada */); 
+// router.post('/create-booking-preference-qr', protect, admin, /* función eliminada o renombrada */);
 
 module.exports = router;
