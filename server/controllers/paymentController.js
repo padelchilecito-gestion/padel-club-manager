@@ -84,7 +84,7 @@ const createBookingQRDynamic = async (req, res) => {
       headers: { 'Authorization': `Bearer ${mpAccessToken}` }
     });
     const userId = meResponse.data.id;
-
+    console.log('VERIFICANDO CUENTA MP:', meResponse.data);
     const settings = await Setting.findOne({ key: 'clubName' });
     const clubName = settings ? settings.value : 'Padel Club';
 
