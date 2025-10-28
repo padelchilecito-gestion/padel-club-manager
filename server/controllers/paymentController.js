@@ -1,9 +1,10 @@
-// server/controllers/paymentController.js - VERSIÓN CORREGIDA
+// server/controllers/paymentController.js - VERSIÓN ACTUALIZADA
 const { Preference, Payment } = require('mercadopago');
 const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-const axios = require('axios'); // Aunque axios ya no se usa aquí, lo mantenemos por si acaso
+const Sale = require('../models/Sale'); // <-- AÑADIR ESTE MODELO
+const axios = require('axios');
 const { format } = require('date-fns');
 
 // ==========================================
@@ -41,7 +42,8 @@ const createBookingPreference = async (req, res) => {
         pending: `${baseUrl}/payment-pending`
       },
       auto_return: 'approved',
-      external_reference: bookingId.toString(),
+      // --- CAMBIO: Añadir prefijo para el webhook ---
+      external_reference: `booking_${bookingId.toString()}`,
       notification_url: `${baseUrl}/api/payments/webhook`,
       metadata: {
         booking_id: bookingId,
@@ -67,7 +69,7 @@ const createBookingPreference = async (req, res) => {
 };
 
 // ==========================================
-// 2. QR DINÁMICO CON PREFERENCE (Solución Definitiva)
+// 2. QR DINÁMICO CON PREFERENCE (Para Reservas)
 // ==========================================
 const createBookingQRDynamic = async (req, res) => {
   const { bookingId } = req.body;
@@ -95,20 +97,17 @@ const createBookingQRDynamic = async (req, res) => {
           currency_id: 'ARS'
         }
       ],
-      external_reference: bookingId.toString(),
+      // --- CAMBIO: Añadir prefijo para el webhook ---
+      external_reference: `booking_${bookingId.toString()}`,
       notification_url: `${baseUrl}/api/payments/webhook`,
     };
     
-    // Crear la preferencia
     const response = await preference.create({ body: preferenceData });
 
-    // ¡ESTE ES EL CAMBIO!
-    // No buscamos un QR, solo devolvemos el link de pago (init_point)
-    // El frontend se encargará de convertir este link en un QR.
-    console.log(`✅ Preferencia (para QR) generada para booking: ${bookingId}`);
+    console.log(`✅ Preferencia (para QR Reserva) generada para booking: ${bookingId}`);
 
     res.json({
-      init_point: response.init_point, // Devolvemos la URL
+      init_point: response.init_point,
       amount: booking.price,
     });
 
@@ -121,9 +120,77 @@ const createBookingQRDynamic = async (req, res) => {
   }
 };
 
+// ==========================================
+// 3. NUEVA FUNCIÓN: QR PARA POS
+// ==========================================
+const createPosPreference = async (req, res) => {
+  const { cart, totalAmount } = req.body;
+  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+
+  if (!cart || cart.length === 0 || !totalAmount) {
+    return res.status(400).json({ message: 'Datos de la venta inválidos' });
+  }
+
+  try {
+    const clubName = (await Setting.findOne({ key: 'clubName' }))?.value || 'Padel Club';
+
+    // 1. Crear la venta en estado 'Pending'
+    const newSale = new Sale({
+      items: cart.map(item => ({
+        product: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      total: totalAmount,
+      paymentMethod: 'Mercado Pago (QR)',
+      status: 'Pending',
+      user: req.user._id, // El admin que está cobrando
+    });
+    await newSale.save();
+
+    // 2. Preparar items para Mercado Pago
+    const mpItems = cart.map(item => ({
+      title: item.name,
+      quantity: item.quantity,
+      unit_price: item.price,
+      currency_id: 'ARS'
+    }));
+
+    // 3. Crear la preferencia de pago
+    const preference = new Preference(client);
+    const preferenceData = {
+      items: mpItems,
+      // --- CAMBIO: Usar prefijo 'sale_' y el ID de la nueva venta ---
+      external_reference: `sale_${newSale._id.toString()}`,
+      notification_url: `${baseUrl}/api/payments/webhook`,
+      metadata: {
+        sale_id: newSale._id.toString(),
+        club_name: clubName
+      }
+    };
+
+    const response = await preference.create({ body: preferenceData });
+
+    console.log(`✅ Preferencia (para QR POS) generada para Venta: ${newSale._id}`);
+
+    res.json({
+      init_point: response.init_point,
+      amount: totalAmount,
+      saleId: newSale._id // Devolvemos el ID de la venta
+    });
+
+  } catch (error) {
+    console.error('❌ Error al crear preferencia de POS:', error);
+    res.status(500).json({ 
+      message: 'Error al generar el QR para la venta',
+      error: error.message
+    });
+  }
+};
 
 // ==========================================
-// 3. WEBHOOK PARA CHECKOUT PRO (payment)
+// 4. WEBHOOK UNIFICADO (Actualizado)
 // ==========================================
 const receiveWebhook = async (req, res) => {
   const { type, data } = req.body;
@@ -144,30 +211,42 @@ const receiveWebhook = async (req, res) => {
         return res.status(200).send('Payment not approved yet');
       }
 
-      const bookingId = paymentData.external_reference;
-      if (!bookingId) {
+      const externalReference = paymentData.external_reference;
+      if (!externalReference) {
         return res.status(200).send('No external_reference in payment');
       }
 
-      const booking = await Booking.findById(bookingId);
-      if (!booking) {
-        return res.status(200).send('Booking not found');
-      }
-      if (booking.isPaid) {
-        return res.status(200).send('Booking already paid');
-      }
-
-      booking.isPaid = true;
-      booking.status = 'Confirmed';
-      booking.paymentMethod = 'Mercado Pago'; // Unificado
-      await booking.save();
-
-      console.log(`✅ Booking ${bookingId} marcado como pagado (desde Webhook)`);
-
       const io = req.app.get('socketio');
-      if (io) {
-        io.emit('booking_update', booking);
+
+      // --- LÓGICA DE WEBHOOK ACTUALIZADA ---
+      if (externalReference.startsWith('booking_')) {
+        
+        const bookingId = externalReference.split('_')[1];
+        const booking = await Booking.findById(bookingId);
+        
+        if (booking && !booking.isPaid) {
+          booking.isPaid = true;
+          booking.status = 'Confirmed';
+          booking.paymentMethod = 'Mercado Pago';
+          await booking.save();
+          console.log(`✅ Booking ${bookingId} marcado como pagado (desde Webhook)`);
+          if (io) io.emit('booking_update', booking);
+        }
+
+      } else if (externalReference.startsWith('sale_')) {
+        
+        const saleId = externalReference.split('_')[1];
+        const sale = await Sale.findById(saleId);
+
+        if (sale && sale.status !== 'Completed') {
+          sale.status = 'Completed';
+          sale.paymentId = paymentId.toString(); // Guardar ID de pago de MP
+          await sale.save();
+          console.log(`✅ Venta POS ${saleId} marcada como pagada (desde Webhook)`);
+          if (io) io.emit('sale_update', sale); // Emitir un evento nuevo
+        }
       }
+      // ------------------------------------
 
       return res.status(200).send('OK');
 
@@ -177,13 +256,12 @@ const receiveWebhook = async (req, res) => {
     }
   }
 
-  // Si no es de tipo 'payment', se ignora. Los QR via Preference notifican con 'payment'.
   return res.status(200).send('Ignored: Not a payment notification');
 };
 
 
 // ==========================================
-// 4. WEBHOOK PARA QR DINÁMICO (merchant_order) - Obsoleto, se mantiene por seguridad
+// 5. WEBHOOK QR (Obsoleto)
 // ==========================================
 const receiveWebhookQR = async (req, res) => {
   console.log('⚠️  Webhook QR (obsoleto) recibido. Redirigiendo al webhook principal.');
@@ -193,6 +271,7 @@ const receiveWebhookQR = async (req, res) => {
 module.exports = {
   createBookingPreference,
   createBookingQRDynamic,
+  createPosPreference, // <-- EXPORTAR LA NUEVA FUNCIÓN
   receiveWebhook,
   receiveWebhookQR
 };
