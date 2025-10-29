@@ -16,8 +16,9 @@ const HomePage = () => {
         setError(null);
         const data = await getSettings();
         
-        if (!data.SLOT_DURATION || !data.CURRENCY) { // Añadido CURRENCY como requisito básico
-          setError('La configuración del club (duración del turno o moneda) no está completa. Contacta al administrador.');
+        // Añadimos CLUB_WHATSAPP como requisito para la reserva
+        if (!data.SLOT_DURATION || !data.CURRENCY || !data.CLUB_WHATSAPP) { 
+          setError('La configuración del club (duración del turno, moneda o WhatsApp) no está completa. Contacta al administrador.');
         } else {
           setSettings(data);
         }
@@ -55,10 +56,12 @@ const HomePage = () => {
       </h1>
       <SimpleTimeSlotFinder
         slotDuration={parseInt(settings.SLOT_DURATION, 10)}
-        currency={settings.CURRENCY || '$'} // Pasar la moneda para el modal
-        // Puedes pasar más configuraciones si BookingModal las necesita para calcular precios
-        // Por ejemplo, un precio base por hora
-        // basePricePerHour={parseFloat(settings.BASE_PRICE_PER_HOUR)} 
+        currency={settings.CURRENCY || '$'}
+        clubWhatsApp={settings.CLUB_WHATSAPP} // Pasar el número de WhatsApp
+        // Otras configuraciones relevantes, por ejemplo, un precio base por hora
+        // basePricePerHour={parseFloat(settings.BASE_PRICE_PER_HOUR || 0)} 
+        // Puedes pasar el objeto 'settings' completo si es más conveniente
+        // clubSettings={settings}
       />
     </div>
   );
