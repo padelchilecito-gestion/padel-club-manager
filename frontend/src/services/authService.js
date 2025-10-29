@@ -6,7 +6,7 @@ const API_URL = '/api/auth'; // Asegúrate de que esta URL sea correcta para tu 
 const USER_API_URL = '/api/users'; // Para obtener el perfil del usuario
 
 // Función para iniciar sesión
-const loginUser = async (email, password) => {
+export const loginUser = async (email, password) => {
     try {
         const response = await axios.post(`${API_URL}/login`, { email, password });
         if (response.data.token) {
@@ -20,7 +20,7 @@ const loginUser = async (email, password) => {
 };
 
 // Función para registrar un nuevo usuario
-const registerUser = async (userData) => {
+export const registerUser = async (userData) => {
     try {
         const response = await axios.post(`${API_URL}/register`, userData);
         if (response.data.token) {
@@ -32,8 +32,9 @@ const registerUser = async (userData) => {
     }
 };
 
-// **NUEVA FUNCIÓN: Obtener el perfil del usuario**
-const getUserProfile = async (token) => {
+// **FUNCIÓN CORREGIDA: Obtener el perfil del usuario**
+// Añadimos 'export' para que AuthContext.jsx pueda importarla
+export const getUserProfile = async (token) => {
     try {
         const config = {
             headers: {
@@ -48,10 +49,10 @@ const getUserProfile = async (token) => {
     }
 };
 
-const authService = {
-    loginUser,
-    registerUser,
-    getUserProfile, // Exportar la nueva función
-};
-
-export default authService;
+// Ya no necesitamos la exportación por defecto (default export)
+// const authService = {
+//     loginUser,
+//     registerUser,
+//     getUserProfile,
+// };
+// export default authService;
