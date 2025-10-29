@@ -6,7 +6,6 @@ import React, { useState, useEffect } from 'react';
 import bookingService from '../../services/bookingService';
 import { getCourts } from '../../services/courtService';
 import { userService } from '../../services/userService';
-import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
