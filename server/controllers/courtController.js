@@ -2,16 +2,14 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// --- Asegúrate de importar 'getDay' y 'addMinutes' ---
-const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format } = require('date-fns'); 
+// --- CORRECCIÓN: Importar 'addDays' ---
+const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format, addDays } = require('date-fns'); 
 const { fromZonedTime } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 const { logActivity } = require('../utils/logActivity');
 
-// (Deja las funciones createCourt, getCourts, getCourtById, updateCourt, deleteCourt tal como están)
-// ...
-// ... (pega las 5 funciones aquí) ...
-
+// (Aquí van las 5 funciones: createCourt, getCourts, getCourtById, updateCourt, deleteCourt)
+// ... (Déjalas como están) ...
 const createCourt = async (req, res) => {
   try {
     const { name, courtType, pricePerHour, isActive } = req.body;
@@ -119,24 +117,21 @@ const getAggregatedAvailability = async (req, res) => {
       return acc; 
     }, {});
     
-    // --- LÓGICA DE HORARIO POR DÍA CORREGIDA ---
-    // getDay() devuelve 0 para Domingo, 1 para Lunes, etc.
+    // 2. Lógica de horario por día
     const dayIndex = getDay(dateObj); 
     const dayKeys = [
       'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'
     ];
-    const dayName = dayKeys[dayIndex]; // Ej: "MONDAY"
+    const dayName = dayKeys[dayIndex];
 
-    // Construir las claves
     const openTimeKey = `${dayName}_OPENING_HOUR`;
     const closeTimeKey = `${dayName}_CLOSING_HOUR`;
 
-    // Obtener los valores correctos
     const openTime = settings[openTimeKey];
     const closeTime = settings[closeTimeKey];
     const slotDuration = parseInt(settings.SLOT_DURATION, 10); 
 
-    // 2. Validar configuración
+    // 3. Validar configuración
     if (!openTime || !closeTime || !slotDuration || slotDuration <= 0) {
       console.error(`❌ Validación de settings falló para ${dayName}:`, { openTime, closeTime, slotDuration });
       return res.status(400).json({
@@ -144,30 +139,49 @@ const getAggregatedAvailability = async (req, res) => {
       });
     }
 
-    // 3. Generar todos los slots posibles del día
+    // 4. Generar todos los slots posibles del día
+    // 'generateTimeSlots' ya maneja el cruce de medianoche
     const allPossibleSlots = generateTimeSlots(openTime, closeTime, slotDuration);
 
-    // 4. Obtener canchas activas
+    // 5. Obtener canchas activas
     const activeCourts = await Court.find({ isActive: true }).select('_id name pricePerHour');
     
     if (!activeCourts || activeCourts.length === 0) {
-      return res.json({ availableSlots: [] }); // Devolver array vacío si no hay canchas
+      return res.json({ availableSlots: [] });
     }
     
-    // 5. Obtener reservas del día
+    // 6. Obtener reservas (¡DE DOS DÍAS!)
+    // Necesitamos las reservas del día seleccionado Y del día siguiente,
+    // por si el horario de cierre cruza la medianoche.
     const start = fromZonedTime(startOfDay(dateObj), timeZone);
-    const end = fromZonedTime(endOfDay(dateObj), timeZone);
+    // Buscar hasta el final del *siguiente* día
+    const end = fromZonedTime(endOfDay(addDays(dateObj, 1)), timeZone); 
 
     const bookings = await Booking.find({
       startTime: { $gte: start, $lt: end }, 
       status: { $ne: 'Cancelled' }
     }).select('court startTime endTime');
 
-    // 6. Calcular disponibilidad agregada
+    // 7. Calcular disponibilidad agregada
+    
+    // --- LÓGICA DE CRUCE DE MEDIANOCHE ---
+    let currentDay = dateObj; // Empezamos en el día seleccionado
+    let lastTimeStr = '00:00'; // Para detectar el cruce
+    
     const availability = allPossibleSlots.map(slotTime => {
-      const slotDateStr = `${format(dateObj, 'yyyy-MM-dd')}T${slotTime}:00`;
+      // Si el slot actual (ej "01:00") es menor que el anterior (ej "23:00"),
+      // significa que cruzamos la medianoche y este slot pertenece al DÍA SIGUIENTE.
+      if (slotTime < lastTimeStr) {
+        currentDay = addDays(dateObj, 1);
+      }
+      lastTimeStr = slotTime; // Actualizar el último slot
+      
+      // Construir la fecha del slot usando el 'currentDay' correcto
+      const slotDateStr = `${format(currentDay, 'yyyy-MM-dd')}T${slotTime}:00`;
       const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone);
       const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration);
+      
+      // --- FIN LÓGICA DE CRUCE ---
 
       const bookedCourtIds = bookings
         .filter(booking => booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC)
