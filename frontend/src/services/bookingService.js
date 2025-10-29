@@ -1,86 +1,49 @@
 // frontend/src/services/bookingService.js
-import api from './api';
-import { format } from 'date-fns';
+import api from './api'; // Tu instancia de axios configurada
+import axios from 'axios'; // Usamos axios directamente para MercadoPago porque puede no requerir token
 
-// Obtener reservas (con filtros opcionales)
-export const getBookings = async (filters = {}) => {
-  try {
-    // Convertir fechas a ISO string si existen
-    if (filters.startDate) filters.startDate = new Date(filters.startDate).toISOString();
-    if (filters.endDate) filters.endDate = new Date(filters.endDate).toISOString();
+const BOOKING_API_URL = '/api/bookings'; // Asegúrate de que esta URL sea correcta
 
-    const { data } = await api.get('/bookings', { params: filters });
-    return data;
-  } catch (error) {
-    console.error('Error fetching bookings:', error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al obtener las reservas');
-  }
-};
-
-// Obtener una reserva por ID
-export const getBookingById = async (id) => {
-  try {
-    const { data } = await api.get(`/bookings/${id}`);
-    return data;
-  } catch (error) {
-    console.error(`Error fetching booking ${id}:`, error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al obtener la reserva');
-  }
-};
-
-// Crear una nueva reserva
-export const createBooking = async (bookingData) => {
-  try {
-    const { data } = await api.post('/bookings', bookingData);
-    return data;
-  } catch (error) {
-    console.error('Error creating booking:', error.response?.data);
-    // Extraer mensajes de validación si existen
-    if (error.response?.data?.errors) {
-      const messages = error.response.data.errors.map(err => err.msg).join(', ');
-      throw new Error(messages || 'Error al crear la reserva');
+/**
+ * Crea una reserva con pago en efectivo.
+ * @param {object} bookingData - Datos de la reserva (date, time, clientName, clientPhone, etc.).
+ * @returns {Promise<object>} Los datos de la reserva creada.
+ */
+const createCashBooking = async (bookingData) => {
+    try {
+        // Asegúrate de que tu backend tenga un endpoint POST /api/bookings/cash
+        const response = await api.post(`${BOOKING_API_URL}/cash`, bookingData);
+        return response.data;
+    } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Error al crear la reserva en efectivo';
+        throw new Error(message);
     }
-    throw new Error(error.response?.data?.message || 'Error al crear la reserva');
-  }
 };
 
-// Actualizar una reserva
-export const updateBooking = async (id, bookingData) => {
-  try {
-    const { data } = await api.put(`/bookings/${id}`, bookingData);
-    return data;
-  } catch (error) {
-    console.error(`Error updating booking ${id}:`, error.response?.data);
-     if (error.response?.data?.errors) {
-       const messages = error.response.data.errors.map(err => err.msg).join(', ');
-       throw new Error(messages || 'Error al actualizar la reserva');
-     }
-    throw new Error(error.response?.data?.message || 'Error al actualizar la reserva');
-  }
+/**
+ * Inicia el proceso de pago con Mercado Pago para una reserva.
+ * @param {object} bookingData - Datos de la reserva necesarios para generar la preferencia.
+ * @returns {Promise<string>} La URL de redirección de Mercado Pago.
+ */
+const createMercadoPagoBooking = async (bookingData) => {
+    try {
+        // Asegúrate de que tu backend tenga un endpoint POST /api/bookings/mercadopago
+        // Este endpoint devolverá la URL de redirección
+        const response = await api.post(`${BOOKING_API_URL}/mercadopago`, bookingData);
+        if (response.data && response.data.init_point) {
+            return response.data.init_point; // URL de Mercado Pago
+        } else {
+            throw new Error('No se recibió la URL de Mercado Pago.');
+        }
+    } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Error al iniciar pago con Mercado Pago';
+        throw new Error(message);
+    }
 };
 
-// Eliminar una reserva
-export const deleteBooking = async (id) => {
-  try {
-    const { data } = await api.delete(`/bookings/${id}`);
-    return data;
-  } catch (error) {
-    console.error(`Error deleting booking ${id}:`, error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al eliminar la reserva');
-  }
+const bookingService = {
+    createCashBooking,
+    createMercadoPagoBooking,
 };
 
-// Verificar disponibilidad para una cancha y fecha
-export const checkAvailability = async (courtId, date) => {
-  try {
-    // Asegurar que la fecha se envíe en formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ) o YYYY-MM-DD
-    // El backend espera ISO o YYYY-MM-DD según la ruta. Verifiquemos /availability/:courtId
-    // La ruta espera 'YYYY-MM-DD' como query param 'date'.
-    const dateString = format(new Date(date), 'yyyy-MM-dd');
-    const { data } = await api.get(`/bookings/availability/${courtId}?date=${dateString}`);
-    return data;
-  } catch (error) {
-    console.error('Error checking availability:', error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al verificar disponibilidad');
-  }
-};
+export default bookingService;
