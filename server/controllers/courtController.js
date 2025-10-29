@@ -2,13 +2,14 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format, addDays } = require('date-fns'); 
+// Asegúrate que estén todos estos imports de date-fns
+const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format, addDays, isBefore } = require('date-fns'); 
 const { fromZonedTime } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 const { logActivity } = require('../utils/logActivity');
 
-// (Aquí van las 5 funciones: createCourt, getCourts, getCourtById, updateCourt, deleteCourt)
-// ... (Déjalas como están) ...
+// (Las funciones createCourt, getCourts, getCourtById, updateCourt, deleteCourt van aquí, sin cambios)
+// ...
 const createCourt = async (req, res) => {
   try {
     const { name, courtType, pricePerHour, isActive } = req.body;
@@ -98,16 +99,15 @@ const deleteCourt = async (req, res) => {
   }
 };
 
-
 // --- FUNCIÓN getAggregatedAvailability CORREGIDA ---
 // @desc    Get aggregated availability for a specific date
-// @route   GET /api/courts/availability/:date
+// @route   GET /api/courts/availability/:date (date format YYYY-MM-DD)
 // @access  Public
 const getAggregatedAvailability = async (req, res) => {
   try {
     const { date } = req.params; 
     const timeZone = 'America/Argentina/Buenos_Aires'; 
-    const dateObj = parseISO(date); 
+    const dateObj = parseISO(date); // Fecha seleccionada por el usuario
 
     // 1. Cargar configuración
     const settingsList = await Setting.find({});
@@ -118,48 +118,39 @@ const getAggregatedAvailability = async (req, res) => {
     
     // 2. Lógica de horario por día
     const dayIndex = getDay(dateObj); 
-    const dayKeys = [
-      'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'
-    ];
+    const dayKeys = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const dayName = dayKeys[dayIndex];
 
-    // --- NUEVA VALIDACIÓN: Revisar si el día está abierto ---
     const isOpenKey = `${dayName}_IS_OPEN`;
-    // El valor se guarda como string 'true'/'false' o puede no existir (undefined)
     const isOpen = settings[isOpenKey] === 'true'; 
 
     if (!isOpen) {
-      console.log(`Día ${dayName} está configurado como CERRADO.`);
-      return res.json({ availableSlots: [] }); // Devolver vacío si está cerrado
+      return res.json({ availableSlots: [] }); // Club cerrado ese día
     }
-    // --- FIN DE VALIDACIÓN ---
 
     const openTimeKey = `${dayName}_OPENING_HOUR`;
     const closeTimeKey = `${dayName}_CLOSING_HOUR`;
-
     const openTime = settings[openTimeKey];
     const closeTime = settings[closeTimeKey];
     const slotDuration = parseInt(settings.SLOT_DURATION, 10); 
 
-    // 3. Validar configuración (solo si está abierto)
+    // 3. Validar configuración
     if (!openTime || !closeTime || !slotDuration || slotDuration <= 0) {
-      console.error(`❌ Validación de settings falló para ${dayName}:`, { openTime, closeTime, slotDuration });
-      return res.status(400).json({
-        message: `La configuración para ${dayName} (abierto) no está completa.`
-      });
+      console.error(`Configuración incompleta para ${dayName}:`, { openTime, closeTime, slotDuration });
+      return res.status(400).json({ message: `Configuración incompleta para ${dayName}.` });
     }
 
     // 4. Generar todos los slots posibles del día
     const allPossibleSlots = generateTimeSlots(openTime, closeTime, slotDuration);
 
     // 5. Obtener canchas activas
-    const activeCourts = await Court.find({ isActive: true }).select('_id name pricePerHour');
-    
+    const activeCourts = await Court.find({ isActive: true }).select('_id');
     if (!activeCourts || activeCourts.length === 0) {
       return res.json({ availableSlots: [] });
     }
+    const totalActiveCourts = activeCourts.length;
     
-    // 6. Obtener reservas (de dos días, para manejar medianoche)
+    // 6. Obtener reservas (del día y del siguiente por si cruza medianoche)
     const start = fromZonedTime(startOfDay(dateObj), timeZone);
     const end = fromZonedTime(endOfDay(addDays(dateObj, 1)), timeZone); 
 
@@ -167,49 +158,62 @@ const getAggregatedAvailability = async (req, res) => {
       startTime: { $gte: start, $lt: end }, 
       status: { $ne: 'Cancelled' }
     }).select('court startTime endTime');
+    
+    // Crear un Set de IDs de canchas activas para búsqueda rápida
+    const activeCourtIds = new Set(activeCourts.map(c => c._id.toString()));
 
-    // 7. Calcular disponibilidad (Esta lógica ya maneja la medianoche)
+    // 7. Calcular disponibilidad agregada
     let currentDay = dateObj; 
     let lastTimeStr = '00:00'; 
     
     const availability = allPossibleSlots.map(slotTime => {
+      // Ajustar el día si cruzamos medianoche
       if (slotTime < lastTimeStr) {
         currentDay = addDays(dateObj, 1);
       }
       lastTimeStr = slotTime; 
       
       const slotDateStr = `${format(currentDay, 'yyyy-MM-dd')}T${slotTime}:00`;
-      const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone);
-      const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration);
+      const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone); // Fecha/Hora UTC del inicio del slot
+      const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration); // Fecha/Hora UTC del fin del slot
       
-      const bookedCourtIds = bookings
-        .filter(booking => booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC)
-        .map(b => b.court.toString());
+      // Contar cuántas canchas *activas* están ocupadas en este slot exacto
+      const bookedActiveCourtIdsInSlot = new Set();
+      bookings.forEach(booking => {
+          // Chequear si la reserva solapa con el slot actual
+          const overlaps = booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC;
+          if (overlaps) {
+              const courtIdStr = booking.court.toString();
+              // Añadir al set solo si la cancha reservada está activa
+              if(activeCourtIds.has(courtIdStr)) {
+                bookedActiveCourtIdsInSlot.add(courtIdStr);
+              }
+          }
+      });
 
-      const availableCourts = activeCourts.filter(
-        court => !bookedCourtIds.includes(court._id.toString())
-      );
+      const availableCourtCount = totalActiveCourts - bookedActiveCourtIdsInSlot.size;
       
       const hourMinute = slotTime.split(':');
+      
+      // --- DEVOLVER dateTimeISO ---
       return {
           hour: parseInt(hourMinute[0], 10),
           minute: parseInt(hourMinute[1], 10),
-          availableCourts: availableCourts.length 
+          availableCourts: availableCourtCount,
+          dateTimeISO: slotDateTimeUTC.toISOString() // <-- Añadido: ISO string completo
         };
+      // --- FIN DEVOLVER dateTimeISO ---
     });
     
     res.json({ availableSlots: availability });
     
   } catch (error) {
-    console.error('❌ Error en getAggregatedAvailability:', error);
-    res.status(500).json({ 
-      message: 'Error al obtener la disponibilidad agregada', 
-      error: error.message 
-    });
+    console.error('Error en getAggregatedAvailability:', error);
+    res.status(500).json({ message: 'Error al obtener la disponibilidad', error: error.message });
   }
 };
-// --- FIN DE LA FUNCIÓN CORREGIDA ---
 
+// Asegúrate de exportar todas las funciones necesarias
 module.exports = {
   createCourt,
   getCourts,
