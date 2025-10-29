@@ -1,85 +1,55 @@
+// frontend/src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../../services/settingService';
-import { FullPageLoading as Loading, ErrorMessage as Error, SuccessMessage as Success } from '../../components/ui/Feedback';
-// --- CAMBIO: Se eliminaron CreditCard y Mail de la importación ---
-import { Settings, Save, Info, Clock, BookOpen } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
 
-// Componente reutilizable para las tarjetas de configuración
-const SettingsCard = ({ title, icon: Icon, children }) => (
-  <div className="bg-gray-800 shadow-lg rounded-lg overflow-hidden">
-    <div className="px-6 py-4 bg-gray-750">
-      <h3 className="text-lg font-semibold text-white flex items-center">
-        <Icon className="mr-3 text-indigo-400" size={22} />
-        {title}
-      </h3>
-    </div>
-    <div className="p-6 space-y-4">
-      {children}
-    </div>
-  </div>
-);
-
-// Componente reutilizable para los campos de formulario
-const InputField = ({ label, id, value, onChange, type = 'text', placeholder = '', helpText = '' }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
-      {label}
-    </label>
-    <input
-      type={type}
-      id={id}
-      name={id}
-      value={value || ''}
-      onChange={onChange}
-      placeholder={placeholder}
-      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-    />
-    {helpText && <p className="mt-1 text-xs text-gray-400">{helpText}</p>}
-  </div>
-);
-
-// Componente reutilizable para los switches (checkboxes)
-const SwitchField = ({ label, id, checked, onChange, helpText = '' }) => (
-  <div className="flex items-center justify-between">
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-300">
-        {label}
-      </label>
-      {helpText && <p className="mt-1 text-xs text-gray-400">{helpText}</p>}
-    </div>
-    <button
-      type="button"
-      id={id}
-      onClick={() => onChange({ target: { name: id, value: !checked, type: 'checkbox' } })}
-      className={`${
-        checked ? 'bg-indigo-600' : 'bg-gray-600'
-      } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900`}
-    >
-      <span
-        className={`${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
-      />
-    </button>
-  </div>
-);
-
+// Definir los días de la semana para el formulario
+const daysOfWeek = [
+  { key: 'MONDAY', label: 'Lunes' },
+  { key: 'TUESDAY', label: 'Martes' },
+  { key: 'WEDNESDAY', label: 'Miércoles' },
+  { key: 'THURSDAY', label: 'Jueves' },
+  { key: 'FRIDAY', label: 'Viernes' },
+  { key: 'SATURDAY', label: 'Sábado' },
+  { key: 'SUNDAY', label: 'Domingo' },
+];
 
 const SettingsPage = () => {
-  const [settings, setSettings] = useState({});
+  // Estado para todos los campos del formulario
+  const [formData, setFormData] = useState({
+    SLOT_DURATION: '60',
+    MONDAY_OPENING_HOUR: '', MONDAY_CLOSING_HOUR: '',
+    TUESDAY_OPENING_HOUR: '', TUESDAY_CLOSING_HOUR: '',
+    WEDNESDAY_OPENING_HOUR: '', WEDNESDAY_CLOSING_HOUR: '',
+    THURSDAY_OPENING_HOUR: '', THURSDAY_CLOSING_HOUR: '',
+    FRIDAY_OPENING_HOUR: '', FRIDAY_CLOSING_HOUR: '',
+    SATURDAY_OPENING_HOUR: '', SATURDAY_CLOSING_HOUR: '',
+    SUNDAY_OPENING_HOUR: '', SUNDAY_CLOSING_HOUR: '',
+    // ... (otras configuraciones se cargarán dinámicamente)
+  });
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
 
+  // Cargar configuraciones existentes
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        const data = await getSettings();
-        setSettings(data);
-        setError(null);
+        const settings = await getSettings(); // getSettings devuelve el objeto { KEY: VALUE }
+        
+        // Actualizar el estado del formulario con los valores de la DB
+        setFormData(prevData => ({
+          ...prevData, // Mantener valores por defecto
+          ...settings  // Sobrescribir con valores cargados
+        }));
+        
       } catch (err) {
-        setError(err.message || 'Error al cargar la configuración');
+        console.error(err);
+        setError('No se pudo cargar la configuración.');
+        toast.error('Error al cargar la configuración.');
       } finally {
         setIsLoading(false);
       }
@@ -88,187 +58,132 @@ const SettingsPage = () => {
   }, []);
 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    
-    // Convertir números si el tipo es 'number'
-    const val = type === 'number' ? (value === '' ? '' : Number(value)) : value;
-
-    setSettings((prev) => ({
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
       ...prev,
-      [name]: val,
-    }));
-  };
-
-  const handleSwitchChange = (e) => {
-    const { name, value } = e.target;
-    setSettings((prev) => ({
-      ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setSuccessMessage('');
+    setIsSaving(true);
+    
+    // Filtrar solo las claves que hemos definido en el formulario
+    // para no enviar otras claves que se hayan cargado (ej. MERCADOPAGO)
+    const keysToUpdate = [
+      'SLOT_DURATION',
+      ...daysOfWeek.flatMap(day => [`${day.key}_OPENING_HOUR`, `${day.key}_CLOSING_HOUR`])
+    ];
+
+    // Crear el array de {key, value} para enviar a la API
+    const settingsToSave = keysToUpdate.map(key => ({
+      key: key,
+      value: formData[key] || '' // Enviar string vacío si está indefinido
+    }));
+
     try {
-      // Filtrar valores nulos o vacíos que no queremos enviar
-      const settingsToUpdate = {};
-      for (const key in settings) {
-        if (settings[key] !== null && settings[key] !== undefined) {
-          settingsToUpdate[key] = settings[key];
-        }
-      }
-      
-      await updateSettings(settingsToUpdate);
-      setSuccessMessage('Configuración guardada exitosamente.');
+      await updateSettings(settingsToSave);
+      toast.success('Configuración guardada con éxito.');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Error al guardar la configuración');
+      console.error(err);
+      toast.error(err.message || 'Error al guardar la configuración.');
     } finally {
-      setIsLoading(false);
-      // Ocultar mensaje de éxito después de 3 segundos
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setIsSaving(false);
     }
   };
+  
+  // --- RENDERIZADO ---
 
-  if (isLoading && !Object.keys(settings).length) {
-    return <Loading text="Cargando configuración..." />;
+  if (isLoading) {
+    return <FullPageLoading text="Cargando configuración..." />;
+  }
+
+  if (error) {
+    return <ErrorMessage message={error} />;
   }
 
   return (
-    <div className="container mx-auto p-6 text-white">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold flex items-center">
-          <Settings className="mr-3" size={30} />
-          Configuración del Sistema
-        </h1>
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold shadow-md hover:bg-indigo-700 transition duration-300 disabled:bg-gray-500"
-        >
-          <Save className="mr-2" size={20} />
-          {isLoading ? 'Guardando...' : 'Guardar Cambios'}
-        </button>
-      </div>
+    <div className="container mx-auto p-4 max-w-4xl">
+      <h1 className="text-3xl font-bold text-white mb-6">Configuración del Club</h1>
 
-      {error && <Error message={error} onClose={() => setError(null)} />}
-      {successMessage && <Success message={successMessage} onClose={() => setSuccessMessage('')} />}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Columna Izquierda */}
-          <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg">
+        
+        {/* --- Sección de Horarios --- */}
+        <div className="border-b border-gray-700 pb-6 mb-6">
+          <h2 className="text-xl font-semibold text-cyan-400 mb-4">Horarios de Apertura</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {/* Duración del Turno */}
+            <div className="md:col-span-1">
+              <label htmlFor="SLOT_DURATION" className="block text-sm font-medium text-gray-300">
+                Duración del Turno (en minutos)
+              </label>
+              <input
+                type="number"
+                name="SLOT_DURATION"
+                id="SLOT_DURATION"
+                value={formData.SLOT_DURATION}
+                onChange={handleChange}
+                className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+                placeholder="Ej: 60"
+              />
+            </div>
             
-            {/* Información del Club */}
-            <SettingsCard title="Información del Club" icon={Info}>
-              <InputField
-                label="Nombre del Club"
-                id="clubName"
-                value={settings.clubName}
-                onChange={handleChange}
-                placeholder="Mi Padel Club"
-              />
-              <InputField
-                label="Dirección"
-                id="clubAddress"
-                value={settings.clubAddress}
-                onChange={handleChange}
-                placeholder="Calle Falsa 123, Ciudad"
-              />
-              <InputField
-                label="Teléfono de Contacto"
-                id="clubPhone"
-                value={settings.clubPhone}
-                onChange={handleChange}
-                placeholder="+54 9 380 000000"
-              />
-              <InputField
-                label="Email de Contacto"
-                id="clubEmail"
-                type="email"
-                value={settings.clubEmail}
-                onChange={handleChange}
-                placeholder="contacto@mipadel.com"
-              />
-            </SettingsCard>
+            <div className="md:col-span-1"></div> 
 
-            {/* Horarios de Funcionamiento */}
-            <SettingsCard title="Horarios de Funcionamiento" icon={Clock}>
-              <InputField
-                label="Hora de Apertura"
-                id="openTime"
-                type="time"
-                value={settings.openTime}
-                onChange={handleChange}
-              />
-              <InputField
-                label="Hora de Cierre"
-                id="closeTime"
-                type="time"
-                value={settings.closeTime}
-                onChange={handleChange}
-              />
-              <InputField
-                label="Duración del Turno (minutos)"
-                id="slotDuration"
-                type="number"
-                value={settings.slotDuration}
-                onChange={handleChange}
-                helpText="Ej: 60, 90. Afecta la grilla de turnos."
-              />
-            </SettingsCard>
-
+            {/* Formulario por día */}
+            {daysOfWeek.map(day => (
+              <React.Fragment key={day.key}>
+                <div className="col-span-2 md:col-span-2 py-2">
+                   <h3 className="text-lg font-medium text-gray-200">{day.label}</h3>
+                </div>
+                <div>
+                  <label htmlFor={`${day.key}_OPENING_HOUR`} className="block text-sm font-medium text-gray-400">
+                    Apertura
+                  </label>
+                  <input
+                    type="time"
+                    name={`${day.key}_OPENING_HOUR`}
+                    id={`${day.key}_OPENING_HOUR`}
+                    value={formData[`${day.key}_OPENING_HOUR`]}
+                    onChange={handleChange}
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`${day.key}_CLOSING_HOUR`} className="block text-sm font-medium text-gray-400">
+                    Cierre
+                  </label>
+                  <input
+                    type="time"
+                    name={`${day.key}_CLOSING_HOUR`}
+                    id={`${day.key}_CLOSING_HOUR`}
+                    value={formData[`${day.key}_CLOSING_HOUR`]}
+                    onChange={handleChange}
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+                  />
+                </div>
+              </React.Fragment>
+            ))}
           </div>
+        </div>
 
-          {/* Columna Derecha */}
-          <div className="space-y-6">
+        {/* (Aquí puedes agregar otras secciones de configuración si las tuvieras) */}
 
-            {/* Reglas de Reserva */}
-            <SettingsCard title="Reglas de Reserva" icon={BookOpen}>
-              <InputField
-                label="Antelación máxima para reservar (días)"
-                id="bookingLeadTime"
-                type="number"
-                value={settings.bookingLeadTime}
-                onChange={handleChange}
-                helpText="Cuántos días a futuro pueden reservar los usuarios."
-              />
-              <InputField
-                label="Límite para cancelar (minutos antes)"
-                id="bookingCancelCutoff"
-                type="number"
-                value={settings.bookingCancelCutoff}
-                onChange={handleChange}
-                helpText="Ej: 120 (para 2 horas). 0 para no permitir."
-              />
-              <InputField
-                label="Máx. reservas activas por usuario"
-                id="maxBookingsPerUser"
-                type="number"
-                value={settings.maxBookingsPerUser}
-                onChange={handleChange}
-                helpText="Límite de reservas pendientes por usuario."
-              />
-            </SettingsCard>
-
-            {/* --- BLOQUE DE PAGOS ELIMINADO --- */}
-
-            {/* --- BLOQUE DE NOTIFICACIONES ELIMINADO --- */}
-
-            {/* Configuración de Tienda */}
-            <SettingsCard title="Configuración de Tienda" icon={Info}>
-              <SwitchField
-                label="Habilitar Tienda Pública"
-                id="shopEnabled"
-                checked={settings.shopEnabled !== 'false' && settings.shopEnabled !== false}
-                onChange={handleSwitchChange}
-                helpText="Mostrar u ocultar la tienda en el sitio público"
-              />
-            </SettingsCard>
-            
-          </div>
+        {/* --- Botón de Guardar --- */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={isSaving}
+            className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+              isSaving
+                ? 'bg-gray-500 cursor-not-allowed'
+                : 'bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500'
+            }`}
+          >
+            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+          </button>
         </div>
       </form>
     </div>
