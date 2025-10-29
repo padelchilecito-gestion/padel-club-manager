@@ -1,18 +1,14 @@
 // padelchilecito-gestion/padel-club-manager/padel-club-manager-e1b54ee9b27c8f286a95c978589cf18147777fb5/server/server.js
 const express = require('express');
-// const { logger, logErrors, errorHandler } = require('./middlewares/errorMiddleware'); // Comentado
 const routes = require('./routes');
 const { setupSocketIO } = require('./config/socket');
 const { logActivity } = require('./utils/logActivity');
-// const { connectToRabbitMQ } = require('./config/rabbitmq'); // Comentado
-// const { setupScheduledTasks } = require('./utils/scheduler'); // Comentado
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
 const cookieParser = require('cookie-parser');
-// const { protect, admin } = require('./middlewares/authMiddleware');
 
 // Cargar variables de entorno
 dotenv.config();
@@ -26,27 +22,40 @@ connectDB();
 
 const app = express();
 
-// --- CORRECCIÓN PARA RATE LIMITER (Advertencia X-Forwarded-For) ---
-// Indicar a Express que confíe en el primer proxy (Render usa uno)
 app.set('trust proxy', 1);
-// --- FIN DE CORRECCIÓN ---
 
-// Configuración de CORS
+// --- INICIO DE LA SOLUCIÓN DE CORS ---
+
+// Lista de orígenes permitidos (acepta strings y Expresiones Regulares)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://padel-club-manager.vercel.app',
-  'https://padel-club-manager-qhy1hsl2y-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-55zprq1ag-eduardo-miguel-riccis-projects.vercel.app',
-  'https://padel-club-manager-xi.vercel.app',
-  // --- AÑADIDO PARA SOLUCIONAR ERROR DE CORS ---
-  'https://padel-club-manager-gjz2ekj5a-eduardo-miguel-riccis-projects.vercel.app'
-  // ---------------------------------------------
+  'https://padel-club-manager.vercel.app', // Tu dominio principal
+  // Expresión Regular para TODAS las URLs temporales de Vercel:
+  /^https:\/\/padel-club-manager-.*-eduardo-miguel-riccis-projects\.vercel\.app$/
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // Permitir solicitudes sin 'origin' (como Postman o apps móviles)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Comprobar si el 'origin' coincide con la lista
+    let originIsAllowed = false;
+    for (const allowed of allowedOrigins) {
+      if (typeof allowed === 'string' && allowed === origin) {
+        originIsAllowed = true;
+        break;
+      }
+      if (allowed instanceof RegExp && allowed.test(origin)) {
+        originIsAllowed = true;
+        break;
+      }
+    }
+
+    if (originIsAllowed) {
       callback(null, true);
     } else {
       console.error(`CORS error: Origin ${origin} not allowed.`);
@@ -55,6 +64,8 @@ app.use(cors({
   },
   credentials: true,
 }));
+// --- FIN DE LA SOLUCIÓN DE CORS ---
+
 
 // Body parser, cookie parser
 app.use(express.json({ limit: '10kb' }));
@@ -69,16 +80,11 @@ app.get('/', (req, res) => {
   res.send('API Padel Club Manager está funcionando...');
 });
 
-// Middlewares de error (comentados)
-// app.use(logErrors);
-// app.use(errorHandler);
-// app.use(logger);
-
 const PORT = process.env.PORT || 10000;
 
 const server = http.createServer(app);
 
-// Configurar Socket.IO
+// Configurar Socket.IO (pasamos la misma lista de orígenes)
 const io = setupSocketIO(server, allowedOrigins);
 app.set('socketio', io);
 
@@ -86,8 +92,7 @@ app.set('socketio', io);
 server.listen(PORT, async () => {
   console.log(`Server started on port ${PORT}`);
   try {
-    // Conexión RabbitMQ (comentada)
-    // Tareas programadas (comentadas)
+    // ...
   } catch (error) {
     console.error('Error during server startup:', error);
   }
