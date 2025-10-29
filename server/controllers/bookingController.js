@@ -9,7 +9,7 @@ const { logActivity } = require('../utils/logActivity');
 const mercadopago = require('mercadopago'); // Ya lo tienes configurado, solo lo importamos
 
 // Importar tu configuración de Mercado Pago
-require('../config/mercadopago-Config'); // Esto cargará la configuración de MP
+require('../config/mercadopago-config'); // Esto cargará la configuración de MP
 
 
 // Helper para encontrar una cancha disponible (lógica simplificada)
