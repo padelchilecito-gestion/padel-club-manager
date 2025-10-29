@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/PosPage.jsx - CON DIAGNÓSTICO
+// frontend/src/pages/admin/PosPage.jsx - CORREGIDO (Muestra Imágenes)
 import React, { useState, useEffect } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
@@ -7,14 +7,14 @@ import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '
 import PosQRModal from '../../components/admin/PosQRModal';
 import { InlineLoading } from '../../components/ui/Feedback';
 
-// Componente interno para la grilla de productos
+// Componente interno para la grilla de productos - CORREGIDO PARA MOSTRAR IMAGEN
 const ProductGrid = ({ products, onAddToCart, loading }) => (
   <div className="bg-gray-800 p-4 rounded-lg h-[80vh] overflow-y-auto">
     <h2 className="text-2xl font-bold text-white mb-4">Productos</h2>
     {loading ? (
       <InlineLoading text="Cargando productos..." />
     ) : (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"> {/* Ajustado grid para imágenes */}
         { /* Si no hay productos DESPUÉS de filtrar, muestra un mensaje */ }
         {products.length === 0 && !loading && (
           <p className="text-gray-400 col-span-full text-center py-10">
@@ -25,11 +25,29 @@ const ProductGrid = ({ products, onAddToCart, loading }) => (
           <button
             key={product._id}
             onClick={() => onAddToCart(product)}
-            className="bg-gray-900 p-3 rounded-lg text-left hover:bg-cyan-900 transition-all shadow-lg"
+            className="bg-gray-900 rounded-lg text-left hover:bg-cyan-900 transition-all shadow-lg overflow-hidden flex flex-col" // Added flex
           >
-            <p className="text-white font-semibold truncate">{product.name}</p>
-            <p className="text-cyan-400 font-bold text-lg">${product.price}</p>
-            <p className="text-xs text-gray-400">Stock: {product.stock}</p>
+            {/* --- INICIO: AÑADIDO PARA MOSTRAR IMAGEN --- */}
+            <div className="w-full h-32 bg-gray-700 flex items-center justify-center"> {/* Placeholder aspect ratio */}
+              {product.imageUrl ? (
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover" // Cover ensures image fills space
+                  loading="lazy" // Lazy load images
+                />
+              ) : (
+                <ShoppingCartIcon className="h-12 w-12 text-gray-500" /> // Placeholder icon
+              )}
+            </div>
+            {/* --- FIN: AÑADIDO PARA MOSTRAR IMAGEN --- */}
+            <div className="p-3 flex-grow flex flex-col justify-between"> {/* Flex grow for text area */}
+              <div>
+                <p className="text-white font-semibold truncate text-sm mb-1">{product.name}</p>
+                <p className="text-cyan-400 font-bold text-base">${product.price}</p>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Stock: {product.stock}</p>
+            </div>
           </button>
         ))}
       </div>
@@ -37,9 +55,10 @@ const ProductGrid = ({ products, onAddToCart, loading }) => (
   </div>
 );
 
-// Componente interno para el carrito
+// Componente interno para el carrito (Sin cambios)
 const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
-  const updateQuantity = (productId, newQuantity) => {
+    // ... (código del carrito sin cambios) ...
+      const updateQuantity = (productId, newQuantity) => {
     if (newQuantity <= 0) {
       setCart((prev) => prev.filter((item) => item.productId !== productId));
     } else {
@@ -116,7 +135,8 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
   );
 };
 
-// Componente principal de la página
+
+// Componente principal de la página (Quitado el console.log)
 const PosPage = () => {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -128,15 +148,13 @@ const PosPage = () => {
       setLoading(true);
       const data = await productService.getProducts();
       
-      // --- ¡ESTE ES EL LOG QUE NECESITAMOS VER! ---
-      console.log('DATOS CRUDOS DEL PRODUCTO (ANTES DE FILTRAR):', JSON.stringify(data, null, 2)); // Usamos JSON.stringify para verlo mejor
-      // ---------------------------------------------
+      // Ya no necesitamos el log aquí
+      // console.log('DATOS CRUDOS DEL PRODUCTO (ANTES DE FILTRAR):', JSON.stringify(data, null, 2)); 
 
       setProducts(data.filter(p => p.stock > 0)); // Solo productos con stock > 0
     } catch (error) {
       toast.error('Error al cargar productos');
-      // --- Log del error si la llamada falla ---
-      console.error('Error en fetchProducts:', error);
+      console.error('Error en fetchProducts (POS Page):', error); // Mantenemos el log de error
     } finally {
       setLoading(false);
     }
