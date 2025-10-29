@@ -1,210 +1,244 @@
+// frontend/src/pages/admin/BookingsPage.jsx - CON BOTÓN DE PAGO MP
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
-import socket from '../../services/socketService';
-import { format } from 'date-fns';
-import { 
-  XCircleIcon, 
-  CurrencyDollarIcon, 
-  ChatBubbleBottomCenterTextIcon,
-  BanknotesIcon,
-  QrCodeIcon 
-} from '@heroicons/react/24/solid';
-// --- 1. IMPORTAR EL NUEVO MODAL ---
-import PaymentQRModal from '../../components/admin/PaymentQRModal';
+import { courtService } from '../../services/courtService';
+import { userService } from '../../services/userService';
+import BookingModal from '../../components/BookingModal';
+import PaymentQRModal from '../../components/admin/PaymentQRModal'; // Para el QR
+import { paymentService } from '../../services/paymentService'; // Para el Link MP
+import { toast } from 'react-hot-toast';
+import { format, startOfDay, endOfDay, addDays, subDays } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, QrCodeIcon, CreditCardIcon } from '@heroicons/react/24/solid';
+import { InlineLoading, ErrorMessage } from '../../components/ui/Feedback';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
+  const [courts, setCourts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const location = useLocation();
-
-  // --- 2. AÑADIR ESTADOS PARA EL MODAL ---
-  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false); // Para el QR
+  const [loadingPaymentLink, setLoadingPaymentLink] = useState(null); // Para el Link MP (guarda el ID del booking)
+
+  const fetchBookings = async (date) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const start = startOfDay(date);
+      const end = endOfDay(date);
+      // Asegurarse de que el servicio maneje bien las fechas ISO
+      const data = await bookingService.getBookings({ 
+        startDate: start.toISOString(), 
+        endDate: end.toISOString() 
+      });
+      setBookings(data);
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+      setError('No se pudieron cargar las reservas.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInitialData = async () => {
+    try {
+      const courtsData = await courtService.getCourts();
+      setCourts(courtsData);
+      const usersData = await userService.getUsers(); // Obtener usuarios para el modal
+      setUsers(usersData);
+    } catch (err) {
+      console.error("Error fetching initial data:", err);
+      setError('Error al cargar datos iniciales (canchas/usuarios).');
+    }
+  };
 
   useEffect(() => {
-    socket.connect();
+    fetchInitialData();
+    fetchBookings(selectedDate);
+  }, [selectedDate]);
 
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        const data = await bookingService.getAllBookings();
-        setBookings(data);
-      } catch (err) {
-        setError('No se pudieron cargar las reservas.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBookings();
-
-    const handleBookingUpdate = (updatedBooking) => {
-        setBookings(prevBookings => {
-            const index = prevBookings.findIndex(b => b._id === updatedBooking._id);
-            if (index !== -1) {
-                const newBookings = [...prevBookings];
-                newBookings[index] = updatedBooking;
-                return newBookings;
-            } else {
-                return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-            }
-        });
-    };
-
-    const handleBookingDelete = ({ id }) => {
-        setBookings(prevBookings => prevBookings.filter(b => b._id !== id));
-    };
-
-    socket.on('booking_update', handleBookingUpdate);
-    socket.on('booking_deleted', handleBookingDelete);
-
-    return () => {
-      socket.off('booking_update', handleBookingUpdate);
-      socket.off('booking_deleted', handleBookingDelete);
-      socket.disconnect();
-    };
-  }, [location.pathname]);
-
-  // Esta función ahora solo maneja pagos MANUALES (Efectivo, Transferencia)
-  const handleManualPayment = async (id, paymentMethod) => {
-    if (!paymentMethod) {
-      alert('Error: Método de pago no especificado.');
-      return;
-    }
-    try {
-        await bookingService.updateBookingStatus(id, { 
-          status: 'Confirmed', 
-          isPaid: true, 
-          paymentMethod: paymentMethod 
-        });
-    } catch (err) {
-        alert('Error al actualizar el pago.');
-    }
+  const handleDateChange = (days) => {
+    setSelectedDate(prevDate => startOfDay(addDays(prevDate, days)));
   };
 
-  const handleCancel = async (id) => {
-      if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
-          try {
-              await bookingService.cancelBooking(id);
-          } catch (err) {
-              alert('Error al cancelar la reserva.');
-          }
-      }
-  };
-
-  // --- 3. FUNCIÓN PARA ABRIR EL MODAL QR ---
-  const handleOpenQrModal = (booking) => {
-    setSelectedBooking(booking);
-    setQrModalOpen(true);
-  };
-  
-  // Función para cerrar el modal
-  const handleCloseQrModal = (paymentSuccess) => {
-    setQrModalOpen(false);
+  const handleSaveBooking = () => {
+    setShowBookingModal(false);
     setSelectedBooking(null);
-    // (No necesitamos refrescar, el socket.io ya actualizó la lista en 'handleBookingUpdate')
+    fetchBookings(selectedDate); // Recargar
   };
 
-  if (loading) return <div className="text-center p-8">Cargando reservas...</div>;
-  if (error) return <div className="text-center p-8 text-danger">{error}</div>;
+  const handleEditBooking = (booking) => {
+    setSelectedBooking(booking);
+    setShowBookingModal(true);
+  };
+
+  const handleDeleteBooking = async (id) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta reserva?')) {
+      try {
+        await bookingService.deleteBooking(id);
+        toast.success('Reserva eliminada');
+        fetchBookings(selectedDate); // Recargar
+      } catch (err) {
+        toast.error('Error al eliminar la reserva');
+        console.error("Error deleting booking:", err);
+      }
+    }
+  };
+
+  const handleShowPaymentModal = (booking) => {
+    setSelectedBooking(booking);
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = (paymentSuccess) => {
+    setShowPaymentModal(false);
+    setSelectedBooking(null);
+    if (paymentSuccess) {
+      fetchBookings(selectedDate); // Recargar si el pago fue exitoso
+    }
+  };
+
+  // --- NUEVA FUNCIÓN PARA PAGAR CON LINK MP ---
+  const handlePayWithMP = async (bookingId) => {
+    setLoadingPaymentLink(bookingId); // Indicar que se está cargando para este booking
+    try {
+      const data = await paymentService.generatePaymentLink(bookingId);
+      if (data.init_point) {
+        window.open(data.init_point, '_blank'); // Abrir link en nueva pestaña
+      } else {
+        throw new Error('No se recibió el link de pago (init_point)');
+      }
+    } catch (err) {
+      console.error("Error generating MP Link:", err);
+      toast.error(err.message || 'No se pudo generar el link de Mercado Pago');
+    } finally {
+      setLoadingPaymentLink(null); // Quitar indicador de carga
+    }
+  };
+  // ------------------------------------------
 
   return (
-    <div className="container mx-auto p-4 md:p-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary mb-4 md:mb-0">Gestión de Turnos</h1>
+    <div className="p-6 bg-gray-900 min-h-screen text-white">
+      <h1 className="text-3xl font-bold mb-6 text-cyan-400">Gestión de Reservas</h1>
+
+      {/* Selector de Fecha */}
+      <div className="mb-6 flex justify-between items-center bg-gray-800 p-4 rounded-lg shadow-md">
+        <button onClick={() => handleDateChange(-1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
+          <ChevronLeftIcon className="h-6 w-6" />
+        </button>
+        <h2 className="text-xl font-semibold capitalize">
+          {format(selectedDate, 'EEEE dd \'de\' MMMM \'de\' yyyy', { locale: es })}
+        </h2>
+        <button onClick={() => handleDateChange(1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
+          <ChevronRightIcon className="h-6 w-6" />
+        </button>
+        <button
+          onClick={() => { setSelectedBooking(null); setShowBookingModal(true); }}
+          className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all ml-4"
+        >
+          <PlusIcon className="h-5 w-5 mr-2" />
+          Nueva Reserva
+        </button>
       </div>
 
-      <div className="bg-dark-secondary shadow-2xl rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-text-secondary">
-            <thead className="text-xs text-text-primary uppercase bg-dark-primary/50">
-              <tr>
-                <th scope="col" className="px-6 py-4">Cliente</th>
-                <th scope="col" className="px-6 py-4 hidden sm:table-cell">Cancha</th>
-                <th scope="col" className="px-6 py-4">Horario</th>
-                <th scope="col" className="px-6 py-4">Estado</th>
-                <th scope="col" className="px-6 py-4 hidden md:table-cell">Pago</th>
-                <th scope="col" className="px-6 py-4 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {bookings.map((booking) => (
-                <tr key={booking._id} className="hover:bg-dark-primary/50 transition-colors">
-                  
-                  <td className="px-6 py-4 font-medium text-text-primary whitespace-nowrap">
-                    <a
-                      href={`https://wa.me/${booking.user.phone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Enviar WhatsApp a ${booking.user.name}`}
-                      className="flex items-center gap-2 hover:text-secondary transition-colors"
-                    >
-                      <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-green-light" />
-                      {`${booking.user.name} ${booking.user.lastName || ''}`}
-                    </a>
-                  </td>
+      {loading && <InlineLoading text="Cargando reservas..." />}
+      {error && !loading && <ErrorMessage message={error} />}
 
-                  <td className="px-6 py-4 hidden sm:table-cell">{booking.court?.name || 'N/a'}</td>
-                  <td className="px-6 py-4">
-                      {format(new Date(booking.startTime), 'dd/MM/yy HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
-                  </td>
-                  <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                          booking.status === 'Confirmed' ? 'bg-green-dark text-white' :
-                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 
-                          booking.status === 'Completed' ? 'bg-blue-dark text-white' : 
-                          booking.status === 'NoShow' ? 'bg-gray-light text-dark-primary' : 
-                          'bg-yellow-dark text-dark-primary' // Pending
-                      }`}>
-                          {booking.status}
-                      </span>
-                  </td>
-                  <td className="px-6 py-4 hidden md:table-cell">
-                       <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                          booking.isPaid ? 'bg-secondary text-dark-primary' : 'bg-gray-light text-white'
-                      }`}>
-                          {/* --- 4. TEXTO DE PAGO MEJORADO --- */}
-                          {booking.isPaid ? `Pagado (${booking.paymentMethod || 'N/A'})` : 'Pendiente'}
-                       </span>
-                  </td>
-                  
-                  <td className="px-6 py-4 flex items-center justify-center gap-3">
-                      {!booking.isPaid && (booking.status === 'Confirmed' || booking.status === 'Pending') && (
-                           <>
-                            {/* Botón Efectivo (Manual) */}
-                            <button onClick={() => handleManualPayment(booking._id, 'Efectivo')} className="text-green-light hover:text-green-dark transition-colors" title="Pagar con Efectivo">
-                                <CurrencyDollarIcon className="h-6 w-6" />
-                            </button>
-                            {/* Botón Transferencia (Manual) */}
-                             <button onClick={() => handleManualPayment(booking._id, 'Transferencia')} className="text-blue-400 hover:text-blue-300 transition-colors" title="Pagar con Transferencia">
-                                <BanknotesIcon className="h-6 w-6" />
-                            </button>
-                            {/* --- 5. BOTÓN QR ABRE EL MODAL --- */}
-                             <button onClick={() => handleOpenQrModal(booking)} className="text-cyan-400 hover:text-cyan-300 transition-colors" title="Pagar con QR Mercado Pago">
-                                <QrCodeIcon className="h-6 w-6" />
-                            </button>
-                           </>
-                      )}
-                      {booking.status !== 'Cancelled' && (
-                           <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400 transition-colors" title="Cancelar Reserva">
-                              <XCircleIcon className="h-6 w-6" />
-                          </button>
-                      )}
-                  </td>
+      {!loading && !error && (
+        <div className="bg-gray-800 shadow-xl rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full table-auto">
+              <thead className="bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Hora</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Cancha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Precio</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
+                {bookings.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-10 text-center text-gray-400">
+                      No hay reservas para esta fecha.
+                    </td>
+                  </tr>
+                ) : (
+                  bookings.map((booking) => (
+                    <tr key={booking._id} className="hover:bg-gray-700/50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                        {format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{booking.court?.name || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{booking.user?.name || 'N/A'} {booking.user?.lastName || ''}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${booking.price}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          booking.isPaid ? 'bg-green-800 text-green-100' : 'bg-yellow-800 text-yellow-100'
+                        }`}>
+                          {booking.isPaid ? 'Pagado' : 'Pendiente'}
+                        </span>
+                         {/* Mostramos el método si está pagado */}
+                         {booking.isPaid && booking.paymentMethod && (
+                           <span className="text-xs text-gray-400 ml-2">({booking.paymentMethod})</span>
+                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        {!booking.isPaid && (
+                          <>
+                            {/* BOTÓN MOSTRAR QR */}
+                            <button 
+                              onClick={() => handleShowPaymentModal(booking)} 
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors"
+                              title="Mostrar QR para pagar"
+                            >
+                              <QrCodeIcon className="h-4 w-4 mr-1"/> QR
+                            </button>
+                            {/* NUEVO BOTÓN PAGAR CON MP (LINK) */}
+                            <button 
+                              onClick={() => handlePayWithMP(booking._id)} 
+                              disabled={loadingPaymentLink === booking._id} // Deshabilitar mientras carga este link
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors disabled:opacity-50"
+                              title="Generar y abrir link de Mercado Pago"
+                            >
+                              <CreditCardIcon className="h-4 w-4 mr-1"/> 
+                              {loadingPaymentLink === booking._id ? 'Generando...' : 'Pagar MP'}
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => handleEditBooking(booking)} className="text-cyan-400 hover:text-cyan-300" title="Editar">Editar</button>
+                        <button onClick={() => handleDeleteBooking(booking._id)} className="text-red-500 hover:text-red-400" title="Eliminar">Eliminar</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      
-      {/* --- 6. RENDERIZAR EL MODAL --- */}
-      {qrModalOpen && selectedBooking && (
-        <PaymentQRModal 
-          booking={selectedBooking} 
-          onClose={handleCloseQrModal} 
+      )}
+
+      {showBookingModal && (
+        <BookingModal
+          booking={selectedBooking}
+          courts={courts}
+          users={users} // Pasar usuarios al modal
+          onClose={() => { setShowBookingModal(false); setSelectedBooking(null); }}
+          onSave={handleSaveBooking}
+          selectedDate={selectedDate} // Pasar fecha seleccionada para pre-rellenar
+        />
+      )}
+
+      {showPaymentModal && selectedBooking && (
+        <PaymentQRModal
+          booking={selectedBooking}
+          onClose={handleClosePaymentModal}
         />
       )}
     </div>
