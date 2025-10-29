@@ -73,7 +73,10 @@ const deleteBooking = async (id) => {
 // Verificar disponibilidad para una cancha y fecha
 const checkAvailability = async (courtId, date) => {
   try {
-    const dateString = format(new Date(date), 'yyyy-MM-dd'); // Asegurar formato YYYY-MM-DD
+    // Asegurar que la fecha se envíe en formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ) o YYYY-MM-DD
+    // El backend espera ISO o YYYY-MM-DD según la ruta. Verifiquemos /availability/:courtId
+    // La ruta espera 'YYYY-MM-DD' como query param 'date'.
+    const dateString = format(new Date(date), 'yyyy-MM-dd'); 
     const { data } = await api.get(`/bookings/availability/${courtId}?date=${dateString}`);
     return data;
   } catch (error) {
@@ -83,7 +86,7 @@ const checkAvailability = async (courtId, date) => {
 };
 
 
-// --- INICIO DE LA CORRECCIÓN ---
+// --- ASEGÚRATE DE QUE ESTA SECCIÓN ESTÉ EXACTAMENTE ASÍ ---
 // Exportar un objeto que contenga TODAS las funciones definidas arriba
 export const bookingService = {
   getBookings,
@@ -91,6 +94,6 @@ export const bookingService = {
   createBooking,
   updateBooking,
   deleteBooking,
-  checkAvailability // <-- AÑADIR ESTA LÍNEA
+  checkAvailability // <-- ¡LA FUNCIÓN DEBE ESTAR AQUÍ!
 };
-// --- FIN DE LA CORRECCIÓN ---
+// --- ---
