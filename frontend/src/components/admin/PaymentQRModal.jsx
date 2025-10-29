@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 
 const PaymentQRModal = ({ booking, onClose }) => {
   // Quitamos estados relacionados al 'webPaymentUrl'
-  const [qrValueString, setQrValueString] = useState(null); 
+  const [qrValueString, setQrValueString] = useState(null);
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(true); // Inicia cargando para generar QR automáticamente
   const [error, setError] = useState(null);
@@ -22,7 +22,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
       if (booking && updatedBooking._id === booking._id && updatedBooking.isPaid) {
         console.log(`💰 Pago confirmado para booking ${booking._id}`);
         setPaymentStatus('success');
-        setTimeout(() => { onClose(true); }, 2500);
+        setTimeout(() => { onClose(true); }, 2500); // Llama a onClose con 'true' para indicar éxito
       }
     };
     socket.on('booking_update', handleBookingUpdate);
@@ -33,11 +33,11 @@ const PaymentQRModal = ({ booking, onClose }) => {
         setLoading(true);
         setError(null);
         console.log(`Solicitando QR para booking ${booking._id}`);
-        
-        const data = await paymentService.generateBookingQR(booking._id);
-        
+
+        const data = await paymentService.generateBookingQR(booking._id); // Llama a la función que devuelve init_point
+
         if (data.init_point) {
-          setQrValueString(data.init_point); 
+          setQrValueString(data.init_point); // Guardamos la URL para el QR
           setAmount(data.amount || booking.price);
           console.log('✅ URL de pago (para QR) generada exitosamente');
         } else {
@@ -53,6 +53,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
 
     generateQR(); // Llamar a la función
 
+    // Limpieza al desmontar
     return () => {
       socket.off('booking_update', handleBookingUpdate);
       socket.disconnect();
@@ -64,11 +65,11 @@ const PaymentQRModal = ({ booking, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
       <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-        
+
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 rounded-t-xl relative"> {/* Cambiado color */}
-          <button 
-            onClick={() => onClose(false)} 
+          <button
+            onClick={() => onClose(false)} // Llama a onClose con 'false' si se cierra manualmente
             className="absolute top-4 right-4 text-white hover:text-gray-200"
             aria-label="Cerrar"
           >
@@ -83,7 +84,7 @@ const PaymentQRModal = ({ booking, onClose }) => {
         {/* Body */}
         <div className="p-6">
           {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
-          
+
           {loading && <InlineLoading text="Generando código QR..." />}
 
           {/* Modo QR (Ahora es el único modo) */}
@@ -98,13 +99,13 @@ const PaymentQRModal = ({ booking, onClose }) => {
                    Total: ${amount}
                  </p>
                </div>
-              
+
               {/* QR Code */}
               <div className="bg-white p-6 rounded-lg flex flex-col items-center"> {/* Ajustado padding */}
-                <QRCodeSVG 
-                  value={qrValueString} 
+                <QRCodeSVG
+                  value={qrValueString} // El valor es la URL init_point
                   size={240} // Ligeramente más pequeño
-                  level="H" 
+                  level="H"
                   includeMargin={true}
                   className="shadow-xl"
                 />
