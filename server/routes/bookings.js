@@ -1,45 +1,29 @@
+// server/routes/bookings.js
+
 const express = require('express');
 const router = express.Router();
-const {
-  createBooking,
-  getBookings,
-  getBookingById,
-  updateBookingStatus,
-  cancelBooking,
-  getBookingAvailability,
+const { 
+  createBooking, // Tu función existente para crear reservas
+  createBookingCash, // Nueva función para pago en efectivo
+  createBookingMercadoPago, // Nueva función para Mercado Pago
+  getBookings, 
+  getBookingById, 
+  updateBooking, 
+  deleteBooking 
 } = require('../controllers/bookingController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-// @route   POST api/bookings
-// @desc    Create a new booking
-// @access  Public
-router.post('/', createBooking);
+// Rutas públicas (no requieren autenticación)
+router.post('/', createBooking); // Si tenías una ruta genérica de creación (revisar si entra en conflicto)
+router.post('/cash', createBookingCash);
+router.post('/mercadopago', createBookingMercadoPago);
 
-// @route   GET api/bookings/availability
-// @desc    Get availability for a specific date
-// @access  Public
-router.get('/availability', getBookingAvailability);
-console.log('[Routes] Booking route /availability registered.');
-
-// @route   GET api/bookings
-// @desc    Get all bookings
-// @access  Operator/Admin
-router.get('/', protect, getBookings);
-
-// @route   GET api/bookings/:id
-// @desc    Get a single booking by ID
-// @access  Operator/Admin
-router.get('/:id', protect, getBookingById);
-
-// @route   PUT api/bookings/:id/status
-// @desc    Update booking status (confirm, etc.)
-// @access  Operator/Admin
-router.put('/:id/status', protect, updateBookingStatus);
-
-// @route   PUT api/bookings/:id/cancel
-// @desc    Cancel a booking
-// @access  Operator/Admin
-router.put('/:id/cancel', protect, cancelBooking);
-
+// Rutas protegidas (requieren autenticación)
+router.route('/')
+  .get(protect, authorize(['Admin', 'Operator']), getBookings); 
+router.route('/:id')
+  .get(protect, getBookingById) 
+  .put(protect, authorize(['Admin', 'Operator']), updateBooking)
+  .delete(protect, authorize(['Admin', 'Operator']), deleteBooking);
 
 module.exports = router;
