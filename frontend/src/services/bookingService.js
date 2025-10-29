@@ -1,4 +1,4 @@
-// frontend/src/services/bookingService.js - CORREGIDO
+// frontend/src/services/bookingService.js - CORREGIDO (VERSIÓN FINAL)
 import api from './api';
 import { format } from 'date-fns'; // Necesario para formatear fechas si se usa
 
@@ -8,7 +8,7 @@ const getBookings = async (filters = {}) => {
     // Convertir fechas a ISO string si existen
     if (filters.startDate) filters.startDate = new Date(filters.startDate).toISOString();
     if (filters.endDate) filters.endDate = new Date(filters.endDate).toISOString();
-    
+
     const { data } = await api.get('/bookings', { params: filters });
     return data;
   } catch (error) {
@@ -76,7 +76,7 @@ const checkAvailability = async (courtId, date) => {
     // Asegurar que la fecha se envíe en formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ) o YYYY-MM-DD
     // El backend espera ISO o YYYY-MM-DD según la ruta. Verifiquemos /availability/:courtId
     // La ruta espera 'YYYY-MM-DD' como query param 'date'.
-    const dateString = format(new Date(date), 'yyyy-MM-dd'); 
+    const dateString = format(new Date(date), 'yyyy-MM-dd');
     const { data } = await api.get(`/bookings/availability/${courtId}?date=${dateString}`);
     return data;
   } catch (error) {
@@ -86,7 +86,7 @@ const checkAvailability = async (courtId, date) => {
 };
 
 
-// --- ASEGÚRATE DE QUE ESTA SECCIÓN ESTÉ EXACTAMENTE ASÍ ---
+// --- LA PARTE MÁS IMPORTANTE ---
 // Exportar un objeto que contenga TODAS las funciones definidas arriba
 export const bookingService = {
   getBookings,
@@ -94,6 +94,6 @@ export const bookingService = {
   createBooking,
   updateBooking,
   deleteBooking,
-  checkAvailability // <-- ¡LA FUNCIÓN DEBE ESTAR AQUÍ!
+  checkAvailability // <-- ¡ASEGÚRATE DE QUE ESTÉ AQUÍ!
 };
 // --- ---
