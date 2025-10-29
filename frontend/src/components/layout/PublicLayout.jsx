@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getSettings } from '../../services/settingService'; // Para verificar si la tienda está habilitada
-
+import settingService from '../../services/settingService'; // Para verificar si la tienda está habilitada
 const PublicLayout = () => {
     const { user, logout } = useAuth(); // Usamos 'user' en lugar de 'isAdmin' para saber si alguien está logueado
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
