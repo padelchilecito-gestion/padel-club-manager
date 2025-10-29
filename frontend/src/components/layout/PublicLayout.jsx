@@ -12,7 +12,7 @@ const PublicLayout = () => {
     useEffect(() => {
         const fetchShopStatus = async () => {
             try {
-                const settings = await getSettings();
+                const settings = await settingService.getSettings();
                 setShopEnabled(settings.SHOP_ENABLED === 'true');
             } catch (error) {
                 console.error("Error al cargar la configuración de la tienda:", error);
