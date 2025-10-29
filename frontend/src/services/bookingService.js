@@ -1,75 +1,96 @@
-import apiClient from './api';
+// frontend/src/services/bookingService.js - CORREGIDO
+import api from './api';
+import { format } from 'date-fns'; // Necesario para formatear fechas si se usa
 
-const getAvailability = async (date) => {
+// Obtener reservas (con filtros opcionales)
+const getBookings = async (filters = {}) => {
   try {
-    const response = await apiClient.get('/bookings/availability', {
-      params: { date },
-    });
-    return response.data;
+    // Convertir fechas a ISO string si existen
+    if (filters.startDate) filters.startDate = new Date(filters.startDate).toISOString();
+    if (filters.endDate) filters.endDate = new Date(filters.endDate).toISOString();
+    
+    const { data } = await api.get('/bookings', { params: filters });
+    return data;
   } catch (error) {
-    console.error('Error fetching availability:', error);
-    throw error.response?.data || error;
+    console.error('Error fetching bookings:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al obtener las reservas');
   }
 };
 
-// ✅ CORRECCIÓN: Cambiar la firma de la función para que coincida con el uso
+// Obtener una reserva por ID
+const getBookingById = async (id) => {
+  try {
+    const { data } = await api.get(`/bookings/${id}`);
+    return data;
+  } catch (error) {
+    console.error(`Error fetching booking ${id}:`, error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al obtener la reserva');
+  }
+};
+
+// Crear una nueva reserva
 const createBooking = async (bookingData) => {
   try {
-    // bookingData ya tiene la estructura correcta: { slots, user, paymentMethod }
-    console.log('📤 Enviando al backend:', bookingData);
-    const response = await apiClient.post('/bookings', bookingData);
-    return response.data;
+    const { data } = await api.post('/bookings', bookingData);
+    return data;
   } catch (error) {
-    console.error('Error creating booking:', error);
-    throw error.response?.data || error;
+    console.error('Error creating booking:', error.response?.data);
+    // Extraer mensajes de validación si existen
+    if (error.response?.data?.errors) {
+      const messages = error.response.data.errors.map(err => err.msg).join(', ');
+      throw new Error(messages || 'Error al crear la reserva');
+    }
+    throw new Error(error.response?.data?.message || 'Error al crear la reserva');
   }
 };
 
-const createPaymentPreference = async (paymentData) => {
+// Actualizar una reserva
+const updateBooking = async (id, bookingData) => {
   try {
-    const response = await apiClient.post('/payments/create-preference', paymentData);
-    return response.data;
+    const { data } = await api.put(`/bookings/${id}`, bookingData);
+    return data;
   } catch (error) {
-    console.error('Error creating payment preference:', error);
-    throw error.response?.data || error;
+    console.error(`Error updating booking ${id}:`, error.response?.data);
+     if (error.response?.data?.errors) {
+       const messages = error.response.data.errors.map(err => err.msg).join(', ');
+       throw new Error(messages || 'Error al actualizar la reserva');
+     }
+    throw new Error(error.response?.data?.message || 'Error al actualizar la reserva');
   }
 };
 
-const getAllBookings = async () => {
+// Eliminar una reserva
+const deleteBooking = async (id) => {
   try {
-    const response = await apiClient.get('/bookings');
-    return response.data;
+    const { data } = await api.delete(`/bookings/${id}`);
+    return data;
   } catch (error) {
-    console.error('Error fetching all bookings:', error);
-    throw error;
+    console.error(`Error deleting booking ${id}:`, error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al eliminar la reserva');
   }
 };
 
-const updateBookingStatus = async (id, statusData) => {
+// Verificar disponibilidad para una cancha y fecha
+const checkAvailability = async (courtId, date) => {
   try {
-    const response = await apiClient.put(`/bookings/${id}/status`, statusData);
-    return response.data;
+    const dateString = format(new Date(date), 'yyyy-MM-dd'); // Asegurar formato YYYY-MM-DD
+    const { data } = await api.get(`/bookings/availability/${courtId}?date=${dateString}`);
+    return data;
   } catch (error) {
-    console.error('Error updating booking status:', error);
-    throw error.response?.data || error;
+    console.error('Error checking availability:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al verificar disponibilidad');
   }
 };
 
-const cancelBooking = async (id) => {
-  try {
-    const response = await apiClient.put(`/bookings/${id}/cancel`);
-    return response.data;
-  } catch (error) {
-    console.error('Error cancelling booking:', error);
-    throw error.response?.data || error;
-  }
-};
 
+// --- INICIO DE LA CORRECCIÓN ---
+// Exportar un objeto que contenga TODAS las funciones definidas arriba
 export const bookingService = {
-  getAvailability,
+  getBookings,
+  getBookingById,
   createBooking,
-  createPaymentPreference,
-  getAllBookings,
-  updateBookingStatus,
-  cancelBooking,
+  updateBooking,
+  deleteBooking,
+  checkAvailability // <-- AÑADIR ESTA LÍNEA
 };
+// --- FIN DE LA CORRECCIÓN ---
