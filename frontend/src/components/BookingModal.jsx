@@ -1,156 +1,197 @@
-import React, { useState } from 'react';
-import { format, addMinutes } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { XMarkIcon } from '@heroicons/react/24/solid';
-import { createBooking } from '../services/bookingService'; // Importar la función directamente
-import { InlineLoading, ErrorMessage } from './ui/Feedback';
+// frontend/src/components/BookingModal.jsx
+import React, { useState, useEffect } from 'react';
+import { createBooking } from '../services/bookingService'; // Asume que tienes este servicio
+import toast from 'react-hot-toast';
 
-// Recibe 'slots' (array) y 'settings'
-const BookingModal = ({ slots, settings, onClose, onBookingSuccess }) => {
-  if (!slots || slots.length === 0) return null;
-
-  // --- Punto 3: Formulario de Cliente ---
-  const [formData, setFormData] = useState({
-    name: '',
-    lastName: '',
-    phone: '',
-  });
-  
-  // --- Punto 4: Opciones de Pago ---
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo'); 
-  
+const BookingModal = ({ 
+  isOpen, 
+  onClose, 
+  courtId, 
+  date, 
+  time, 
+  price: initialPrice, // Renombrado para no chocar con el estado 'price'
+  userPhone, 
+  userName, 
+  userLastName,
+  onSubmit, // Función para manejar el envío de la reserva
+  currency = '$', // Moneda por defecto
+  slotDuration, // Duración del slot para calcular precio
+}) => {
+  const [clientName, setClientName] = useState(userName || '');
+  const [clientLastName, setClientLastName] = useState(userLastName || '');
+  const [clientPhone, setClientPhone] = useState(userPhone || '');
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' o 'mercadopago'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // --- Punto 5: Resumen y Totalización ---
-  const sortedSlots = slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const firstSlot = sortedSlots[0];
-  const lastSlot = sortedSlots[sortedSlots.length - 1];
   
-  const totalSlots = slots.length;
-  const totalPrice = slots.reduce((total, slot) => total + slot.price, 0);
-  const totalDuration = totalSlots * (settings.slotDuration || 30);
+  // Calcula un precio estimado si no se proporciona
+  // Esto es un placeholder, la lógica de precios real debería ser más robusta
+  const calculatedPrice = initialPrice || (slotDuration ? (slotDuration / 60 * 1000) : 0); // Ej: $1000 por hora
+  const displayPrice = calculatedPrice > 0 ? `${currency} ${calculatedPrice.toFixed(2)}` : 'A Confirmar';
 
-  // Calcular hora de inicio y fin
-  const dateObj = new Date(firstSlot.date + 'T00:00:00');
-  const startTimeStr = firstSlot.startTime;
-  const lastSlotTime = new Date(`1970-01-01T${lastSlot.startTime}`);
-  const endTimeObj = addMinutes(lastSlotTime, settings.slotDuration || 30);
-  const endTimeStr = format(endTimeObj, 'HH:mm');
+  useEffect(() => {
+    if (isOpen) {
+      setClientName(userName || '');
+      setClientLastName(userLastName || '');
+      setClientPhone(userPhone || '');
+      setPaymentMethod('cash'); // Resetear método de pago al abrir
+      setError(null);
+    }
+  }, [isOpen, userName, userLastName, userPhone]);
 
-  // Enviar reserva
+  if (!isOpen) return null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.lastName || !formData.phone) {
-      setError('Por favor completa todos tus datos.');
-      return;
-    }
-    
     setLoading(true);
     setError(null);
-    
+
+    if (!clientName || !clientPhone) {
+      setError('El nombre y el teléfono del cliente son obligatorios.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const bookingData = {
-        slots: slots, // Array de slots seleccionados
-        user: formData, // Datos del cliente
-        paymentMethod: paymentMethod, // Forma de pago
+        court: courtId, // Podría ser null si el backend asigna
+        startTime: `${date}T${time}:00`, // Formato ISO para el backend
+        duration: slotDuration, // Duración del turno en minutos
+        clientName,
+        clientLastName,
+        clientPhone,
+        paymentMethod,
+        // status: 'Pending', // El backend debería asignar el estado inicial
+        // price: calculatedPrice, // Podrías enviar el precio calculado
       };
 
-      // Llamar al 'createBooking' modificado del backend
-      await createBooking(bookingData);
-      
-      setLoading(false);
-      onBookingSuccess(); // Cierra el modal y refresca
-      
+      // Si el componente padre pasa una función onSubmit, la usamos
+      // Esto permite que SimpleTimeSlotFinder maneje la llamada al servicio de booking
+      if (onSubmit) {
+        await onSubmit(bookingData);
+      } else {
+        // Si no, este modal llama directamente al servicio (menos flexible)
+        // await createBooking(bookingData); 
+        // toast.success('Reserva creada con éxito!');
+        // onClose();
+      }
+
     } catch (err) {
+      console.error("Error al crear la reserva:", err);
+      const errorMessage = err.response?.data?.message || err.message || 'Error al crear la reserva.';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
-      setError(err.message || 'Error al crear la reserva.');
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-          <XMarkIcon className="h-7 w-7" />
-        </button>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-gray-700">
         <h2 className="text-2xl font-bold text-white mb-4">Confirmar Reserva</h2>
-        
-        {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
+        <p className="text-gray-300 mb-4">
+          Cancha: {courtId ? 'Cancha ' + courtId : 'Asignación automática'}
+          <br />
+          Fecha: {date}
+          <br />
+          Hora: {time}
+          <br />
+          Precio: <span className="font-semibold text-green-400">{displayPrice}</span>
+        </p>
 
         <form onSubmit={handleSubmit}>
-          {/* --- Punto 5: Resumen --- */}
-          <div className="bg-gray-900 p-4 rounded-lg mb-4">
-            <h3 className="text-lg font-semibold text-indigo-400 mb-3">Resumen de tu Reserva</h3>
-            <p className="text-gray-300">
-              <strong className="text-gray-400">Fecha:</strong> {format(dateObj, "EEEE, dd 'de' MMMM", { locale: es })}
-            </p>
-            <p className="text-gray-300">
-              <strong className="text-gray-400">Horario:</strong> {startTimeStr} a {endTimeStr} ({totalDuration} min)
-            </p>
-            <p className="text-gray-300">
-              <strong className="text-gray-400">Cancha:</strong> {firstSlot.courtName} (Asignada)
-            </p>
-            <p className="text-2xl font-bold text-white mt-3">
-              <strong className="text-gray-400">Total:</strong> ${totalPrice}
-            </p>
-          </div>
-
-          {/* --- Punto 3: Formulario Cliente --- */}
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-indigo-400 mb-3">Tus Datos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-300">Nombre</label>
-                <input type="text" name="name" id="name" value={formData.name} onChange={handleInputChange} required className="w-full mt-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-white" />
-              </div>
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-300">Apellido</label>
-                <input type="text" name="lastName" id="lastName" value={formData.lastName} onChange={handleInputChange} required className="w-full mt-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-white" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-300">Teléfono (WhatsApp)</label>
-              <input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleInputChange} required placeholder="Ej: 3825123456" className="w-full mt-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-white" />
-            </div>
+            <label htmlFor="clientName" className="block text-gray-300 text-sm font-bold mb-2">
+              Nombre:
+            </label>
+            <input
+              type="text"
+              id="clientName"
+              className="shadow appearance-none border border-gray-700 rounded w-full py-2 px-3 text-white leading-tight focus:outline-none focus:shadow-outline bg-gray-700"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              required
+              disabled={loading}
+            />
           </div>
-
-          {/* --- Punto 4: Opciones de Pago --- */}
+          <div className="mb-4">
+            <label htmlFor="clientLastName" className="block text-gray-300 text-sm font-bold mb-2">
+              Apellido:
+            </label>
+            <input
+              type="text"
+              id="clientLastName"
+              className="shadow appearance-none border border-gray-700 rounded w-full py-2 px-3 text-white leading-tight focus:outline-none focus:shadow-outline bg-gray-700"
+              value={clientLastName}
+              onChange={(e) => setClientLastName(e.target.value)}
+              disabled={loading}
+            />
+          </div>
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-indigo-400 mb-3">Forma de Pago</h3>
-            <div className="flex gap-4">
-              <label className={`flex-1 p-4 rounded-lg border-2 cursor-pointer ${paymentMethod === 'Efectivo' ? 'border-indigo-500 bg-indigo-900' : 'border-gray-700 bg-gray-900'}`}>
-                <input type="radio" name="paymentMethod" value="Efectivo" checked={paymentMethod === 'Efectivo'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
-                <span className="text-white font-bold">Efectivo en el Club</span>
+            <label htmlFor="clientPhone" className="block text-gray-300 text-sm font-bold mb-2">
+              Teléfono:
+            </label>
+            <input
+              type="tel"
+              id="clientPhone"
+              className="shadow appearance-none border border-gray-700 rounded w-full py-2 px-3 text-white leading-tight focus:outline-none focus:shadow-outline bg-gray-700"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-gray-300 text-sm font-bold mb-2">
+              Método de Pago:
+            </label>
+            <div className="flex items-center space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio text-purple-600 focus:ring-purple-500"
+                  name="paymentMethod"
+                  value="cash"
+                  checked={paymentMethod === 'cash'}
+                  onChange={() => setPaymentMethod('cash')}
+                  disabled={loading}
+                />
+                <span className="ml-2 text-white">Efectivo</span>
               </label>
-              <label className={`flex-1 p-4 rounded-lg border-2 cursor-pointer ${paymentMethod === 'Mercado Pago' ? 'border-indigo-500 bg-indigo-900' : 'border-gray-700 bg-gray-900'}`}>
-                <input type="radio" name="paymentMethod" value="Mercado Pago" checked={paymentMethod === 'Mercado Pago'} onChange={(e) => setPaymentMethod(e.target.value)} className="hidden" />
-                <span className="text-white font-bold">Mercado Pago</span>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio text-purple-600 focus:ring-purple-500"
+                  name="paymentMethod"
+                  value="mercadopago"
+                  checked={paymentMethod === 'mercadopago'}
+                  onChange={() => setPaymentMethod('mercadopago')}
+                  disabled={loading}
+                />
+                <span className="ml-2 text-white">Mercado Pago</span>
               </label>
             </div>
           </div>
 
-          {/* Acciones */}
-          <div className="mt-6 flex justify-end gap-4">
+          {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
+
+          <div className="flex justify-end space-x-4">
             <button
               type="button"
               onClick={onClose}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors"
               disabled={loading}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-md transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors"
               disabled={loading}
-              className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-md transition-colors disabled:opacity-50"
             >
-              {loading ? <InlineLoading text="Confirmando..." /> : 'Confirmar Reserva'}
+              {loading ? 'Reservando...' : 'Confirmar Reserva'}
             </button>
           </div>
         </form>
