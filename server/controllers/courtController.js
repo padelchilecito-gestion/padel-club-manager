@@ -2,7 +2,6 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// --- CORRECCIÓN: Importar 'addDays' ---
 const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format, addDays } = require('date-fns'); 
 const { fromZonedTime } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
@@ -124,6 +123,17 @@ const getAggregatedAvailability = async (req, res) => {
     ];
     const dayName = dayKeys[dayIndex];
 
+    // --- NUEVA VALIDACIÓN: Revisar si el día está abierto ---
+    const isOpenKey = `${dayName}_IS_OPEN`;
+    // El valor se guarda como string 'true'/'false' o puede no existir (undefined)
+    const isOpen = settings[isOpenKey] === 'true'; 
+
+    if (!isOpen) {
+      console.log(`Día ${dayName} está configurado como CERRADO.`);
+      return res.json({ availableSlots: [] }); // Devolver vacío si está cerrado
+    }
+    // --- FIN DE VALIDACIÓN ---
+
     const openTimeKey = `${dayName}_OPENING_HOUR`;
     const closeTimeKey = `${dayName}_CLOSING_HOUR`;
 
@@ -131,16 +141,15 @@ const getAggregatedAvailability = async (req, res) => {
     const closeTime = settings[closeTimeKey];
     const slotDuration = parseInt(settings.SLOT_DURATION, 10); 
 
-    // 3. Validar configuración
+    // 3. Validar configuración (solo si está abierto)
     if (!openTime || !closeTime || !slotDuration || slotDuration <= 0) {
       console.error(`❌ Validación de settings falló para ${dayName}:`, { openTime, closeTime, slotDuration });
       return res.status(400).json({
-        message: `La configuración para ${dayName} no está completa. Faltan horas de apertura/cierre o duración del turno.`
+        message: `La configuración para ${dayName} (abierto) no está completa.`
       });
     }
 
     // 4. Generar todos los slots posibles del día
-    // 'generateTimeSlots' ya maneja el cruce de medianoche
     const allPossibleSlots = generateTimeSlots(openTime, closeTime, slotDuration);
 
     // 5. Obtener canchas activas
@@ -150,11 +159,8 @@ const getAggregatedAvailability = async (req, res) => {
       return res.json({ availableSlots: [] });
     }
     
-    // 6. Obtener reservas (¡DE DOS DÍAS!)
-    // Necesitamos las reservas del día seleccionado Y del día siguiente,
-    // por si el horario de cierre cruza la medianoche.
+    // 6. Obtener reservas (de dos días, para manejar medianoche)
     const start = fromZonedTime(startOfDay(dateObj), timeZone);
-    // Buscar hasta el final del *siguiente* día
     const end = fromZonedTime(endOfDay(addDays(dateObj, 1)), timeZone); 
 
     const bookings = await Booking.find({
@@ -162,27 +168,20 @@ const getAggregatedAvailability = async (req, res) => {
       status: { $ne: 'Cancelled' }
     }).select('court startTime endTime');
 
-    // 7. Calcular disponibilidad agregada
-    
-    // --- LÓGICA DE CRUCE DE MEDIANOCHE ---
-    let currentDay = dateObj; // Empezamos en el día seleccionado
-    let lastTimeStr = '00:00'; // Para detectar el cruce
+    // 7. Calcular disponibilidad (Esta lógica ya maneja la medianoche)
+    let currentDay = dateObj; 
+    let lastTimeStr = '00:00'; 
     
     const availability = allPossibleSlots.map(slotTime => {
-      // Si el slot actual (ej "01:00") es menor que el anterior (ej "23:00"),
-      // significa que cruzamos la medianoche y este slot pertenece al DÍA SIGUIENTE.
       if (slotTime < lastTimeStr) {
         currentDay = addDays(dateObj, 1);
       }
-      lastTimeStr = slotTime; // Actualizar el último slot
+      lastTimeStr = slotTime; 
       
-      // Construir la fecha del slot usando el 'currentDay' correcto
       const slotDateStr = `${format(currentDay, 'yyyy-MM-dd')}T${slotTime}:00`;
       const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone);
       const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration);
       
-      // --- FIN LÓGICA DE CRUCE ---
-
       const bookedCourtIds = bookings
         .filter(booking => booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC)
         .map(b => b.court.toString());
