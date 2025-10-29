@@ -1,32 +1,43 @@
+// server/routes/cashbox.js - CON VALIDATOR COMENTADO TEMPORALMENTE
 const express = require('express');
 const router = express.Router();
 const {
+  getActiveCashboxSession,
   startCashboxSession,
   closeCashboxSession,
-  getCurrentCashboxSession,
-  getLastClosedSession,
+  getActiveSessionReport,
+  // getCashboxHistory, // Asegúrate de importar si usas estas funciones
+  // getSessionDetails
 } = require('../controllers/cashboxController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// @route   POST api/cashbox/start
-// @desc    Start a new cashbox session
-// @access  Operator/Admin
-router.post('/start', protect, startCashboxSession);
+// --- INICIO DE CORRECCIÓN TEMPORAL ---
+// Importar el validador (si existe)
+// const { validateStartSession } = require('../validators/cashboxValidator'); 
+// --- FIN DE CORRECCIÓN TEMPORAL ---
 
-// @route   POST api/cashbox/close
-// @desc    Close the current cashbox session
-// @access  Operator/Admin
-router.post('/close', protect, closeCashboxSession);
 
-// @route   GET api/cashbox/current
-// @desc    Get the current open cashbox session
-// @access  Operator/Admin
-router.get('/current', protect, getCurrentCashboxSession);
+// Obtener sesión activa
+router.get('/session/active', protect, getActiveCashboxSession);
 
-// @route   GET api/cashbox/last-closed
-// @desc    Get the last closed session for reporting
-// @access  Operator/Admin
-router.get('/last-closed', protect, getLastClosedSession);
+// Iniciar sesión
+// --- CORRECCIÓN TEMPORAL: Comentado 'validateStartSession' ---
+router.post('/session/start', protect, /* validateStartSession, */ startCashboxSession);
+// --- FIN DE CORRECCIÓN TEMPORAL ---
 
+
+// Cerrar sesión
+router.post('/session/close', protect, closeCashboxSession);
+
+// Obtener reporte de sesión activa
+router.get('/session/report', protect, getActiveSessionReport); // <-- Esta es la línea 24 (ahora 28)
+
+// --- POTENCIALMENTE FALTAN ESTAS RUTAS! ---
+// // Obtener historial de sesiones (Ejemplo)
+// router.get('/history', protect, getCashboxHistory); 
+
+// // Obtener detalles de una sesión específica (Ejemplo)
+// router.get('/session/:id', protect, getSessionDetails);
+// --- ---
 
 module.exports = router;
