@@ -2,14 +2,12 @@
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-// Asegúrate que estén todos estos imports de date-fns
 const { startOfDay, endOfDay, parseISO, getDay, addMinutes, format, addDays, isBefore } = require('date-fns'); 
 const { fromZonedTime } = require('date-fns-tz');
 const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 const { logActivity } = require('../utils/logActivity');
 
-// (Las funciones createCourt, getCourts, getCourtById, updateCourt, deleteCourt van aquí, sin cambios)
-// ...
+// (createCourt, getCourts, getCourtById, updateCourt, deleteCourt ... sin cambios)
 const createCourt = async (req, res) => {
   try {
     const { name, courtType, pricePerHour, isActive } = req.body;
@@ -99,10 +97,7 @@ const deleteCourt = async (req, res) => {
   }
 };
 
-// --- FUNCIÓN getAggregatedAvailability CORREGIDA ---
-// @desc    Get aggregated availability for a specific date
-// @route   GET /api/courts/availability/:date (date format YYYY-MM-DD)
-// @access  Public
+
 const getAggregatedAvailability = async (req, res) => {
   try {
     const { date } = req.params; 
@@ -141,6 +136,7 @@ const getAggregatedAvailability = async (req, res) => {
     }
 
     // 4. Generar todos los slots posibles del día
+    // Esto es crucial: generateTimeSlots debe manejar correctamente horarios que cruzan la medianoche
     const allPossibleSlots = generateTimeSlots(openTime, closeTime, slotDuration);
 
     // 5. Obtener canchas activas
@@ -150,59 +146,54 @@ const getAggregatedAvailability = async (req, res) => {
     }
     const totalActiveCourts = activeCourts.length;
     
-    // 6. Obtener reservas (del día y del siguiente por si cruza medianoche)
-    const start = fromZonedTime(startOfDay(dateObj), timeZone);
-    const end = fromZonedTime(endOfDay(addDays(dateObj, 1)), timeZone); 
+    // 6. Obtener reservas
+    // Para manejar turnos que cruzan la medianoche, obtenemos reservas desde el inicio del día
+    // hasta el final del día siguiente.
+    const startOfTargetDate = fromZonedTime(startOfDay(dateObj), timeZone);
+    const endOfNextDay = fromZonedTime(endOfDay(addDays(dateObj, 1)), timeZone); // Incluye el día siguiente
 
     const bookings = await Booking.find({
-      startTime: { $gte: start, $lt: end }, 
-      status: { $ne: 'Cancelled' }
+      startTime: { $gte: startOfTargetDate, $lt: endOfNextDay }, 
+      status: { $ne: 'Cancelled' } // Ignorar reservas canceladas
     }).select('court startTime endTime');
     
-    // Crear un Set de IDs de canchas activas para búsqueda rápida
     const activeCourtIds = new Set(activeCourts.map(c => c._id.toString()));
 
     // 7. Calcular disponibilidad agregada
-    let currentDay = dateObj; 
-    let lastTimeStr = '00:00'; 
-    
-    const availability = allPossibleSlots.map(slotTime => {
-      // Ajustar el día si cruzamos medianoche
-      if (slotTime < lastTimeStr) {
-        currentDay = addDays(dateObj, 1);
-      }
-      lastTimeStr = slotTime; 
-      
-      const slotDateStr = `${format(currentDay, 'yyyy-MM-dd')}T${slotTime}:00`;
-      const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone); // Fecha/Hora UTC del inicio del slot
-      const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration); // Fecha/Hora UTC del fin del slot
-      
-      // Contar cuántas canchas *activas* están ocupadas en este slot exacto
-      const bookedActiveCourtIdsInSlot = new Set();
-      bookings.forEach(booking => {
-          // Chequear si la reserva solapa con el slot actual
-          const overlaps = booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC;
-          if (overlaps) {
-              const courtIdStr = booking.court.toString();
-              // Añadir al set solo si la cancha reservada está activa
-              if(activeCourtIds.has(courtIdStr)) {
-                bookedActiveCourtIdsInSlot.add(courtIdStr);
-              }
-          }
-      });
+    let currentDayIterator = dateObj; // Usaremos esto para ajustar el día si el slot cruza medianoche
+    let previousSlotTime = '00:00'; // Para detectar el cruce de medianoche
 
-      const availableCourtCount = totalActiveCourts - bookedActiveCourtIdsInSlot.size;
-      
-      const hourMinute = slotTime.split(':');
-      
-      // --- DEVOLVER dateTimeISO ---
-      return {
-          hour: parseInt(hourMinute[0], 10),
-          minute: parseInt(hourMinute[1], 10),
-          availableCourts: availableCourtCount,
-          dateTimeISO: slotDateTimeUTC.toISOString() // <-- Añadido: ISO string completo
+    const availability = allPossibleSlots.map(slotTime => {
+        // Si el tiempo actual del slot es menor que el anterior, significa que hemos cruzado la medianoche
+        if (slotTime < previousSlotTime) {
+            currentDayIterator = addDays(currentDayIterator, 1);
+        }
+        previousSlotTime = slotTime;
+
+        const slotDateStr = `${format(currentDayIterator, 'yyyy-MM-dd')}T${slotTime}:00`;
+        const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone); // Convertir a UTC con la zona horaria
+        const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration);
+
+        const bookedActiveCourtIdsInSlot = new Set();
+        bookings.forEach(booking => {
+            const overlaps = booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC;
+            if (overlaps) {
+                const courtIdStr = booking.court.toString();
+                if(activeCourtIds.has(courtIdStr)) {
+                    bookedActiveCourtIdsInSlot.add(courtIdStr);
+                }
+            }
+        });
+
+        const availableCourtCount = totalActiveCourts - bookedActiveCourtIdsInSlot.size;
+        const hourMinute = slotTime.split(':');
+
+        return {
+            hour: parseInt(hourMinute[0], 10),
+            minute: parseInt(hourMinute[1], 10),
+            availableCourts: availableCourtCount,
+            dateTimeISO: slotDateTimeUTC.toISOString() // Formato ISO para el frontend
         };
-      // --- FIN DEVOLVER dateTimeISO ---
     });
     
     res.json({ availableSlots: availability });
@@ -213,7 +204,6 @@ const getAggregatedAvailability = async (req, res) => {
   }
 };
 
-// Asegúrate de exportar todas las funciones necesarias
 module.exports = {
   createCourt,
   getCourts,
