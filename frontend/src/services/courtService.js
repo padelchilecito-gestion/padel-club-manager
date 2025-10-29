@@ -1,64 +1,56 @@
+// frontend/src/services/courtService.js - CORREGIDO
 import api from './api';
 
-// --- NUEVA FUNCIÓN (Punto 1) ---
-/**
- * Obtiene la disponibilidad agregada para una FECHA (en todas las canchas).
- */
-export const getAggregatedAvailability = async (date) => {
-  // Llama a la nueva ruta: GET /api/courts/availability/:date
-  const { data } = await api.get(`/courts/availability/${date}`);
-  return data;
+// Obtener todas las canchas
+const getCourts = async () => {
+  try {
+    const { data } = await api.get('/courts');
+    return data;
+  } catch (error) {
+    console.error('Error fetching courts:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al obtener las canchas');
+  }
 };
 
-
-// --- FUNCIONES ANTIGUAS (Mantenidas por si el Admin las usa) ---
-
-/**
- * Obtiene solo las canchas activas para el público.
- */
-export const getPublicCourts = async () => {
-  const { data } = await api.get('/courts/public');
-  return data;
+// Crear una nueva cancha
+const createCourt = async (courtData) => {
+  try {
+    const { data } = await api.post('/courts', courtData);
+    return data;
+  } catch (error) {
+    console.error('Error creating court:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al crear la cancha');
+  }
 };
 
-/**
- * (Obsoleto para el flujo público) Obtiene la disponibilidad para una cancha y fecha específicas.
- */
-export const getAvailability = async (date, courtId) => {
-  const { data } = await api.get(`/courts/availability/${date}/${courtId}`);
-  return data;
+// Actualizar una cancha
+const updateCourt = async (id, courtData) => {
+  try {
+    const { data } = await api.put(`/courts/${id}`, courtData);
+    return data;
+  } catch (error) {
+    console.error(`Error updating court ${id}:`, error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al actualizar la cancha');
+  }
 };
 
-// --- FUNCIONES DE ADMIN ---
-
-/**
- * (Admin) Obtiene todas las canchas.
- */
-export const getCourts = async () => {
-  const { data } = await api.get('/courts');
-  return data;
+// Eliminar una cancha
+const deleteCourt = async (id) => {
+  try {
+    const { data } = await api.delete(`/courts/${id}`);
+    return data;
+  } catch (error) {
+    console.error(`Error deleting court ${id}:`, error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al eliminar la cancha');
+  }
 };
 
-/**
- * (Admin) Crea una nueva cancha.
- */
-export const createCourt = async (courtData) => {
-  const { data } = await api.post('/courts', courtData);
-  return data;
+// --- INICIO DE LA CORRECCIÓN ---
+// Exportar un objeto que contenga las funciones definidas arriba
+export const courtService = {
+  getCourts,
+  createCourt,
+  updateCourt,
+  deleteCourt
 };
-
-/**
- * (Admin) Actualiza una cancha.
- */
-export const updateCourt = async (id, courtData) => {
-  const { data } = await api.put(`/courts/${id}`, courtData);
-  return data;
-};
-
-/**
- * (Admin) Elimina una cancha.
- */
-export const deleteCourt = async (id) => {
-  const { data } = await api.delete(`/courts/${id}`);
-  return data;
-};
+// --- FIN DE LA CORRECCIÓN ---
