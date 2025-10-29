@@ -1,7 +1,7 @@
 // frontend/src/pages/HomePage.jsx
 import React, { useState, useEffect } from 'react';
 import SimpleTimeSlotFinder from '../components/SimpleTimeSlotFinder';
-import { getSettings } from '../services/settingService';
+import settingService from '../services/settingService';
 import { FullPageLoading, ErrorMessage } from '../components/ui/Feedback';
 
 const HomePage = () => {
@@ -14,7 +14,7 @@ const HomePage = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await getSettings();
+        const data = await settingService.getSettings();
         
         // Añadimos CLUB_WHATSAPP como requisito para la reserva
         if (!data.SLOT_DURATION || !data.CURRENCY || !data.CLUB_WHATSAPP) { 
