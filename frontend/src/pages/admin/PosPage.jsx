@@ -15,6 +15,12 @@ const ProductGrid = ({ products, onAddToCart, loading }) => (
       <InlineLoading text="Cargando productos..." />
     ) : (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        { /* Si no hay productos DESPUÉS de filtrar, muestra un mensaje */ }
+        {products.length === 0 && !loading && (
+          <p className="text-gray-400 col-span-full text-center py-10">
+            No hay productos con stock disponibles para mostrar.
+          </p>
+        )}
         {products.map((product) => (
           <button
             key={product._id}
@@ -37,6 +43,15 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
     if (newQuantity <= 0) {
       setCart((prev) => prev.filter((item) => item.productId !== productId));
     } else {
+      // Encontrar el stock máximo del producto en el carrito
+      const itemInCart = cart.find(item => item.productId === productId);
+      const maxStock = itemInCart ? itemInCart.stock : 0; 
+      
+      if (newQuantity > maxStock) {
+        toast.error(`Stock máximo (${maxStock}) alcanzado.`);
+        newQuantity = maxStock; // No permitir superar el stock
+      }
+
       setCart((prev) =>
         prev.map((item) =>
           item.productId === productId ? { ...item, quantity: newQuantity } : item
@@ -113,13 +128,15 @@ const PosPage = () => {
       setLoading(true);
       const data = await productService.getProducts();
       
-      // --- LÍNEA DE DIAGNÓSTICO AÑADIDA ---
-      console.log('DATOS CRUDOS DEL PRODUCTO (ANTES DE FILTRAR):', data);
-      // ------------------------------------
+      // --- ¡ESTE ES EL LOG QUE NECESITAMOS VER! ---
+      console.log('DATOS CRUDOS DEL PRODUCTO (ANTES DE FILTRAR):', JSON.stringify(data, null, 2)); // Usamos JSON.stringify para verlo mejor
+      // ---------------------------------------------
 
-      setProducts(data.filter(p => p.stock > 0)); // Solo productos con stock
+      setProducts(data.filter(p => p.stock > 0)); // Solo productos con stock > 0
     } catch (error) {
       toast.error('Error al cargar productos');
+      // --- Log del error si la llamada falla ---
+      console.error('Error en fetchProducts:', error);
     } finally {
       setLoading(false);
     }
@@ -153,7 +170,7 @@ const PosPage = () => {
         name: product.name, 
         price: product.price, 
         quantity: 1,
-        stock: product.stock // Guardar stock para referencia
+        stock: product.stock // Guardar stock para referencia en el carrito
       }];
     });
   };
