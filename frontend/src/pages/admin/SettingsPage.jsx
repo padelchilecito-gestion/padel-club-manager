@@ -4,9 +4,9 @@ import { getSettings, updateSettings } from '../../services/settingService';
 import toast from 'react-hot-toast';
 import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
 
-// --- NUEVA LÓGICA DE UI ---
+// --- LÓGICA DE UI MEJORADA ---
 
-// Claves para el formulario de horarios
+// 1. Claves para el formulario de horarios
 const daysOfWeek = [
   { key: 'MONDAY', label: 'Lunes' },
   { key: 'TUESDAY', label: 'Martes' },
@@ -17,25 +17,22 @@ const daysOfWeek = [
   { key: 'SUNDAY', label: 'Domingo' },
 ];
 
-// Lista de *todas* las claves que maneja el formulario de horarios
-const newScheduleKeys = [
-  'SLOT_DURATION',
-  ...daysOfWeek.flatMap(day => [
-    `${day.key}_IS_OPEN`,
-    `${day.key}_OPENING_HOUR`,
-    `${day.key}_CLOSING_HOUR`
-  ])
-];
-
-// Lista de claves *viejas* que queremos ignorar en la pestaña "Avanzada"
-const oldScheduleKeys = [
-  'WEEKDAY_OPENING_HOUR',
-  'WEEKDAY_CLOSING_HOUR',
-  'WEEKEND_OPENING_HOUR',
-  'WEEKEND_CLOSING_HOUR',
-  'openTime', // Clave genérica vieja
-  'closeTime', // Clave genérica vieja
-  'slotDuration' // Clave vieja en minúsculas
+// 2. Lista DEFINITIVA de campos para la pestaña "Avanzada"
+// Solo lo que esté en esta lista aparecerá.
+const advancedSettingsList = [
+  { key: 'CLUB_NOMBRE', label: 'Nombre del Club' },
+  { key: 'CLUB_DIRECCION', label: 'Dirección del Club' },
+  { key: 'CLUB_TELEFONO', label: 'Teléfono de Contacto (Público)' },
+  { key: 'CLUB_EMAIL', label: 'Email de Contacto' },
+  { key: 'CLUB_ADMIN_WHATSAPP', label: 'WhatsApp del Administrador (para notificaciones)' }, // <-- AÑADIDO
+  { key: 'SHOP_ENABLED', label: 'Tienda Habilitada (escribe "true" para activar)' }, // <-- CAMPO PARA LA TIENDA
+  
+  // --- CAMPOS DE WHATSAPP API (opcionales, si los usas) ---
+  { key: 'WHATSAPP_SENDER_NUMBER', label: 'WhatsApp API - Número Emisor' }, 
+  { key: 'WHATSAPP_API_TOKEN', label: 'WhatsApp API - Token' },
+  
+  // --- CAMPOS ELIMINADOS DE LA VISTA ---
+  // (Cloudinary y Timezone ya no están en esta lista)
 ];
 // --- FIN LÓGICA DE UI ---
 
@@ -55,8 +52,6 @@ const SettingsPage = () => {
         setIsLoading(true);
         const settings = await getSettings(); // Devuelve { KEY: VALUE }
         
-        // Inicializar el estado del formulario con los valores de la DB
-        // Aseguramos que los valores 'IS_OPEN' sean booleanos para los checkboxes
         const processedSettings = { ...settings };
         daysOfWeek.forEach(day => {
           const key = `${day.key}_IS_OPEN`;
@@ -80,7 +75,6 @@ const SettingsPage = () => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      // Los checkboxes guardan boolean, el resto guarda el valor
       [name]: type === 'checkbox' ? checked : value,
     }));
   };
@@ -90,17 +84,15 @@ const SettingsPage = () => {
     setIsSaving(true);
     
     // Convertir el objeto formData al array que espera el backend
-    // Aseguramos que los booleanos 'IS_OPEN' se guarden como string 'true'/'false'
     const settingsToSave = Object.keys(formData).map(key => {
       let value = formData[key];
-      // Si es una clave de 'IS_OPEN', convertir boolean a string
       if (key.endsWith('_IS_OPEN')) {
         value = value ? 'true' : 'false';
       }
       
       return {
         key: key,
-        value: value || '' // Enviar string vacío si es null/undefined
+        value: value || ''
       };
     });
 
@@ -125,14 +117,6 @@ const SettingsPage = () => {
     return <ErrorMessage message={error} />;
   }
   
-  // Filtrar claves para la pestaña "Avanzada"
-  const otherSettingsKeys = Object.keys(formData).filter(
-    key => 
-      !newScheduleKeys.includes(key) && // No es una clave de horario NUEVA
-      !oldScheduleKeys.includes(key) && // No es una clave de horario VIEJA
-      key !== '__v' && key !== '_id' // Excluir claves internas
-  );
-
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-3xl font-bold text-white mb-6">Configuración del Club</h1>
@@ -251,29 +235,28 @@ const SettingsPage = () => {
           </div>
         </div>
         
-        {/* Contenido Pestaña Avanzada */}
+        {/* --- Contenido Pestaña Avanzada (CORREGIDO) --- */}
         <div className={activeTab === 'avanzada' ? 'block' : 'hidden'}>
            <div className="space-y-4">
-            {otherSettingsKeys.length > 0 ? (
-              otherSettingsKeys.map(key => (
-                <div key={key}>
-                  <label htmlFor={key} className="block text-sm font-medium text-gray-300 capitalize">
-                    {key.replace(/_/g, ' ')}
+            
+            {/* Iteramos sobre la lista predefinida */}
+            {advancedSettingsList.map(setting => (
+                <div key={setting.key}>
+                  <label htmlFor={setting.key} className="block text-sm font-medium text-gray-300">
+                    {setting.label} {/* Usamos la etiqueta en español */}
                   </label>
                   <input
                     type="text"
-                    name={key}
-                    id={key}
-                    value={formData[key] || ''}
+                    name={setting.key} // El 'name' sigue siendo la clave de la DB
+                    id={setting.key}
+                    value={formData[setting.key] || ''} // El valor se toma del estado
                     onChange={handleChange}
                     className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
-                    placeholder={`Valor para ${key}`}
+                    placeholder={setting.label}
                   />
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-400">No hay configuraciones avanzadas cargadas.</p>
-            )}
+              ))}
+              
            </div>
         </div>
 
