@@ -1,11 +1,11 @@
 // frontend/src/pages/HomePage.jsx
 import React, { useState, useEffect } from 'react';
-import SimpleTimeSlotFinder from '../components/SimpleTimeSlotFinder'; // <-- Cambiado al nuevo componente
+import SimpleTimeSlotFinder from '../components/SimpleTimeSlotFinder';
 import { getSettings } from '../services/settingService';
 import { FullPageLoading, ErrorMessage } from '../components/ui/Feedback';
 
 const HomePage = () => {
-  const [settings, setSettings] = useState(null); // Inicia como null
+  const [settings, setSettings] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -14,14 +14,12 @@ const HomePage = () => {
       try {
         setIsLoading(true);
         setError(null);
-        // getSettings ahora devuelve un objeto { key: value }
         const data = await getSettings();
         
-        // Validar que tengamos al menos la duración del slot
-        if (!data.SLOT_DURATION) {
-          setError('La configuración del club (duración del turno) no está completa. Contacta al administrador.');
+        if (!data.SLOT_DURATION || !data.CURRENCY) { // Añadido CURRENCY como requisito básico
+          setError('La configuración del club (duración del turno o moneda) no está completa. Contacta al administrador.');
         } else {
-          setSettings(data); // Guardar todas las configuraciones cargadas
+          setSettings(data);
         }
 
       } catch (err) {
@@ -34,8 +32,6 @@ const HomePage = () => {
     fetchSettings();
   }, []);
 
-  // --- Renderizado ---
-  
   if (isLoading) {
     return <FullPageLoading text="Cargando configuración..." />;
   }
@@ -48,19 +44,21 @@ const HomePage = () => {
     );
   }
 
-  // Asegurarnos que settings no sea null antes de renderizar
   if (!settings) {
-     return <FullPageLoading text="Inicializando..." />; // O algún otro estado intermedio
+     return <FullPageLoading text="Inicializando..." />;
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-lg"> {/* Centrado y con ancho máximo */}
+    <div className="container mx-auto px-4 py-8 max-w-lg">
       <h1 className="text-3xl font-bold text-center text-purple-400 mb-8">
         Reserva tu Cancha de Pádel
       </h1>
-      {/* Pasamos solo la duración del slot necesaria por ahora */}
       <SimpleTimeSlotFinder
         slotDuration={parseInt(settings.SLOT_DURATION, 10)}
+        currency={settings.CURRENCY || '$'} // Pasar la moneda para el modal
+        // Puedes pasar más configuraciones si BookingModal las necesita para calcular precios
+        // Por ejemplo, un precio base por hora
+        // basePricePerHour={parseFloat(settings.BASE_PRICE_PER_HOUR)} 
       />
     </div>
   );
