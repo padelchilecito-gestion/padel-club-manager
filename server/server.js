@@ -24,15 +24,20 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-// --- INICIO DE LA SOLUCIÓN DE CORS ---
+// --- INICIO DE LA SOLUCIÓN DE CORS (CORREGIDA) ---
 
-// Lista de orígenes permitidos (acepta strings y Expresiones Regulares)
+// Lista de orígenes permitidos
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://padel-club-manager.vercel.app', // Tu dominio principal
-  // Expresión Regular para TODAS las URLs temporales de Vercel:
-  /^https:\/\/padel-club-manager-.*-eduardo-miguel-riccis-projects\.vercel\.app$/
+  
+  // Esta Expresión Regular acepta CUALQUIER URL que comience con 'padel-club-manager-'
+  // y termine en '.vercel.app'. Esto incluye:
+  // - ...-xi.vercel.app
+  // - ...-c6koi7qcd-eduardo-miguel-riccis-projects.vercel.app
+  // - y cualquier otra que Vercel genere en el futuro.
+  /^https:\/\/padel-club-manager-.*\.vercel\.app$/
 ];
 
 app.use(cors({
