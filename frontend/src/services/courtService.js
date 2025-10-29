@@ -44,3 +44,19 @@ export const deleteCourt = async (id) => {
     throw new Error(error.response?.data?.message || 'Error al eliminar la cancha');
   }
 };
+
+// --- INICIO DE LA CORRECCIÓN ---
+// Esta es la función que faltaba y que TimeSlotFinder necesita
+
+export const getAggregatedAvailability = async (dateString) => {
+  try {
+    // La fecha debe estar en formato ISO string
+    const { data } = await api.get(`/courts/availability/${dateString}`);
+    return data;
+  } catch (error)
+    {
+    console.error('Error fetching aggregated availability:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'Error al obtener la disponibilidad');
+  }
+};
+// --- FIN DE LA CORRECCIÓN ---
