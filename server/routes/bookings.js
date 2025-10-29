@@ -11,7 +11,7 @@ const {
   updateBooking, 
   deleteBooking 
 } = require('../controllers/bookingController');
-const { protect, authorize } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator, admin, authorize } = require('../middlewares/authMiddleware');
 
 // Rutas públicas (no requieren autenticación)
 router.post('/', createBooking); // Si tenías una ruta genérica de creación (revisar si entra en conflicto)
