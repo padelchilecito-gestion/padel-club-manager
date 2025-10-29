@@ -15,19 +15,15 @@ const daysOfWeek = [
   { key: 'SUNDAY', label: 'Domingo' },
 ];
 
+// Claves que se manejan en el formulario de horarios
+const scheduleKeys = [
+  'SLOT_DURATION',
+  ...daysOfWeek.flatMap(day => [`${day.key}_OPENING_HOUR`, `${day.key}_CLOSING_HOUR`])
+];
+
 const SettingsPage = () => {
-  // Estado para todos los campos del formulario
-  const [formData, setFormData] = useState({
-    SLOT_DURATION: '60',
-    MONDAY_OPENING_HOUR: '', MONDAY_CLOSING_HOUR: '',
-    TUESDAY_OPENING_HOUR: '', TUESDAY_CLOSING_HOUR: '',
-    WEDNESDAY_OPENING_HOUR: '', WEDNESDAY_CLOSING_HOUR: '',
-    THURSDAY_OPENING_HOUR: '', THURSDAY_CLOSING_HOUR: '',
-    FRIDAY_OPENING_HOUR: '', FRIDAY_CLOSING_HOUR: '',
-    SATURDAY_OPENING_HOUR: '', SATURDAY_CLOSING_HOUR: '',
-    SUNDAY_OPENING_HOUR: '', SUNDAY_CLOSING_HOUR: '',
-    // ... (otras configuraciones se cargarán dinámicamente)
-  });
+  // formData contendrá TODAS las configuraciones
+  const [formData, setFormData] = useState({});
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,11 +36,8 @@ const SettingsPage = () => {
         setIsLoading(true);
         const settings = await getSettings(); // getSettings devuelve el objeto { KEY: VALUE }
         
-        // Actualizar el estado del formulario con los valores de la DB
-        setFormData(prevData => ({
-          ...prevData, // Mantener valores por defecto
-          ...settings  // Sobrescribir con valores cargados
-        }));
+        // Cargar todas las configuraciones en el estado
+        setFormData(settings);
         
       } catch (err) {
         console.error(err);
@@ -69,18 +62,14 @@ const SettingsPage = () => {
     e.preventDefault();
     setIsSaving(true);
     
-    // Filtrar solo las claves que hemos definido en el formulario
-    // para no enviar otras claves que se hayan cargado (ej. MERCADOPAGO)
-    const keysToUpdate = [
-      'SLOT_DURATION',
-      ...daysOfWeek.flatMap(day => [`${day.key}_OPENING_HOUR`, `${day.key}_CLOSING_HOUR`])
-    ];
-
-    // Crear el array de {key, value} para enviar a la API
-    const settingsToSave = keysToUpdate.map(key => ({
+    // --- CORRECCIÓN DE GUARDADO ---
+    // Convertir el objeto formData COMPLETO al array que espera el backend
+    // (El backend ahora espera: [{key: 'K1', value: 'V1'}, {key: 'K2', value: 'V2'}])
+    const settingsToSave = Object.keys(formData).map(key => ({
       key: key,
       value: formData[key] || '' // Enviar string vacío si está indefinido
     }));
+    // --- FIN DE CORRECCIÓN ---
 
     try {
       await updateSettings(settingsToSave);
@@ -102,15 +91,22 @@ const SettingsPage = () => {
   if (error) {
     return <ErrorMessage message={error} />;
   }
+  
+  // --- LÓGICA PARA RESTAURAR CAMPOS ---
+  // Filtramos las claves que NO están en el formulario de horarios
+  const otherSettingsKeys = Object.keys(formData).filter(
+    key => !scheduleKeys.includes(key) && key !== '__v' // Excluir claves internas de mongoose
+  );
+  // --- FIN LÓGICA ---
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-3xl font-bold text-white mb-6">Configuración del Club</h1>
 
-      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg">
+      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg space-y-8">
         
-        {/* --- Sección de Horarios --- */}
-        <div className="border-b border-gray-700 pb-6 mb-6">
+        {/* --- Sección de Horarios (Visible siempre) --- */}
+        <div className="border-b border-gray-700 pb-6">
           <h2 className="text-xl font-semibold text-cyan-400 mb-4">Horarios de Apertura</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -123,7 +119,7 @@ const SettingsPage = () => {
                 type="number"
                 name="SLOT_DURATION"
                 id="SLOT_DURATION"
-                value={formData.SLOT_DURATION}
+                value={formData.SLOT_DURATION || ''}
                 onChange={handleChange}
                 className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
                 placeholder="Ej: 60"
@@ -146,7 +142,7 @@ const SettingsPage = () => {
                     type="time"
                     name={`${day.key}_OPENING_HOUR`}
                     id={`${day.key}_OPENING_HOUR`}
-                    value={formData[`${day.key}_OPENING_HOUR`]}
+                    value={formData[`${day.key}_OPENING_HOUR`] || ''}
                     onChange={handleChange}
                     className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
                   />
@@ -159,7 +155,7 @@ const SettingsPage = () => {
                     type="time"
                     name={`${day.key}_CLOSING_HOUR`}
                     id={`${day.key}_CLOSING_HOUR`}
-                    value={formData[`${day.key}_CLOSING_HOUR`]}
+                    value={formData[`${day.key}_CLOSING_HOUR`] || ''}
                     onChange={handleChange}
                     className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
                   />
@@ -168,8 +164,33 @@ const SettingsPage = () => {
             ))}
           </div>
         </div>
-
-        {/* (Aquí puedes agregar otras secciones de configuración si las tuvieras) */}
+        
+        {/* --- Sección Avanzada (Restaurada) --- */}
+        <div className="border-b border-gray-700 pb-6">
+           <h2 className="text-xl font-semibold text-yellow-400 mb-4">Configuración Avanzada</h2>
+           <div className="space-y-4">
+            {otherSettingsKeys.length > 0 ? (
+              otherSettingsKeys.map(key => (
+                <div key={key}>
+                  <label htmlFor={key} className="block text-sm font-medium text-gray-300 capitalize">
+                    {key.replace(/_/g, ' ')}
+                  </label>
+                  <input
+                    type="text"
+                    name={key}
+                    id={key}
+                    value={formData[key] || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
+                    placeholder={`Valor para ${key}`}
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-400">No hay otras configuraciones avanzadas cargadas.</p>
+            )}
+           </div>
+        </div>
 
         {/* --- Botón de Guardar --- */}
         <div className="flex justify-end">
@@ -182,7 +203,7 @@ const SettingsPage = () => {
                 : 'bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500'
             }`}
           >
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            {isSaving ? 'Guardando...' : 'Guardar Todos los Cambios'}
           </button>
         </div>
       </form>
