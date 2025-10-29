@@ -7,8 +7,11 @@ const SettingSchema = new mongoose.Schema({
     required: true,
     unique: true,
     enum: [
-      'MERCADOPAGO_ACCESS_TOKEN',
-      'MERCADOPAGO_WEBHOOK_SECRET',
+      // --- CLAVES DE MERCADO PAGO ELIMINADAS ---
+      // 'MERCADOPAGO_ACCESS_TOKEN', (Eliminada)
+      // 'MERCADOPAGO_WEBHOOK_SECRET', (Eliminada)
+      // ---
+      
       'CLOUDINARY_CLOUD_NAME',
       'CLOUDINARY_API_KEY',
       'CLOUDINARY_API_SECRET',
@@ -57,7 +60,5 @@ const SettingSchema = new mongoose.Schema({
     ref: 'User',
   }
 }, { timestamps: true });
-
-// --- LÍNEA PROBLEMÁTICA (56) ELIMINADA ---
 
 module.exports = mongoose.model('Setting', SettingSchema);
