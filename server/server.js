@@ -2,11 +2,11 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const http = require('http'); // Necesario para socket.io
-const cors = require('cors'); // --- PASO 1: Importar CORS ---
+const cors = require('cors'); // Importar CORS
 const connectDB = require('./config/db');
 const { initSocket } = require('./config/socket');
 const allRoutes = require('./routes/index');
-const { loadSettings } = require('./config/mercadopago-config');
+// La línea que importaba 'loadSettings' de mercadopago-config fue eliminada
 
 // Cargar variables de entorno
 dotenv.config();
@@ -14,12 +14,11 @@ dotenv.config();
 // Conectar a la base de datos
 connectDB();
 
-// Cargar configuración de MP al iniciar
-loadSettings();
+// La llamada a 'loadSettings()' fue eliminada
 
 const app = express();
 
-// --- PASO 2: Configurar CORS ---
+// --- Configurar CORS (Esto es lo que agregamos y está correcto) ---
 // Definir los orígenes permitidos
 const allowedOrigins = [
   'https://padel-club-manager-xi.vercel.app', // Tu frontend en Vercel
