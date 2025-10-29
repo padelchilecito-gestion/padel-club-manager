@@ -1,10 +1,10 @@
-// --- IMPORTS AÑADIDOS/VERIFICADOS ---
+// server/controllers/courtController.js
 const Court = require('../models/Court');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-const { startOfDay, endOfDay, parseISO } = require('date-fns');
+const { startOfDay, endOfDay, parseISO, getDay } = require('date-fns'); // Importar getDay
 const { fromZonedTime } = require('date-fns-tz');
-const { generateTimeSlots } = require('../utils/timeSlotGenerator'); // Asegúrate que este archivo exista en utils/
+const { generateTimeSlots } = require('../utils/timeSlotGenerator'); 
 const { logActivity } = require('../utils/logActivity');
 
 // @desc    Create a new court
@@ -14,7 +14,6 @@ const createCourt = async (req, res) => {
   try {
     const { name, courtType, pricePerHour, isActive } = req.body;
     
-    // Validación básica
     if (!name || !courtType || !pricePerHour) {
         return res.status(400).json({ message: 'Nombre, tipo y precio son requeridos.' });
     }
@@ -27,9 +26,7 @@ const createCourt = async (req, res) => {
     });
 
     const createdCourt = await court.save();
-    
     await logActivity('Court', createdCourt._id, 'create', req.user ? req.user.id : 'System', { name });
-    
     res.status(201).json(createdCourt);
   } catch (error) {
     console.error('Error creando cancha:', error);
@@ -83,9 +80,7 @@ const updateCourt = async (req, res) => {
       court.isActive = isActive !== undefined ? isActive : court.isActive;
 
       const updatedCourt = await court.save();
-      
       await logActivity('Court', updatedCourt._id, 'update', req.user ? req.user.id : 'System', { name: updatedCourt.name });
-      
       res.json(updatedCourt);
     } else {
       res.status(404).json({ message: 'Cancha no encontrada' });
@@ -104,12 +99,8 @@ const deleteCourt = async (req, res) => {
     const court = await Court.findById(req.params.id);
 
     if (court) {
-      // Opcional: Verificar si hay reservas futuras antes de borrar
-      // Por ahora, borrado directo:
-      await court.deleteOne(); // Usar deleteOne()
-      
+      await court.deleteOne(); 
       await logActivity('Court', req.params.id, 'delete', req.user ? req.user.id : 'System', { name: court.name });
-      
       res.json({ message: 'Cancha eliminada' });
     } else {
       res.status(404).json({ message: 'Cancha no encontrada' });
@@ -120,14 +111,15 @@ const deleteCourt = async (req, res) => {
   }
 };
 
-// --- FUNCIÓN getAggregatedAvailability REEMPLAZADA ---
+// --- FUNCIÓN getAggregatedAvailability CORREGIDA ---
 // @desc    Get aggregated availability for a specific date
 // @route   GET /api/courts/availability/:date
 // @access  Public
 const getAggregatedAvailability = async (req, res) => {
   try {
-    const { date } = req.params; // Asumiendo que la ruta es /availability/:date
-    const timeZone = 'America/Argentina/Buenos_Aires';
+    const { date } = req.params; 
+    const timeZone = 'America/Argentina/Buenos_Aires'; // Asegúrate que esta sea tu zona horaria
+    const dateObj = parseISO(date); // La fecha que llega del frontend
 
     // 1. Cargar configuración
     const settingsList = await Setting.find({});
@@ -136,41 +128,39 @@ const getAggregatedAvailability = async (req, res) => {
       return acc; 
     }, {});
     
-    // console.log('📋 CONFIGURACIÓN CARGADA:', settings);
+    // --- LÓGICA DE HORARIO CORREGIDA ---
+    // Determinar si es fin de semana (0 = Domingo, 6 = Sábado)
+    const dayOfWeek = getDay(dateObj); 
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
-    const slotDuration = parseInt(settings.slotDuration, 10);
-    
-    if (!settings || !settings.openTime || !settings.closeTime || !slotDuration || slotDuration <= 0) {
-      console.error('❌ Validación de settings falló:', settings);
+    // Seleccionar las claves correctas
+    const openTimeKey = isWeekend ? 'WEEKEND_OPENING_HOUR' : 'WEEKDAY_OPENING_HOUR';
+    const closeTimeKey = isWeekend ? 'WEEKEND_CLOSING_HOUR' : 'WEEKDAY_CLOSING_HOUR';
+
+    // Obtener los valores correctos
+    const openTime = settings[openTimeKey];
+    const closeTime = settings[closeTimeKey];
+    const slotDuration = parseInt(settings.SLOT_DURATION, 10); // Usar la clave correcta
+
+    // 2. Validar configuración
+    if (!openTime || !closeTime || !slotDuration || slotDuration <= 0) {
+      console.error('❌ Validación de settings falló:', { openTime, closeTime, slotDuration });
       return res.status(400).json({
-        message: 'La configuración del club no está completa. Faltan Hora de Apertura, Cierre o Duración del Turno (debe ser > 0).'
+        message: 'La configuración del club no está completa. Faltan horas de apertura/cierre o duración del turno.'
       });
     }
 
-    // 2. Generar todos los slots posibles del día
-    const allPossibleSlots = generateTimeSlots(settings.openTime, settings.closeTime, slotDuration);
-    // console.log(`⏰ Slots generados: ${allPossibleSlots.length} slots`);
+    // 3. Generar todos los slots posibles del día
+    const allPossibleSlots = generateTimeSlots(openTime, closeTime, slotDuration);
 
-    // 3. Obtener canchas activas
+    // 4. Obtener canchas activas
     const activeCourts = await Court.find({ isActive: true }).select('_id name pricePerHour');
     
     if (!activeCourts || activeCourts.length === 0) {
-      console.warn('⚠️ No hay canchas activas');
-      // Devolver los slots como "no disponibles" en lugar de un 404
-      return res.json(allPossibleSlots.map(slotTime => ({
-          startTime: slotTime,
-          isAvailable: false,
-          price: 0,
-          courtId: null,
-          courtName: null,
-          availableCount: 0
-      })));
+      return res.json({ availableSlots: [] }); // Devolver array vacío si no hay canchas
     }
     
-    // console.log(`🏟️ Canchas activas: ${activeCourts.length}`);
-
-    // 4. Obtener reservas del día
-    const dateObj = parseISO(date);
+    // 5. Obtener reservas del día
     const start = fromZonedTime(startOfDay(dateObj), timeZone);
     const end = fromZonedTime(endOfDay(dateObj), timeZone);
 
@@ -179,62 +169,43 @@ const getAggregatedAvailability = async (req, res) => {
       status: { $ne: 'Cancelled' }
     }).select('court startTime endTime');
 
-    // console.log(`📅 Reservas encontradas: ${bookings.length}`);
-
-    // 5. CLAVE: Calcular disponibilidad agregada correctamente
+    // 6. Calcular disponibilidad agregada
     const availability = allPossibleSlots.map(slotTime => {
-      // Convertir el slot time a UTC (usando la zona horaria)
-      const slotDateTimeUTC = fromZonedTime(`${date}T${slotTime}:00`, timeZone);
+      // (slotTime es un string "HH:mm")
+      // Convertir el slot "HH:mm" a un objeto Date completo en la zona horaria correcta
+      const slotDateStr = `${format(dateObj, 'yyyy-MM-dd')}T${slotTime}:00`;
+      const slotDateTimeUTC = fromZonedTime(slotDateStr, timeZone);
       
       // Calcular el fin del slot
-      const slotEndTime = new Date(slotDateTimeUTC.getTime() + slotDuration * 60000);
+      const slotEndTime = addMinutes(slotDateTimeUTC, slotDuration);
 
       // Encontrar qué canchas están ocupadas en este slot
       const bookedCourtIds = bookings
         .filter(booking => {
-          // Una reserva ocupa este slot si:
-          // - Empieza ANTES de que termine el slot Y termina DESPUÉS de que empiece el slot
+          // Un slot está ocupado si una reserva empieza antes de que TERMINE el slot
+          // Y termina después de que EMPIECE el slot.
           return booking.startTime < slotEndTime && booking.endTime > slotDateTimeUTC;
         })
         .map(b => b.court.toString());
-
-      // console.log(`🕐 Slot ${slotTime}: ${bookedCourtIds.length} canchas ocupadas de ${activeCourts.length}`);
 
       // Canchas disponibles = Todas las activas - Las ocupadas
       const availableCourts = activeCourts.filter(
         court => !bookedCourtIds.includes(court._id.toString())
       );
-
-      // Si hay AL MENOS UNA cancha disponible
-      if (availableCourts.length > 0) {
-        // Ordenar por precio y tomar la más barata
-        availableCourts.sort((a, b) => a.pricePerHour - b.pricePerHour);
-        const cheapestCourt = availableCourts[0];
-        
-        return {
-          startTime: slotTime,
-          isAvailable: true,
-          price: cheapestCourt.pricePerHour, // Precio del turno (cancha más barata)
-          courtId: cheapestCourt._id,
-          courtName: cheapestCourt.name,
-          availableCount: availableCourts.length // 👈 Útil para debug
+      
+      const hourMinute = slotTime.split(':');
+      return {
+          hour: parseInt(hourMinute[0], 10),
+          minute: parseInt(hourMinute[1], 10),
+          availableCourts: availableCourts.length // Cuántas canchas quedan libres
         };
-      } else {
-        // Todas las canchas están ocupadas
-        return {
-          startTime: slotTime,
-          isAvailable: false,
-          price: 0,
-          courtId: null,
-          courtName: null,
-          availableCount: 0
-        };
-      }
     });
-
-    // console.log(`✅ Disponibilidad calculada: ${availability.filter(s => s.isAvailable).length} slots disponibles`);
     
-    res.json(availability);
+    // Devolver solo los slots que tienen al menos 1 cancha disponible
+    // const availableSlots = availability.filter(slot => slot.availableCourts > 0);
+    // No, devolvemos todos y el frontend los pinta
+    
+    res.json({ availableSlots: availability });
     
   } catch (error) {
     console.error('❌ Error en getAggregatedAvailability:', error);
@@ -244,7 +215,7 @@ const getAggregatedAvailability = async (req, res) => {
     });
   }
 };
-// --- FIN DE LA FUNCIÓN REEMPLAZADA ---
+// --- FIN DE LA FUNCIÓN CORREGIDA ---
 
 module.exports = {
   createCourt,
@@ -252,5 +223,5 @@ module.exports = {
   getCourtById,
   updateCourt,
   deleteCourt,
-  getAggregatedAvailability, // <-- Exportación de la función nueva/corregida
+  getAggregatedAvailability, 
 };
