@@ -1,8 +1,8 @@
-// frontend/src/services/courtService.js - CORREGIDO
+// frontend/src/services/courtService.js
 import api from './api';
 
 // Obtener todas las canchas
-const getCourts = async () => {
+export const getCourts = async () => {
   try {
     const { data } = await api.get('/courts');
     return data;
@@ -13,7 +13,7 @@ const getCourts = async () => {
 };
 
 // Crear una nueva cancha
-const createCourt = async (courtData) => {
+export const createCourt = async (courtData) => {
   try {
     const { data } = await api.post('/courts', courtData);
     return data;
@@ -24,7 +24,7 @@ const createCourt = async (courtData) => {
 };
 
 // Actualizar una cancha
-const updateCourt = async (id, courtData) => {
+export const updateCourt = async (id, courtData) => {
   try {
     const { data } = await api.put(`/courts/${id}`, courtData);
     return data;
@@ -35,7 +35,7 @@ const updateCourt = async (id, courtData) => {
 };
 
 // Eliminar una cancha
-const deleteCourt = async (id) => {
+export const deleteCourt = async (id) => {
   try {
     const { data } = await api.delete(`/courts/${id}`);
     return data;
@@ -44,13 +44,3 @@ const deleteCourt = async (id) => {
     throw new Error(error.response?.data?.message || 'Error al eliminar la cancha');
   }
 };
-
-// --- INICIO DE LA CORRECCIÓN ---
-// Exportar un objeto que contenga las funciones definidas arriba
-export const courtService = {
-  getCourts,
-  createCourt,
-  updateCourt,
-  deleteCourt
-};
-// --- FIN DE LA CORRECCIÓN ---
