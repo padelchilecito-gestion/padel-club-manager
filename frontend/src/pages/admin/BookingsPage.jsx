@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/BookingsPage.jsx - CON BOTÓN DE PAGO MP
 import React, { useState, useEffect } from 'react';
-import { bookingService } from '../../services/bookingService';
+import { getBookings, deleteBooking } from '../../services/bookingService';
 import { courtService } from '../../services/courtService';
 import { userService } from '../../services/userService';
 import BookingModal from '../../components/BookingModal';
@@ -31,7 +31,7 @@ const BookingsPage = () => {
       const start = startOfDay(date);
       const end = endOfDay(date);
       // Asegurarse de que el servicio maneje bien las fechas ISO
-      const data = await bookingService.getBookings({
+      const data = await getBookings({
         startDate: start.toISOString(),
         endDate: end.toISOString()
       });
@@ -86,7 +86,7 @@ const BookingsPage = () => {
   const handleDeleteBooking = async (id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta reserva?')) {
       try {
-        await bookingService.deleteBooking(id);
+        await deleteBooking(id);
         toast.success('Reserva eliminada');
         fetchBookings(selectedDate); // Recargar
       } catch (err) {

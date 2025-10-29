@@ -1,9 +1,9 @@
-// frontend/src/services/bookingService.js - CORREGIDO (VERSIÓN FINAL)
+// frontend/src/services/bookingService.js
 import api from './api';
-import { format } from 'date-fns'; // Necesario para formatear fechas si se usa
+import { format } from 'date-fns';
 
 // Obtener reservas (con filtros opcionales)
-const getBookings = async (filters = {}) => {
+export const getBookings = async (filters = {}) => {
   try {
     // Convertir fechas a ISO string si existen
     if (filters.startDate) filters.startDate = new Date(filters.startDate).toISOString();
@@ -18,7 +18,7 @@ const getBookings = async (filters = {}) => {
 };
 
 // Obtener una reserva por ID
-const getBookingById = async (id) => {
+export const getBookingById = async (id) => {
   try {
     const { data } = await api.get(`/bookings/${id}`);
     return data;
@@ -29,7 +29,7 @@ const getBookingById = async (id) => {
 };
 
 // Crear una nueva reserva
-const createBooking = async (bookingData) => {
+export const createBooking = async (bookingData) => {
   try {
     const { data } = await api.post('/bookings', bookingData);
     return data;
@@ -45,7 +45,7 @@ const createBooking = async (bookingData) => {
 };
 
 // Actualizar una reserva
-const updateBooking = async (id, bookingData) => {
+export const updateBooking = async (id, bookingData) => {
   try {
     const { data } = await api.put(`/bookings/${id}`, bookingData);
     return data;
@@ -60,7 +60,7 @@ const updateBooking = async (id, bookingData) => {
 };
 
 // Eliminar una reserva
-const deleteBooking = async (id) => {
+export const deleteBooking = async (id) => {
   try {
     const { data } = await api.delete(`/bookings/${id}`);
     return data;
@@ -71,7 +71,7 @@ const deleteBooking = async (id) => {
 };
 
 // Verificar disponibilidad para una cancha y fecha
-const checkAvailability = async (courtId, date) => {
+export const checkAvailability = async (courtId, date) => {
   try {
     // Asegurar que la fecha se envíe en formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ) o YYYY-MM-DD
     // El backend espera ISO o YYYY-MM-DD según la ruta. Verifiquemos /availability/:courtId
@@ -84,16 +84,3 @@ const checkAvailability = async (courtId, date) => {
     throw new Error(error.response?.data?.message || 'Error al verificar disponibilidad');
   }
 };
-
-
-// --- LA PARTE MÁS IMPORTANTE ---
-// Exportar un objeto que contenga TODAS las funciones definidas arriba
-export const bookingService = {
-  getBookings,
-  getBookingById,
-  createBooking,
-  updateBooking,
-  deleteBooking,
-  checkAvailability // <-- ¡ASEGÚRATE DE QUE ESTÉ AQUÍ!
-};
-// --- ---
