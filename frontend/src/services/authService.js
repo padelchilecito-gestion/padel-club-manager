@@ -1,27 +1,57 @@
-import apiClient from './api';
+// frontend/src/services/authService.js
 
-const login = async (username, password) => {
-  try {
-    const response = await apiClient.post('/auth/login', { username, password });
-    return response.data;
-  } catch (error) {
-    console.error('Login failed:', error.response?.data?.message || error.message);
-    throw error.response?.data || error;
-  }
-};
+import axios from 'axios';
 
-const register = async (userData) => {
+const API_URL = '/api/auth'; // Asegúrate de que esta URL sea correcta para tu backend
+const USER_API_URL = '/api/users'; // Para obtener el perfil del usuario
+
+// Función para iniciar sesión
+const loginUser = async (email, password) => {
     try {
-        // This endpoint is protected, so the token from the logged-in admin is sent automatically by the interceptor
-        const response = await apiClient.post('/users/register', userData);
+        const response = await axios.post(`${API_URL}/login`, { email, password });
+        if (response.data.token) {
+            // Guardar el token en localStorage es opcional aquí si ya lo manejas en AuthContext
+            // localStorage.setItem('token', response.data.token);
+        }
         return response.data;
     } catch (error) {
-        console.error('Registration failed:', error.response?.data?.message || error.message);
-        throw error.response?.data || error;
+        throw error; // Re-lanza el error para que el AuthContext lo maneje
     }
-}
-
-export const authService = {
-  login,
-  register,
 };
+
+// Función para registrar un nuevo usuario
+const registerUser = async (userData) => {
+    try {
+        const response = await axios.post(`${API_URL}/register`, userData);
+        if (response.data.token) {
+            // localStorage.setItem('token', response.data.token);
+        }
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// **NUEVA FUNCIÓN: Obtener el perfil del usuario**
+const getUserProfile = async (token) => {
+    try {
+        const config = {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        };
+        // Asumiendo que tienes un endpoint como /api/users/profile que devuelve el perfil del usuario
+        const response = await axios.get(`${USER_API_URL}/profile`, config); 
+        return response.data; // Debería devolver un objeto de usuario { id, name, email, role, etc. }
+    } catch (error) {
+        throw error;
+    }
+};
+
+const authService = {
+    loginUser,
+    registerUser,
+    getUserProfile, // Exportar la nueva función
+};
+
+export default authService;
