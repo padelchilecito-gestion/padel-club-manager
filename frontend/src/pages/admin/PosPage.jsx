@@ -1,10 +1,10 @@
-// frontend/src/pages/admin/PosPage.jsx
+// frontend/src/pages/admin/PosPage.jsx - CON DIAGNÓSTICO
 import React, { useState, useEffect } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
 import { toast } from 'react-hot-toast';
 import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
-import PosQRModal from '../../components/admin/PosQRModal'; // <-- IMPORTAR EL NUEVO MODAL
+import PosQRModal from '../../components/admin/PosQRModal';
 import { InlineLoading } from '../../components/ui/Feedback';
 
 // Componente interno para la grilla de productos
@@ -88,7 +88,7 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             Registrar (Efectivo)
           </button>
           <button
-            onClick={onShowQR} // <-- CONECTADO AL MODAL
+            onClick={onShowQR} 
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
@@ -106,15 +106,17 @@ const PosPage = () => {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // --- AÑADIR ESTE ESTADO ---
   const [showQRModal, setShowQRModal] = useState(false);
-  // -------------------------
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const data = await productService.getProducts();
+      
+      // --- LÍNEA DE DIAGNÓSTICO AÑADIDA ---
+      console.log('DATOS CRUDOS DEL PRODUCTO (ANTES DE FILTRAR):', data);
+      // ------------------------------------
+
       setProducts(data.filter(p => p.stock > 0)); // Solo productos con stock
     } catch (error) {
       toast.error('Error al cargar productos');
@@ -158,7 +160,6 @@ const PosPage = () => {
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  // Botón de pago en efectivo
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
@@ -170,13 +171,12 @@ const PosPage = () => {
       });
       toast.success('Venta registrada (Efectivo)');
       setCart([]);
-      fetchProducts(); // Re-fetch productos para actualizar stock
+      fetchProducts(); 
     } catch (error) {
       toast.error('Error al registrar la venta');
     }
   };
 
-  // --- NUEVO HANDLER para cerrar el modal ---
   const handleQRModalClose = (paymentSuccess) => {
     setShowQRModal(false);
     if (paymentSuccess) {
@@ -184,14 +184,11 @@ const PosPage = () => {
       setCart([]);
       fetchProducts(); // Re-fetch productos
     }
-    // Si no fue exitoso (paymentSuccess = false), la venta queda 'Pending' en la DB
-    // y no se descuenta stock hasta que el webhook confirme.
   };
 
   return (
     <div className="p-4 h-full">
       
-      {/* --- RENDERIZAR EL MODAL --- */}
       {showQRModal && (
         <PosQRModal 
           cart={cart}
@@ -201,19 +198,16 @@ const PosPage = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-        {/* Columna de Productos */}
         <div className="md:col-span-2 h-full">
           <ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
         </div>
-
-        {/* Columna de Carrito */}
         <div className="h-full">
           <Cart 
             cart={cart} 
             setCart={setCart} 
             total={total} 
             onRegisterSale={handleRegisterSale}
-            onShowQR={() => setShowQRModal(true)} // <-- PASAR EL HANDLER
+            onShowQR={() => setShowQRModal(true)} 
           />
         </div>
       </div>
