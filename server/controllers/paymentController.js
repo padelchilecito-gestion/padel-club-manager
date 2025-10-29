@@ -1,9 +1,10 @@
-// server/controllers/paymentController.js - VERSIÓN ACTUALIZADA
+// server/controllers/paymentController.js - VERSIÓN CORREGIDA
 const { Preference, Payment } = require('mercadopago');
 const client = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Setting = require('../models/Setting');
-const Sale = require('../models/Sale'); // <-- AÑADIR ESTE MODELO
+const Sale = require('../models/Sale');
+const Product = require('../models/Product'); // <-- AÑADIDO PARA MANEJAR STOCK
 const axios = require('axios');
 const { format } = require('date-fns');
 
@@ -42,7 +43,6 @@ const createBookingPreference = async (req, res) => {
         pending: `${baseUrl}/payment-pending`
       },
       auto_return: 'approved',
-      // --- CAMBIO: Añadir prefijo para el webhook ---
       external_reference: `booking_${bookingId.toString()}`,
       notification_url: `${baseUrl}/api/payments/webhook`,
       metadata: {
@@ -97,7 +97,6 @@ const createBookingQRDynamic = async (req, res) => {
           currency_id: 'ARS'
         }
       ],
-      // --- CAMBIO: Añadir prefijo para el webhook ---
       external_reference: `booking_${bookingId.toString()}`,
       notification_url: `${baseUrl}/api/payments/webhook`,
     };
@@ -161,7 +160,6 @@ const createPosPreference = async (req, res) => {
     const preference = new Preference(client);
     const preferenceData = {
       items: mpItems,
-      // --- CAMBIO: Usar prefijo 'sale_' y el ID de la nueva venta ---
       external_reference: `sale_${newSale._id.toString()}`,
       notification_url: `${baseUrl}/api/payments/webhook`,
       metadata: {
@@ -190,7 +188,7 @@ const createPosPreference = async (req, res) => {
 };
 
 // ==========================================
-// 4. WEBHOOK UNIFICADO (Actualizado)
+// 4. WEBHOOK UNIFICADO (Actualizado y CORREGIDO)
 // ==========================================
 const receiveWebhook = async (req, res) => {
   const { type, data } = req.body;
@@ -243,6 +241,23 @@ const receiveWebhook = async (req, res) => {
           sale.paymentId = paymentId.toString(); // Guardar ID de pago de MP
           await sale.save();
           console.log(`✅ Venta POS ${saleId} marcada como pagada (desde Webhook)`);
+
+          // --- INICIO DE CORRECCIÓN DE STOCK ---
+          // Descontar stock al confirmar el pago de la venta
+          try {
+            for (const item of sale.items) {
+              const product = await Product.findById(item.product);
+              if (product) {
+                product.stock -= item.quantity;
+                await product.save();
+              }
+            }
+            console.log(`📦 Stock descontado para Venta POS ${saleId}`);
+          } catch (stockError) {
+            console.error(`❌ Error al descontar stock para Venta ${saleId}:`, stockError);
+          }
+          // --- FIN DE CORRECCIÓN DE STOCK ---
+
           if (io) io.emit('sale_update', sale); // Emitir un evento nuevo
         }
       }
@@ -271,7 +286,7 @@ const receiveWebhookQR = async (req, res) => {
 module.exports = {
   createBookingPreference,
   createBookingQRDynamic,
-  createPosPreference, // <-- EXPORTAR LA NUEVA FUNCIÓN
+  createPosPreference,
   receiveWebhook,
   receiveWebhookQR
 };
