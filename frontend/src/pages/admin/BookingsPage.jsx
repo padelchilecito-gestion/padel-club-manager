@@ -7,7 +7,7 @@ import BookingModal from '../../components/BookingModal';
 import PaymentQRModal from '../../components/admin/PaymentQRModal'; // Para el QR
 import { paymentService } from '../../services/paymentService'; // Para el Link MP
 import { toast } from 'react-hot-toast';
-import { format, startOfDay, endOfDay, addDays, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, addDays } from 'date-fns'; // Quitamos subDays si no se usa
 import { es } from 'date-fns/locale';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, QrCodeIcon, CreditCardIcon } from '@heroicons/react/24/solid';
 import { InlineLoading, ErrorMessage } from '../../components/ui/Feedback';
@@ -31,9 +31,9 @@ const BookingsPage = () => {
       const start = startOfDay(date);
       const end = endOfDay(date);
       // Asegurarse de que el servicio maneje bien las fechas ISO
-      const data = await bookingService.getBookings({ 
-        startDate: start.toISOString(), 
-        endDate: end.toISOString() 
+      const data = await bookingService.getBookings({
+        startDate: start.toISOString(),
+        endDate: end.toISOString()
       });
       setBookings(data);
     } catch (err) {
@@ -46,9 +46,12 @@ const BookingsPage = () => {
 
   const fetchInitialData = async () => {
     try {
-      const courtsData = await courtService.getCourts();
+      // Usar Promise.all para cargar en paralelo si es posible
+      const [courtsData, usersData] = await Promise.all([
+        courtService.getCourts(),
+        userService.getUsers() // Obtener usuarios para el modal
+      ]);
       setCourts(courtsData);
-      const usersData = await userService.getUsers(); // Obtener usuarios para el modal
       setUsers(usersData);
     } catch (err) {
       console.error("Error fetching initial data:", err);
@@ -58,7 +61,11 @@ const BookingsPage = () => {
 
   useEffect(() => {
     fetchInitialData();
-    fetchBookings(selectedDate);
+    // No necesitamos llamar a fetchBookings aquí, se llama abajo
+  }, []); // Cargar datos iniciales solo una vez
+
+  useEffect(() => {
+    fetchBookings(selectedDate); // Cargar reservas cuando cambie la fecha
   }, [selectedDate]);
 
   const handleDateChange = (days) => {
@@ -102,10 +109,11 @@ const BookingsPage = () => {
     }
   };
 
-  // --- NUEVA FUNCIÓN PARA PAGAR CON LINK MP ---
+  // --- FUNCIÓN PARA PAGAR CON LINK MP ---
   const handlePayWithMP = async (bookingId) => {
     setLoadingPaymentLink(bookingId); // Indicar que se está cargando para este booking
     try {
+      // Usar la función generatePaymentLink (la del botón web original)
       const data = await paymentService.generatePaymentLink(bookingId);
       if (data.init_point) {
         window.open(data.init_point, '_blank'); // Abrir link en nueva pestaña
@@ -126,19 +134,21 @@ const BookingsPage = () => {
       <h1 className="text-3xl font-bold mb-6 text-cyan-400">Gestión de Reservas</h1>
 
       {/* Selector de Fecha */}
-      <div className="mb-6 flex justify-between items-center bg-gray-800 p-4 rounded-lg shadow-md">
-        <button onClick={() => handleDateChange(-1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
-          <ChevronLeftIcon className="h-6 w-6" />
-        </button>
-        <h2 className="text-xl font-semibold capitalize">
-          {format(selectedDate, 'EEEE dd \'de\' MMMM \'de\' yyyy', { locale: es })}
-        </h2>
-        <button onClick={() => handleDateChange(1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
-          <ChevronRightIcon className="h-6 w-6" />
-        </button>
+      <div className="mb-6 flex flex-wrap justify-between items-center bg-gray-800 p-4 rounded-lg shadow-md gap-4"> {/* Added flex-wrap y gap */}
+        <div className="flex items-center"> {/* Agrupado controles de fecha */}
+          <button onClick={() => handleDateChange(-1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
+            <ChevronLeftIcon className="h-6 w-6" />
+          </button>
+          <h2 className="text-xl font-semibold capitalize mx-4 whitespace-nowrap"> {/* Added whitespace-nowrap */}
+            {format(selectedDate, 'EEEE dd \'de\' MMMM \'de\' yyyy', { locale: es })}
+          </h2>
+          <button onClick={() => handleDateChange(1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
+            <ChevronRightIcon className="h-6 w-6" />
+          </button>
+        </div>
         <button
           onClick={() => { setSelectedBooking(null); setShowBookingModal(true); }}
-          className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all ml-4"
+          className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Nueva Reserva
@@ -170,7 +180,8 @@ const BookingsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  bookings.map((booking) => (
+                  bookings.sort((a, b) => new Date(a.startTime) - new Date(b.startTime)) // Ordenar por hora
+                  .map((booking) => (
                     <tr key={booking._id} className="hover:bg-gray-700/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                         {format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
@@ -189,31 +200,31 @@ const BookingsPage = () => {
                            <span className="text-xs text-gray-400 ml-2">({booking.paymentMethod})</span>
                          )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 flex items-center"> {/* Added flex items-center */}
                         {!booking.isPaid && (
                           <>
                             {/* BOTÓN MOSTRAR QR */}
-                            <button 
-                              onClick={() => handleShowPaymentModal(booking)} 
-                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors"
+                            <button
+                              onClick={() => handleShowPaymentModal(booking)}
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors flex-shrink-0" /* Added flex-shrink-0 */
                               title="Mostrar QR para pagar"
                             >
                               <QrCodeIcon className="h-4 w-4 mr-1"/> QR
                             </button>
                             {/* NUEVO BOTÓN PAGAR CON MP (LINK) */}
-                            <button 
-                              onClick={() => handlePayWithMP(booking._id)} 
+                            <button
+                              onClick={() => handlePayWithMP(booking._id)}
                               disabled={loadingPaymentLink === booking._id} // Deshabilitar mientras carga este link
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors disabled:opacity-50"
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors disabled:opacity-50 flex-shrink-0" /* Added flex-shrink-0 */
                               title="Generar y abrir link de Mercado Pago"
                             >
-                              <CreditCardIcon className="h-4 w-4 mr-1"/> 
+                              <CreditCardIcon className="h-4 w-4 mr-1"/>
                               {loadingPaymentLink === booking._id ? 'Generando...' : 'Pagar MP'}
                             </button>
                           </>
                         )}
-                        <button onClick={() => handleEditBooking(booking)} className="text-cyan-400 hover:text-cyan-300" title="Editar">Editar</button>
-                        <button onClick={() => handleDeleteBooking(booking._id)} className="text-red-500 hover:text-red-400" title="Eliminar">Eliminar</button>
+                        <button onClick={() => handleEditBooking(booking)} className="text-cyan-400 hover:text-cyan-300 flex-shrink-0" title="Editar">Editar</button> {/* Added flex-shrink-0 */}
+                        <button onClick={() => handleDeleteBooking(booking._id)} className="text-red-500 hover:text-red-400 flex-shrink-0" title="Eliminar">Eliminar</button> {/* Added flex-shrink-0 */}
                       </td>
                     </tr>
                   ))
@@ -236,7 +247,7 @@ const BookingsPage = () => {
       )}
 
       {showPaymentModal && selectedBooking && (
-        <PaymentQRModal
+        <PaymentQRModal // El modal de QR ahora solo muestra QR
           booking={selectedBooking}
           onClose={handleClosePaymentModal}
         />
