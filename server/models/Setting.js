@@ -18,7 +18,7 @@ const SettingSchema = new mongoose.Schema({
       'SHOP_ENABLED',
       'SLOT_DURATION',
       
-      // --- NUEVAS CLAVES DE HORARIO ---
+      // --- Claves de Horario Nuevas ---
       'MONDAY_IS_OPEN',
       'MONDAY_OPENING_HOUR',
       'MONDAY_CLOSING_HOUR',
@@ -39,7 +39,13 @@ const SettingSchema = new mongoose.Schema({
       'SATURDAY_CLOSING_HOUR',
       'SUNDAY_IS_OPEN',
       'SUNDAY_OPENING_HOUR',
-      'SUNDAY_CLOSING_HOUR'
+      'SUNDAY_CLOSING_HOUR',
+      
+      // --- Claves Viejas (Las dejamos para evitar errores, no molestan) ---
+      'WEEKDAY_OPENING_HOUR',
+      'WEEKDAY_CLOSING_HOUR',
+      'WEEKEND_OPENING_HOUR',
+      'WEEKEND_CLOSING_HOUR'
     ],
   },
   value: {
@@ -52,9 +58,6 @@ const SettingSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Filtramos claves viejas que ya no deberían estar en el enum
-SettingSchema.path('key').enum(SettingSchema.path('key').enumValues.filter(k => 
-  !k.startsWith('WEEKDAY_') && !k.startsWith('WEEKEND_')
-));
+// --- LÍNEA PROBLEMÁTICA (56) ELIMINADA ---
 
 module.exports = mongoose.model('Setting', SettingSchema);
