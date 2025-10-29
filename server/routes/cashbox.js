@@ -13,7 +13,7 @@ const { protect } = require('../middlewares/authMiddleware');
 
 // --- INICIO DE CORRECCIÓN TEMPORAL ---
 // Importar el validador (si existe)
-// const { validateStartSession } = require('../validators/cashboxValidator'); 
+ const { validateStartSession } = require('../validators/cashboxValidator'); 
 // --- FIN DE CORRECCIÓN TEMPORAL ---
 
 
