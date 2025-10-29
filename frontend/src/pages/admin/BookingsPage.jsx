@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/BookingsPage.jsx - CON BOTÓN DE PAGO MP
 import React, { useState, useEffect } from 'react';
 import { getBookings, deleteBooking } from '../../services/bookingService';
-import { courtService } from '../../services/courtService';
+import { getCourts } from '../../services/courtService';
 import { userService } from '../../services/userService';
 import BookingModal from '../../components/BookingModal';
 import PaymentQRModal from '../../components/admin/PaymentQRModal'; // Para el QR
@@ -48,7 +48,7 @@ const BookingsPage = () => {
     try {
       // Usar Promise.all para cargar en paralelo si es posible
       const [courtsData, usersData] = await Promise.all([
-        courtService.getCourts(),
+        getCourts(),
         userService.getUsers() // Obtener usuarios para el modal
       ]);
       setCourts(courtsData);
