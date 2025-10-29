@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { XMarkIcon } from '@heroicons/react/24/solid';
-import { bookingService } from '../services/bookingService'; // Importar el servicio
+import { createBooking } from '../services/bookingService'; // Importar la función directamente
 import { InlineLoading, ErrorMessage } from './ui/Feedback';
 
 // Recibe 'slots' (array) y 'settings'
@@ -62,7 +62,7 @@ const BookingModal = ({ slots, settings, onClose, onBookingSuccess }) => {
       };
 
       // Llamar al 'createBooking' modificado del backend
-      await bookingService.createBooking(bookingData); 
+      await createBooking(bookingData);
       
       setLoading(false);
       onBookingSuccess(); // Cierra el modal y refresca
