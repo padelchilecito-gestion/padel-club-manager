@@ -14,15 +14,25 @@ const SettingSchema = new mongoose.Schema({
       'CLOUDINARY_API_SECRET',
       'WHATSAPP_SENDER_NUMBER',
       'WHATSAPP_API_TOKEN',
-      // Claves de horario
       'TIMEZONE',
-      'WEEKDAY_OPENING_HOUR',
-      'WEEKDAY_CLOSING_HOUR',
-      'WEEKEND_OPENING_HOUR',
-      'WEEKEND_CLOSING_HOUR',
       'SHOP_ENABLED',
-      // --- CORRECCIÓN: Clave faltante ---
-      'SLOT_DURATION' // <--- AÑADIR ESTA LÍNEA
+      'SLOT_DURATION',
+      
+      // --- CORRECCIÓN: Claves por día ---
+      'MONDAY_OPENING_HOUR',
+      'MONDAY_CLOSING_HOUR',
+      'TUESDAY_OPENING_HOUR',
+      'TUESDAY_CLOSING_HOUR',
+      'WEDNESDAY_OPENING_HOUR',
+      'WEDNESDAY_CLOSING_HOUR',
+      'THURSDAY_OPENING_HOUR',
+      'THURSDAY_CLOSING_HOUR',
+      'FRIDAY_OPENING_HOUR',
+      'FRIDAY_CLOSING_HOUR',
+      'SATURDAY_OPENING_HOUR',
+      'SATURDAY_CLOSING_HOUR',
+      'SUNDAY_OPENING_HOUR',
+      'SUNDAY_CLOSING_HOUR'
     ],
   },
   value: {
