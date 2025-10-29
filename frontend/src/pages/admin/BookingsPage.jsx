@@ -1,256 +1,220 @@
-// frontend/src/pages/admin/BookingsPage.jsx - CON BOTÓN DE PAGO MP
+// frontend/src/pages/admin/BookingsPage.jsx
+// --- CÓDIGO COMPLETO Y CORREGIDO ---
+
 import React, { useState, useEffect } from 'react';
-import { getBookings, deleteBooking } from '../../services/bookingService';
+// 1. CORRECCIÓN EN LA IMPORTACIÓN:
+import bookingService from '../../services/bookingService';
 import { getCourts } from '../../services/courtService';
 import { userService } from '../../services/userService';
-import BookingModal from '../../components/BookingModal';
-import PaymentQRModal from '../../components/admin/PaymentQRModal'; // Para el QR
-import { paymentService } from '../../services/paymentService'; // Para el Link MP
-import { toast } from 'react-hot-toast';
-import { format, startOfDay, endOfDay, addDays } from 'date-fns'; // Quitamos subDays si no se usa
+import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
+import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, QrCodeIcon, CreditCardIcon } from '@heroicons/react/24/solid';
-import { InlineLoading, ErrorMessage } from '../../components/ui/Feedback';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
+import PaymentQRModal from '../../components/admin/PaymentQRModal';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [courts, setCourts] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false); // Para el QR
-  const [loadingPaymentLink, setLoadingPaymentLink] = useState(null); // Para el Link MP (guarda el ID del booking)
 
-  const fetchBookings = async (date) => {
+  const fetchBookings = async () => {
     try {
       setLoading(true);
+      // 2. CORRECCIÓN EN LA LLAMADA (se añade bookingService.):
+      const data = await bookingService.getBookings(); 
+      
+      // Mapeo de canchas
+      const courtsData = await getCourts();
+      setCourts(courtsData);
+      
+      // Mapeo de usuarios
+      const usersData = await userService.getUsers();
+      const usersMap = usersData.reduce((acc, user) => {
+        acc[user._id] = user.name;
+        return acc;
+      }, {});
+      setUsers(usersMap);
+
+      const mappedBookings = data.map(booking => ({
+        ...booking,
+        courtName: courtsData.find(c => c._id === booking.court)?.name || 'Cancha eliminada',
+        userName: booking.user ? (usersMap[booking.user] || 'Usuario eliminado') : (booking.clientName || 'Cliente (Público)')
+      }));
+
+      setBookings(mappedBookings);
       setError(null);
-      const start = startOfDay(date);
-      const end = endOfDay(date);
-      // Asegurarse de que el servicio maneje bien las fechas ISO
-      const data = await getBookings({
-        startDate: start.toISOString(),
-        endDate: end.toISOString()
-      });
-      setBookings(data);
     } catch (err) {
       console.error("Error fetching bookings:", err);
-      setError('No se pudieron cargar las reservas.');
+      setError(err.message || 'Error al cargar las reservas');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchInitialData = async () => {
-    try {
-      // Usar Promise.all para cargar en paralelo si es posible
-      const [courtsData, usersData] = await Promise.all([
-        getCourts(),
-        userService.getUsers() // Obtener usuarios para el modal
-      ]);
-      setCourts(courtsData);
-      setUsers(usersData);
-    } catch (err) {
-      console.error("Error fetching initial data:", err);
-      setError('Error al cargar datos iniciales (canchas/usuarios).');
-    }
-  };
-
   useEffect(() => {
-    fetchInitialData();
-    // No necesitamos llamar a fetchBookings aquí, se llama abajo
-  }, []); // Cargar datos iniciales solo una vez
+    fetchBookings();
+  }, []);
 
-  useEffect(() => {
-    fetchBookings(selectedDate); // Cargar reservas cuando cambie la fecha
-  }, [selectedDate]);
-
-  const handleDateChange = (days) => {
-    setSelectedDate(prevDate => startOfDay(addDays(prevDate, days)));
-  };
-
-  const handleSaveBooking = () => {
-    setShowBookingModal(false);
-    setSelectedBooking(null);
-    fetchBookings(selectedDate); // Recargar
-  };
-
-  const handleEditBooking = (booking) => {
+  const openDeleteModal = (booking) => {
     setSelectedBooking(booking);
-    setShowBookingModal(true);
+    setIsDeleteModalOpen(true);
   };
 
-  const handleDeleteBooking = async (id) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta reserva?')) {
-      try {
-        await deleteBooking(id);
-        toast.success('Reserva eliminada');
-        fetchBookings(selectedDate); // Recargar
-      } catch (err) {
-        toast.error('Error al eliminar la reserva');
-        console.error("Error deleting booking:", err);
-      }
-    }
-  };
-
-  const handleShowPaymentModal = (booking) => {
-    setSelectedBooking(booking);
-    setShowPaymentModal(true);
-  };
-
-  const handleClosePaymentModal = (paymentSuccess) => {
-    setShowPaymentModal(false);
+  const closeDeleteModal = () => {
     setSelectedBooking(null);
-    if (paymentSuccess) {
-      fetchBookings(selectedDate); // Recargar si el pago fue exitoso
-    }
+    setIsDeleteModalOpen(false);
   };
 
-  // --- FUNCIÓN PARA PAGAR CON LINK MP ---
-  const handlePayWithMP = async (bookingId) => {
-    setLoadingPaymentLink(bookingId); // Indicar que se está cargando para este booking
+  const handleDelete = async () => {
+    if (!selectedBooking) return;
     try {
-      // Usar la función generatePaymentLink (la del botón web original)
-      const data = await paymentService.generatePaymentLink(bookingId);
-      if (data.init_point) {
-        window.open(data.init_point, '_blank'); // Abrir link en nueva pestaña
-      } else {
-        throw new Error('No se recibió el link de pago (init_point)');
-      }
+      // 3. CORRECCIÓN EN LA LLAMADA (se añade bookingService.):
+      await bookingService.deleteBooking(selectedBooking._id);
+      toast.success('Reserva eliminada correctamente');
+      closeDeleteModal();
+      fetchBookings(); // Recargar la lista
     } catch (err) {
-      console.error("Error generating MP Link:", err);
-      toast.error(err.message || 'No se pudo generar el link de Mercado Pago');
-    } finally {
-      setLoadingPaymentLink(null); // Quitar indicador de carga
+      toast.error('Error al eliminar la reserva');
+      console.error("Error deleting booking:", err);
     }
   };
-  // ------------------------------------------
+
+  const openQrModal = (booking) => {
+    if (booking.status === 'Confirmed' || booking.paymentStatus === 'Paid') {
+      toast.success('Esta reserva ya está pagada.');
+      return;
+    }
+    setSelectedBooking(booking);
+    setIsQrModalOpen(true);
+  };
+
+  // Esta función se llamará cuando el modal QR confirme el pago
+  const handlePaymentSuccess = () => {
+    toast.success('Pago registrado. Actualizando reserva...');
+    setIsQrModalOpen(false);
+    // Podríamos actualizar el estado localmente o recargar todo
+    fetchBookings(); 
+  };
+
+
+  if (loading) return <FullPageLoading text="Cargando reservas..." />;
+  if (error) return <ErrorMessage message={error} />;
 
   return (
-    <div className="p-6 bg-gray-900 min-h-screen text-white">
-      <h1 className="text-3xl font-bold mb-6 text-cyan-400">Gestión de Reservas</h1>
-
-      {/* Selector de Fecha */}
-      <div className="mb-6 flex flex-wrap justify-between items-center bg-gray-800 p-4 rounded-lg shadow-md gap-4"> {/* Added flex-wrap y gap */}
-        <div className="flex items-center"> {/* Agrupado controles de fecha */}
-          <button onClick={() => handleDateChange(-1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
-            <ChevronLeftIcon className="h-6 w-6" />
-          </button>
-          <h2 className="text-xl font-semibold capitalize mx-4 whitespace-nowrap"> {/* Added whitespace-nowrap */}
-            {format(selectedDate, 'EEEE dd \'de\' MMMM \'de\' yyyy', { locale: es })}
-          </h2>
-          <button onClick={() => handleDateChange(1)} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
-            <ChevronRightIcon className="h-6 w-6" />
-          </button>
-        </div>
-        <button
-          onClick={() => { setSelectedBooking(null); setShowBookingModal(true); }}
-          className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all"
-        >
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-white">Gestión de Reservas</h1>
+        {/* <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
           <PlusIcon className="h-5 w-5 mr-2" />
           Nueva Reserva
-        </button>
+        </button> */}
       </div>
 
-      {loading && <InlineLoading text="Cargando reservas..." />}
-      {error && !loading && <ErrorMessage message={error} />}
-
-      {!loading && !error && (
-        <div className="bg-gray-800 shadow-xl rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Hora</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Cancha</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Precio</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Acciones</th>
+      {/* Aquí irían filtros de fecha, cancha, etc. */}
+      
+      <div className="bg-gray-800 shadow-xl rounded-lg overflow-x-auto border border-gray-700">
+        <table className="min-w-full text-sm text-left text-gray-300">
+          <thead className="text-xs text-gray-400 uppercase bg-gray-900">
+            <tr>
+              <th scope="col" className="px-6 py-3">Fecha y Hora</th>
+              <th scope="col" className="px-6 py-3">Cancha</th>
+              <th scope="col" className="px-6 py-3">Cliente</th>
+              <th scope="col" className="px-6 py-3">Estado</th>
+              <th scope="col" className="px-6 py-3">Pago</th>
+              <th scope="col" className="px-6 py-3">Precio</th>
+              <th scope="col" className="px-6 py-3">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.length > 0 ? (
+              bookings.map((booking) => (
+                <tr key={booking._id} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700">
+                  <td className="px-6 py-4 font-medium whitespace-nowrap">
+                    {format(parseISO(booking.startTime), "EEE dd MMM - HH:mm 'hs'", { locale: es })}
+                  </td>
+                  <td className="px-6 py-4">{booking.courtName}</td>
+                  <td className="px-6 py-4">{booking.userName || booking.clientName}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      booking.status === 'Confirmed' ? 'bg-green-900 text-green-300' :
+                      booking.status === 'Pending' ? 'bg-yellow-900 text-yellow-300' :
+                      booking.status === 'Cancelled' ? 'bg-red-900 text-red-300' :
+                      'bg-gray-700 text-gray-300'
+                    }`}>
+                      {booking.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`flex items-center text-xs ${
+                      booking.paymentStatus === 'Paid' ? 'text-green-400' : 'text-yellow-400'
+                    }`}>
+                      {booking.paymentStatus === 'Paid' ? <CheckCircleIcon className="h-4 w-4 mr-1" /> : <XCircleIcon className="h-4 w-4 mr-1" />}
+                      {booking.paymentStatus} ({booking.paymentMethod})
+                    </span>
+                  </td>
+                   <td className="px-6 py-4">${booking.price}</td>
+                  <td className="px-6 py-4 flex items-center space-x-3">
+                    {booking.paymentStatus !== 'Paid' && (
+                       <button 
+                        onClick={() => openQrModal(booking)}
+                        className="p-1 text-green-400 hover:text-green-300" 
+                        title="Registrar Pago (QR/Efectivo)"
+                      >
+                        <CurrencyDollarIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                    {/* <button className="p-1 text-blue-400 hover:text-blue-300" title="Editar">
+                      <PencilIcon className="h-5 w-5" />
+                    </button> */}
+                    <button 
+                      onClick={() => openDeleteModal(booking)}
+                      className="p-1 text-red-500 hover:text-red-400" 
+                      title="Eliminar"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {bookings.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-10 text-center text-gray-400">
-                      No hay reservas para esta fecha.
-                    </td>
-                  </tr>
-                ) : (
-                  bookings.sort((a, b) => new Date(a.startTime) - new Date(b.startTime)) // Ordenar por hora
-                  .map((booking) => (
-                    <tr key={booking._id} className="hover:bg-gray-700/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                        {format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{booking.court?.name || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{booking.user?.name || 'N/A'} {booking.user?.lastName || ''}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${booking.price}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          booking.isPaid ? 'bg-green-800 text-green-100' : 'bg-yellow-800 text-yellow-100'
-                        }`}>
-                          {booking.isPaid ? 'Pagado' : 'Pendiente'}
-                        </span>
-                         {/* Mostramos el método si está pagado */}
-                         {booking.isPaid && booking.paymentMethod && (
-                           <span className="text-xs text-gray-400 ml-2">({booking.paymentMethod})</span>
-                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 flex items-center"> {/* Added flex items-center */}
-                        {!booking.isPaid && (
-                          <>
-                            {/* BOTÓN MOSTRAR QR */}
-                            <button
-                              onClick={() => handleShowPaymentModal(booking)}
-                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors flex-shrink-0" /* Added flex-shrink-0 */
-                              title="Mostrar QR para pagar"
-                            >
-                              <QrCodeIcon className="h-4 w-4 mr-1"/> QR
-                            </button>
-                            {/* NUEVO BOTÓN PAGAR CON MP (LINK) */}
-                            <button
-                              onClick={() => handlePayWithMP(booking._id)}
-                              disabled={loadingPaymentLink === booking._id} // Deshabilitar mientras carga este link
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-xs inline-flex items-center transition-colors disabled:opacity-50 flex-shrink-0" /* Added flex-shrink-0 */
-                              title="Generar y abrir link de Mercado Pago"
-                            >
-                              <CreditCardIcon className="h-4 w-4 mr-1"/>
-                              {loadingPaymentLink === booking._id ? 'Generando...' : 'Pagar MP'}
-                            </button>
-                          </>
-                        )}
-                        <button onClick={() => handleEditBooking(booking)} className="text-cyan-400 hover:text-cyan-300 flex-shrink-0" title="Editar">Editar</button> {/* Added flex-shrink-0 */}
-                        <button onClick={() => handleDeleteBooking(booking._id)} className="text-red-500 hover:text-red-400 flex-shrink-0" title="Eliminar">Eliminar</button> {/* Added flex-shrink-0 */}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7" className="text-center py-8 text-gray-400">
+                  No se encontraron reservas.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {showBookingModal && (
-        <BookingModal
-          booking={selectedBooking}
-          courts={courts}
-          users={users} // Pasar usuarios al modal
-          onClose={() => { setShowBookingModal(false); setSelectedBooking(null); }}
-          onSave={handleSaveBooking}
-          selectedDate={selectedDate} // Pasar fecha seleccionada para pre-rellenar
+      {isDeleteModalOpen && (
+        <ConfirmModal
+          isOpen={isDeleteModalOpen}
+          onClose={closeDeleteModal}
+          onConfirm={handleDelete}
+          title="Confirmar Eliminación"
+          message={`¿Estás seguro de que deseas eliminar la reserva de ${selectedBooking?.userName || selectedBooking?.clientName} el ${selectedBooking ? format(parseISO(selectedBooking.startTime), "dd/MM/yy 'a las' HH:mm", { locale: es }) : ''}? Esta acción no se puede deshacer.`}
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          confirmColor="red"
         />
       )}
-
-      {showPaymentModal && selectedBooking && (
-        <PaymentQRModal // El modal de QR ahora solo muestra QR
-          booking={selectedBooking}
-          onClose={handleClosePaymentModal}
-        />
+      
+      {isQrModalOpen && selectedBooking && (
+         <PaymentQRModal
+            isOpen={isQrModalOpen}
+            onClose={() => setIsQrModalOpen(false)}
+            booking={selectedBooking}
+            onPaymentSuccess={handlePaymentSuccess}
+         />
       )}
     </div>
   );
