@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { authService } from './authService';
+import { registerUser } from './authService';
 
 const getAllUsers = async () => {
   try {
@@ -13,7 +13,7 @@ const getAllUsers = async () => {
 
 const createUser = async (userData) => {
     // Re-using the admin-protected register endpoint from authService
-    return authService.register(userData);
+    return registerUser(userData);
 };
 
 const deleteUser = async (id) => {
