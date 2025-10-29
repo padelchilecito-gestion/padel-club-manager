@@ -31,7 +31,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://padel-club-manager.vercel.app', // Tu dominio principal
-  
+  'https://padel-club-manager-xi.vercel.app',
   // Esta Expresión Regular acepta CUALQUIER URL que comience con 'padel-club-manager-'
   // y termine en '.vercel.app'. Esto incluye:
   // - ...-xi.vercel.app
