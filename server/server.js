@@ -17,9 +17,10 @@ connectDB();
 const app = express();
 
 // --- Configurar CORS ---
+// (Mantenemos la corrección anterior de la barra inclinada '/')
 const allowedOrigins = [
   'https://padel-club-manager-xi.vercel.app', // Tu frontend en Vercel
-  'https://padel-club-manager-xi.vercel.app/', // CORRECCIÓN: Añadido con trailing slash
+  'https://padel-club-manager-xi.vercel.app/', // Con trailing slash
   'http://localhost:5173' // Para desarrollo local
 ];
 
@@ -52,9 +53,10 @@ app.get('/', (req, res) => {
 // Crear servidor HTTP
 const server = http.createServer(app);
 
-// --- CORRECCIÓN DE LLAMADA A FUNCIÓN ---
-// Inicializar Socket.io
-setupSocketIO(server, allowedOrigins); // Cambiado de initSocket
+// --- CORRECCIÓN DE LLAMADA A FUNCIÓN (Punto 4 del colega) ---
+// Inicializar Socket.io y guardar la instancia en la app de Express
+const io = setupSocketIO(server, allowedOrigins); // Cambiado de initSocket
+app.set('socketio', io); // Guardar 'io' para usarlo en los controladores
 
 const PORT = process.env.PORT || 5000;
 
