@@ -38,11 +38,13 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, [loadUser]);
 
-  const login = async (email, password) => {
+  // CORREGIDO: Aceptar 'username' en lugar de 'email'
+  const login = async (username, password) => { 
     setAuthLoading(true);
     setError(null);
     try {
-      const data = await loginUser(email, password);
+      // CORREGIDO: Pasar 'username'
+      const data = await loginUser(username, password); 
       localStorage.setItem('token', data.token);
       
       // Recargar usuario inmediatamente para tener el rol actualizado
