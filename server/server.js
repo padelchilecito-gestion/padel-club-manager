@@ -19,6 +19,7 @@ const app = express();
 // --- Configurar CORS ---
 const allowedOrigins = [
   'https://padel-club-manager-xi.vercel.app', // Tu frontend en Vercel
+  'https://padel-club-manager-xi.vercel.app/', // CORRECCIÓN: Añadido con trailing slash
   'http://localhost:5173' // Para desarrollo local
 ];
 
