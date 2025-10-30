@@ -1,24 +1,33 @@
+// frontend/src/components/auth/ProtectedRoute.jsx
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { FullPageLoading } from '../ui/Feedback';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, authLoading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
-    // You can add a loading spinner here
-    return <div className="flex justify-center items-center h-screen">Cargando...</div>;
+  if (authLoading) {
+    return <FullPageLoading text="Verificando sesión..." />;
   }
 
-  if (!isAuthenticated) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to. This allows us to send them along to that page after they
-    // log in, which is a nicer user experience than dropping them off on the home page.
+  if (!user) {
+    // No logueado, redirigir a login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return children;
+  // --- CORRECCIÓN: AÑADIR VALIDACIÓN DE ROL ---
+  // El usuario está logueado, pero ¿es Admin u Operator?
+  const isAdminOrOperator = user.role === 'Admin' || user.role === 'Operator';
+
+  if (!isAdminOrOperator) {
+    // Logueado pero NO es admin/operator, redirigir a la página principal
+    return <Navigate to="/" state={{ from: location }} replace />;
+  }
+  
+  // Si 'user' existe Y es Admin/Operator, permite el acceso
+  return children; 
 };
 
 export default ProtectedRoute;
