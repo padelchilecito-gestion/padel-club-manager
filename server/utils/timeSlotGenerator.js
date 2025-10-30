@@ -1,5 +1,5 @@
 // server/utils/timeSlotGenerator.js
-const { addMinutes, format, parse } = require('date-fns');
+const { addMinutes, format, parse, addDays } = require('date-fns'); // <-- CORRECCIÓN AQUÍ
 
 /**
  * Genera una lista de strings de tiempo (HH:MM) para los slots de un día.
