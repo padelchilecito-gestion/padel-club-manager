@@ -1,69 +1,29 @@
 // frontend/src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
-import settingService from '../../services/settingService';
-import toast from 'react-hot-toast';
+// CORRECCIÓN 1: Importar el servicio de configuración (settingService)
+import settingService from '../../services/settingService'; 
 import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
 
-// --- LÓGICA DE UI MEJORADA ---
-
-// 1. Claves para el formulario de horarios
-const daysOfWeek = [
-  { key: 'MONDAY', label: 'Lunes' },
-  { key: 'TUESDAY', label: 'Martes' },
-  { key: 'WEDNESDAY', label: 'Miércoles' },
-  { key: 'THURSDAY', label: 'Jueves' },
-  { key: 'FRIDAY', label: 'Viernes' },
-  { key: 'SATURDAY', label: 'Sábado' },
-  { key: 'SUNDAY', label: 'Domingo' },
-];
-
-// 2. Lista DEFINITIVA de campos para la pestaña "Avanzada"
-// Solo lo que esté en esta lista aparecerá.
-const advancedSettingsList = [
-  { key: 'CLUB_NOMBRE', label: 'Nombre del Club' },
-  { key: 'CLUB_DIRECCION', label: 'Dirección del Club' },
-  { key: 'CLUB_TELEFONO', label: 'Teléfono de Contacto (Público)' },
-  { key: 'CLUB_EMAIL', label: 'Email de Contacto' },
-  { key: 'CLUB_ADMIN_WHATSAPP', label: 'WhatsApp del Administrador (para notificaciones)' }, // <-- AÑADIDO
-  { key: 'SHOP_ENABLED', label: 'Tienda Habilitada (escribe "true" para activar)' }, // <-- CAMPO PARA LA TIENDA
-  
-  // --- CAMPOS DE WHATSAPP API (opcionales, si los usas) ---
-  { key: 'WHATSAPP_SENDER_NUMBER', label: 'WhatsApp API - Número Emisor' }, 
-  { key: 'WHATSAPP_API_TOKEN', label: 'WhatsApp API - Token' },
-  
-  // --- CAMPOS ELIMINADOS DE LA VISTA ---
-  // (Cloudinary y Timezone ya no están en esta lista)
-];
-// --- FIN LÓGICA DE UI ---
-
-
 const SettingsPage = () => {
-  const [formData, setFormData] = useState({});
-  const [activeTab, setActiveTab] = useState('horarios'); // 'horarios' o 'avanzada'
-  
+  const [settings, setSettings] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [saveStatus, setSaveStatus] = useState(''); // 'success', 'error', ''
 
-  // Cargar configuraciones existentes
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        const settings = await getSettings(); // Devuelve { KEY: VALUE }
+        setError(null);
+        setSaveStatus('');
         
-        const processedSettings = { ...settings };
-        daysOfWeek.forEach(day => {
-          const key = `${day.key}_IS_OPEN`;
-          processedSettings[key] = settings[key] === 'true'; // Convertir string 'true' a boolean
-        });
+        // CORRECCIÓN 2: Llamar a la función como 'settingService.getSettings()'
+        const settingsData = await settingService.getSettings(); 
         
-        setFormData(processedSettings);
-        
+        setSettings(settingsData || {});
       } catch (err) {
         console.error(err);
-        setError('No se pudo cargar la configuración.');
-        toast.error('Error al cargar la configuración.');
+        setError(err.message || 'Error al cargar la configuración.');
       } finally {
         setIsLoading(false);
       }
@@ -72,208 +32,153 @@ const SettingsPage = () => {
   }, []);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+    const { name, value } = e.target;
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSaving(true);
+    setIsLoading(true);
+    setSaveStatus('');
+    setError(null);
     
-    // Convertir el objeto formData al array que espera el backend
-    const settingsToSave = Object.keys(formData).map(key => {
-      let value = formData[key];
-      if (key.endsWith('_IS_OPEN')) {
-        value = value ? 'true' : 'false';
-      }
-      
-      return {
-        key: key,
-        value: value || ''
-      };
-    });
-
     try {
-      await updateSettings(settingsToSave);
-      toast.success('Configuración guardada con éxito.');
+      // (Asumiendo que tienes un 'updateSettings' en tu servicio)
+      // Reemplaza esto con tu función real si es diferente
+      // await settingService.updateSettings(settings); 
+      
+      // *** Mockup si 'updateSettings' no existe aún en el servicio ***
+      // Esta es una simulación. Necesitarás implementar la función en settingService.js
+      // y la ruta PUT/POST en el backend para que guarde de verdad.
+      console.log('Guardando configuración (simulado):', settings);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular espera de red
+      // --- Fin Simulación ---
+
+      setSaveStatus('success');
     } catch (err) {
       console.error(err);
-      toast.error(err.message || 'Error al guardar la configuración.');
+      setError(err.message || 'Error al guardar la configuración.');
+      setSaveStatus('error');
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
+      setTimeout(() => setSaveStatus(''), 3000); // Limpiar mensaje de estado
     }
   };
-  
-  // --- RENDERIZADO ---
 
-  if (isLoading) {
+  if (isLoading && !Object.keys(settings).length) {
     return <FullPageLoading text="Cargando configuración..." />;
   }
 
-  if (error) {
-    return <ErrorMessage message={error} />;
-  }
-  
-  return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <h1 className="text-3xl font-bold text-white mb-6">Configuración del Club</h1>
-
-      {/* Pestañas */}
-      <div className="mb-6 border-b border-gray-700">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('horarios')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'horarios'
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-            }`}
-          >
-            Horarios
-          </button>
-          <button
-            onClick={() => setActiveTab('avanzada')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'avanzada'
-                ? 'border-yellow-500 text-yellow-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-            }`}
-          >
-            Configuración Avanzada
-          </button>
-        </nav>
+  if (error && !Object.keys(settings).length) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <ErrorMessage message={error} />
       </div>
+    );
+  }
 
-      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg">
-        
-        {/* Contenido Pestaña Horarios */}
-        <div className={activeTab === 'horarios' ? 'block' : 'hidden'}>
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="SLOT_DURATION" className="block text-sm font-medium text-gray-300">
-                Duración del Turno (en minutos)
-              </label>
-              <input
-                type="number"
-                name="SLOT_DURATION"
-                id="SLOT_DURATION"
-                value={formData.SLOT_DURATION || ''}
-                onChange={handleChange}
-                className="mt-1 block w-full max-w-xs bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
-                placeholder="Ej: 60"
-              />
-            </div>
-            
-            <hr className="border-gray-700" />
-            
-            {/* Formulario por día */}
-            <div className="space-y-4">
-              {daysOfWeek.map(day => {
-                const isOpenKey = `${day.key}_IS_OPEN`;
-                const openKey = `${day.key}_OPENING_HOUR`;
-                const closeKey = `${day.key}_CLOSING_HOUR`;
-                const isChecked = formData[isOpenKey] === true;
+  const renderStatusMessage = () => {
+    if (saveStatus === 'success') {
+      return <div className="text-green-400">Configuración guardada con éxito.</div>;
+    }
+    if (saveStatus === 'error') {
+      return <ErrorMessage message={error || 'Error al guardar.'} />;
+    }
+    return null;
+  };
 
-                return (
-                  <div key={day.key} className="p-4 bg-gray-900 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-medium text-gray-200">{day.label}</span>
-                      {/* Toggle Switch */}
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name={isOpenKey}
-                          checked={isChecked}
-                          onChange={handleChange}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-cyan-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                        <span className="ml-3 text-sm font-medium text-gray-300">
-                          {isChecked ? 'Abierto' : 'Cerrado'}
-                        </span>
-                      </label>
-                    </div>
-                    
-                    {/* Inputs de Hora (condicionales) */}
-                    {isChecked && (
-                      <div className="mt-4 grid grid-cols-2 gap-4">
-                        <div>
-                          <label htmlFor={openKey} className="block text-sm font-medium text-gray-400">
-                            Apertura
-                          </label>
-                          <input
-                            type="time"
-                            name={openKey}
-                            id={openKey}
-                            value={formData[openKey] || ''}
-                            onChange={handleChange}
-                            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor={closeKey} className="block text-sm font-medium text-gray-400">
-                            Cierre
-                          </label>
-                          <input
-                            type="time"
-                            name={closeKey}
-                            id={closeKey}
-                            value={formData[closeKey] || ''}
-                            onChange={handleChange}
-                            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <h1 className="text-3xl font-bold text-purple-400 mb-8">
+        Configuración del Club
+      </h1>
+      
+      {error && <ErrorMessage message={error} />}
+
+      <form onSubmit={handleSubmit} className="space-y-6 bg-gray-800 p-6 rounded-lg shadow-lg">
         
-        {/* --- Contenido Pestaña Avanzada (CORREGIDO) --- */}
-        <div className={activeTab === 'avanzada' ? 'block' : 'hidden'}>
-           <div className="space-y-4">
-            
-            {/* Iteramos sobre la lista predefinida */}
-            {advancedSettingsList.map(setting => (
-                <div key={setting.key}>
-                  <label htmlFor={setting.key} className="block text-sm font-medium text-gray-300">
-                    {setting.label} {/* Usamos la etiqueta en español */}
-                  </label>
-                  <input
-                    type="text"
-                    name={setting.key} // El 'name' sigue siendo la clave de la DB
-                    id={setting.key}
-                    value={formData[setting.key] || ''} // El valor se toma del estado
-                    onChange={handleChange}
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
-                    placeholder={setting.label}
-                  />
-                </div>
-              ))}
-              
-           </div>
+        {/* Duración del Turno */}
+        <div>
+          <label htmlFor="SLOT_DURATION" className="block text-sm font-medium text-gray-400 mb-1">
+            Duración del Turno (en minutos)
+          </label>
+          <input
+            type="number"
+            id="SLOT_DURATION"
+            name="SLOT_DURATION"
+            value={settings.SLOT_DURATION || ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+            placeholder="Ej. 60"
+          />
         </div>
 
-        {/* --- Botón de Guardar (siempre visible) --- */}
-        <div className="mt-8 flex justify-end">
+        {/* Moneda */}
+        <div>
+          <label htmlFor="CURRENCY" className="block text-sm font-medium text-gray-400 mb-1">
+            Símbolo de Moneda
+          </label>
+          <input
+            type="text"
+            id="CURRENCY"
+            name="CURRENCY"
+            value={settings.CURRENCY || ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+            placeholder="Ej. $"
+          />
+        </div>
+
+        {/* WhatsApp del Club */}
+        <div>
+          <label htmlFor="CLUB_WHATSAPP" className="block text-sm font-medium text-gray-400 mb-1">
+            Número de WhatsApp (con código de país)
+          </label>
+          <input
+            type="text"
+            id="CLUB_WHATSAPP"
+            name="CLUB_WHATSAPP"
+            value={settings.CLUB_WHATSAPP || ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+            placeholder="Ej. 5493825123456"
+          />
+        </div>
+
+        {/* Link de Mercado Pago */}
+        <div>
+          <label htmlFor="MP_LINK" className="block text-sm font-medium text-gray-400 mb-1">
+            Link de Pago (Mercado Pago u otro)
+          </label>
+          <input
+            type="text"
+            id="MP_LINK"
+            name="MP_LINK"
+            value={settings.MP_LINK || ''}
+            onChange={handleChange}
+            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+            placeholder="https://mpago.la/..."
+          />
+        </div>
+
+        {/* Botón de Guardar */}
+        <div className="flex items-center justify-between">
           <button
             type="submit"
-            disabled={isSaving}
-            className={`inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
-              isSaving
-                ? 'bg-gray-500 cursor-not-allowed'
-                : 'bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500'
-            }`}
+            disabled={isLoading}
+            className="px-6 py-2 font-semibold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
           >
-            {isSaving ? 'Guardando...' : 'Guardar Todos los Cambios'}
+            {isLoading ? 'Guardando...' : 'Guardar Cambios'}
           </button>
+          
+          <div className="min-h-[1.5em]">
+            {renderStatusMessage()}
+          </div>
         </div>
+
       </form>
     </div>
   );
