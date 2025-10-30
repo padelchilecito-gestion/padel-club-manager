@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
-import { getSettings, updateSettings } from '../../services/settingService';
+import settingService from '../../services/settingService';
 import toast from 'react-hot-toast';
 import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
 
