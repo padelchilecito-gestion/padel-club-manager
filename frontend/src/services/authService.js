@@ -1,14 +1,18 @@
 // frontend/src/services/authService.js
 
 import axios from 'axios';
-
-const API_URL = '/api/auth'; // Asegúrate de que esta URL sea correcta para tu backend
-const USER_API_URL = '/api/users'; // Para obtener el perfil del usuario
+// CORRECCIÓN: Quitamos api.js y usamos axios directo con la URL completa
+// porque 'api.js' (el interceptor) aún no tiene el token de autorización 
+// en el momento del login. Esto evita problemas de URL duplicada (/api/api).
+const API_URL_BASE = import.meta.env.VITE_API_URL || '';
+const API_URL = `${API_URL_BASE}/api/auth`; 
+const USER_API_URL = `${API_URL_BASE}/api/users`;
 
 // Función para iniciar sesión
-export const loginUser = async (email, password) => {
+export const loginUser = async (username, password) => { // <-- CORREGIDO (username)
     try {
-        const response = await axios.post(`${API_URL}/login`, { email, password });
+        // CORREGIDO: Usar axios.post y enviar 'username'
+        const response = await axios.post(`${API_URL}/login`, { username, password }); 
         if (response.data.token) {
             // Guardar el token en localStorage es opcional aquí si ya lo manejas en AuthContext
             // localStorage.setItem('token', response.data.token);
@@ -22,6 +26,7 @@ export const loginUser = async (email, password) => {
 // Función para registrar un nuevo usuario
 export const registerUser = async (userData) => {
     try {
+        // CORREGIDO: Usar axios.post
         const response = await axios.post(`${API_URL}/register`, userData);
         if (response.data.token) {
             // localStorage.setItem('token', response.data.token);
@@ -41,6 +46,7 @@ export const getUserProfile = async (token) => {
                 Authorization: `Bearer ${token}`,
             },
         };
+        // CORREGIDO: Usar axios.get
         // Asumiendo que tienes un endpoint como /api/users/profile que devuelve el perfil del usuario
         const response = await axios.get(`${USER_API_URL}/profile`, config); 
         return response.data; // Debería devolver un objeto de usuario { id, name, email, role, etc. }
