@@ -1,8 +1,9 @@
+// server/controllers/userController.js
 const User = require('../models/User');
 const { logActivity } = require('../utils/logActivity');
 
 // @desc    Register a new user
-// @route   POST /api/users/register
+// @route   POST /api/users
 // @access  Admin
 const registerUser = async (req, res) => {
   const { username, password, role } = req.body;
@@ -78,9 +79,88 @@ const deleteUser = async (req, res) => {
     }
 };
 
+// --- INICIO DE FUNCIONES FALTANTES ---
+
+// @desc    Get user profile
+// @route   GET /api/users/profile
+// @access  Protected
+const getUserProfile = async (req, res) => {
+  try {
+    // req.user.id es añadido por el middleware 'protect'
+    const user = await User.findById(req.user.id).select('-password');
+
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Get user by ID
+// @route   GET /api/users/:id
+// @access  Protected
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Update user
+// @route   PUT /api/users/:id
+// @access  Protected (o Admin, según tu lógica de negocio)
+const updateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+      user.username = req.body.username || user.username;
+      user.role = req.body.role || user.role;
+
+      // Si se proporciona una nueva contraseña, el hook 'pre-save' en el modelo User.js la hasheará
+      if (req.body.password) {
+        user.password = req.body.password;
+      }
+
+      const updatedUser = await user.save();
+      
+      const logDetails = `User '${updatedUser.username}' (ID: ${updatedUser._id}) was updated by '${req.user.username}'.`;
+      await logActivity(req.user, 'USER_UPDATED', logDetails);
+
+      res.json({
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        role: updatedUser.role,
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// --- FIN DE FUNCIONES FALTANTES ---
+
 
 module.exports = {
   registerUser,
   getAllUsers,
   deleteUser,
+  getUserProfile, // <-- CORRECCIÓN: Exportar
+  getUserById,    // <-- CORRECCIÓN: Exportar
+  updateUser,     // <-- CORRECCIÓN: Exportar
 };
