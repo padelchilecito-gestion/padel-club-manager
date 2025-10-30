@@ -1,20 +1,18 @@
 // frontend/src/services/authService.js
 
 import axios from 'axios';
-// CORRECCIÓN: Quitamos api.js y usamos axios directo con la URL completa
-// porque 'api.js' (el interceptor) aún no tiene el token de autorización 
-// en el momento del login. Esto evita problemas de URL duplicada (/api/api).
-const API_URL_BASE = import.meta.env.VITE_API_URL || '';
-const API_URL = `${API_URL_BASE}/api/auth`; 
-const USER_API_URL = `${API_URL_BASE}/api/users`;
+
+// CORRECCIÓN: Volvemos a las rutas relativas. Vercel (vercel.json)
+// se encargará de redirigirlas al backend.
+const API_URL = '/api/auth'; // Para Login
+const USER_API_URL = '/api/users'; // Para Registro y Perfil
 
 // Función para iniciar sesión
 export const loginUser = async (username, password) => { // <-- CORREGIDO (username)
     try {
-        // CORREGIDO: Usar axios.post y enviar 'username'
-        const response = await axios.post(`${API_URL}/login`, { username, password }); 
+        // Usar ruta relativa y 'username'
+        const response = await axios.post(`${API_URL}/login`, { username, password });
         if (response.data.token) {
-            // Guardar el token en localStorage es opcional aquí si ya lo manejas en AuthContext
             // localStorage.setItem('token', response.data.token);
         }
         return response.data;
@@ -26,8 +24,9 @@ export const loginUser = async (username, password) => { // <-- CORREGIDO (usern
 // Función para registrar un nuevo usuario
 export const registerUser = async (userData) => {
     try {
-        // CORREGIDO: Usar axios.post
-        const response = await axios.post(`${API_URL}/register`, userData);
+        // CORRECCIÓN: La ruta de registro está en USER_API_URL ('/api/users'), 
+        // no en API_URL ('/api/auth').
+        const response = await axios.post(USER_API_URL, userData); 
         if (response.data.token) {
             // localStorage.setItem('token', response.data.token);
         }
@@ -46,19 +45,10 @@ export const getUserProfile = async (token) => {
                 Authorization: `Bearer ${token}`,
             },
         };
-        // CORREGIDO: Usar axios.get
-        // Asumiendo que tienes un endpoint como /api/users/profile que devuelve el perfil del usuario
+        // Usar ruta relativa
         const response = await axios.get(`${USER_API_URL}/profile`, config); 
         return response.data; // Debería devolver un objeto de usuario { id, name, email, role, etc. }
     } catch (error) {
         throw error;
     }
 };
-
-// Ya no necesitamos la exportación por defecto (default export)
-// const authService = {
-//     loginUser,
-//     registerUser,
-//     getUserProfile,
-// };
-// export default authService;
