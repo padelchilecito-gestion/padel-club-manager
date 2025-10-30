@@ -43,4 +43,20 @@ const admin = (req, res, next) => {
   }
 };
 
-module.exports = { protect, admin };
+// --- AÑADIDO ---
+// Esta es la función que faltaba.
+// Acepta un array de roles (ej. ['Admin', 'Operator'])
+// y devuelve un middleware que comprueba si el usuario (req.user) tiene uno de esos roles.
+const authorize = (roles) => {
+  return (req, res, next) => {
+    // Se asume que 'protect' ya se ejecutó y adjuntó 'req.user'
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: `Acceso denegado. Se requiere rol: ${roles.join(' o ')}` });
+    }
+    next();
+  };
+};
+
+// --- MODIFICADO ---
+// Añadimos 'authorize' al objeto que exportamos
+module.exports = { protect, admin, authorize };
