@@ -1,70 +1,56 @@
-import React, { useState } from 'react';
+// frontend/src/pages/admin/AdminLayout.jsx
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from '../../components/admin/Sidebar';
 import AdminHeader from '../../components/admin/AdminHeader';
 import DashboardPage from './DashboardPage';
 import BookingsPage from './BookingsPage';
-import PosPage from './PosPage';
-import InventoryPage from './InventoryPage';
 import CourtsPage from './CourtsPage';
+import InventoryPage from './InventoryPage';
+import PosPage from './PosPage';
+import CashboxPage from './CashboxPage';
+import SalesHistoryPage from './SalesHistoryPage';
 import UsersPage from './UsersPage';
 import ReportsPage from './ReportsPage';
 import ActivityLogPage from './ActivityLogPage';
-import SettingsPage from './SettingsPage';
-import CashboxPage from './CashboxPage';
-import SalesHistoryPage from './SalesHistoryPage';
-
-// Import route protectors
-import ProtectedRoute from '../../components/auth/ProtectedRoute';
-import AdminRoute from '../../components/auth/AdminRoute';
-
+import SettingsPage from './SettingsPage'; // <-- CORRECCIÓN 1: Importar SettingsPage
 
 const AdminLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   return (
-    <div className="flex h-screen bg-dark-primary text-text-primary overflow-hidden">
-      {/* Sidebar for Desktop */}
-      <div className="hidden md:flex md:flex-shrink-0">
-        <Sidebar />
-      </div>
+    <div className="flex h-screen bg-gray-900 text-gray-200">
+      {/* Sidebar */}
+      <Sidebar />
 
-      {/* Mobile Sidebar */}
-      <div
-        className={`fixed inset-0 z-30 transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } transition-transform duration-300 ease-in-out md:hidden`}
-      >
-        <Sidebar />
-      </div>
-
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-primary p-4 md:p-6">
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            ></div>
-          )}
+        {/* Header */}
+        <AdminHeader />
+
+        {/* Page Content */}
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
           <Routes>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
-            <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
-            <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-            <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
-            <Route path="cashbox" element={<ProtectedRoute><CashboxPage /></ProtectedRoute>} />
+            {/* La ruta base "/admin" se maneja aquí */}
+            <Route path="/" element={<DashboardPage />} /> 
+            
+            {/* React Router v6 maneja rutas anidadas relativas al 'path' del padre.
+              En App.jsx, el padre es "/admin/*".
+              Por lo tanto, "bookings" aquí equivale a "/admin/bookings".
+            */}
+            <Route path="/bookings" element={<BookingsPage />} />
+            <Route path="/courts" element={<CourtsPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/pos" element={<PosPage />} />
+            <Route path="/cashbox" element={<CashboxPage />} />
+            <Route path="/sales-history" element={<SalesHistoryPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/activity-log" element={<ActivityLogPage />} />
 
-            {/* Routes for Admin only */}
-            <Route path="users" element={<AdminRoute><UsersPage /></AdminRoute>} />
-            <Route path="sales" element={<AdminRoute><SalesHistoryPage /></AdminRoute>} />
-            <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
-            <Route path="logs" element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
-            <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+            {/* --- CORRECCIÓN 2: Añadir la ruta de Settings --- */}
+            <Route path="/settings" element={<SettingsPage />} />
 
-            {/* Fallback for any other admin route */}
-            <Route path="*" element={<h1 className="text-white">Página no encontrada en el panel</h1>} />
+            {/* Redirigir cualquier ruta desconocida dentro de /admin al Dashboard */}
+            <Route path="*" element={<Navigate to="/admin" replace />} /> 
           </Routes>
         </main>
       </div>
