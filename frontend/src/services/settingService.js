@@ -1,7 +1,8 @@
 // frontend/src/services/settingService.js
 import api from './api';
 
-const SETTING_API_URL = '/api/settings'; // Asegúrate de que esta URL sea correcta
+// CORRECCIÓN: Quitamos /api de esta URL, porque api.js ya lo incluye en la baseURL.
+const SETTING_API_URL = '/settings'; 
 
 /**
  * Obtiene todas las configuraciones del sistema.
