@@ -9,7 +9,8 @@ import { userService } from '../../services/userService';
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FullPageLoading, ErrorMessage, ConfirmModal } from '../../components/ui/Feedback';
+import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import toast from 'react-hot-toast';
 import PaymentQRModal from '../../components/admin/PaymentQRModal';
 
