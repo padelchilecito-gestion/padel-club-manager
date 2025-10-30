@@ -1,37 +1,44 @@
 // frontend/src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom'; // Importar Navigate
 import { FullPageLoading, ErrorMessage } from '../components/ui/Feedback';
 
 const LoginPage = () => {
-  // CORREGIDO: Cambiar 'email' por 'username'
   const [username, setUsername] = useState(''); 
   const [password, setPassword] = useState('');
-  const { login, authLoading, error } = useAuth();
+  const { login, authLoading, error, user } = useAuth(); // <-- OBTENER 'user'
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // CORREGIDO: Pasar 'username'
       await login(username, password); 
-      
-      // La redirección ahora se maneja en AuthContext
-      // const from = location.state?.from?.pathname || '/admin';
-      // navigate(from, { replace: true });
-
+      // La redirección ahora se maneja en AuthContext O en el re-render de abajo
     } catch (err) {
-      // El error ya se maneja y almacena en el AuthContext
       console.error(err.message); 
     }
   };
 
+  // --- CORRECCIÓN 1: CHEQUEO DE 'authLoading' ---
+  // Mantenemos al usuario en "Cargando" mientras el login (que incluye el profile) termina.
   if (authLoading && !error) {
     return <FullPageLoading text="Iniciando sesión..." />;
   }
+  
+  // --- CORRECCIÓN 2: CHEQUEO DE 'user' ---
+  // Si 'authLoading' terminó y SÍ tenemos un 'user', significa que el login fue exitoso.
+  // Lo redirigimos al admin panel.
+  if (user) {
+    // Si el usuario es Admin/Operator, va a /admin, si no, a la página principal
+    if (user.role === 'Admin' || user.role === 'Operator') {
+      return <Navigate to="/admin" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
 
+  // Si no hay 'user' y no está cargando, mostramos el formulario de login
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-200">
       <div className="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
@@ -45,7 +52,6 @@ const LoginPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            {/* CORREGIDO: Label y htmlFor */}
             <label 
               htmlFor="username" 
               className="block text-sm font-medium text-gray-400"
@@ -53,7 +59,6 @@ const LoginPage = () => {
               Usuario (Username)
             </label>
             <input
-              // CORREGIDO: type, id, value, onChange
               type="text" 
               id="username"
               value={username}
