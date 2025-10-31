@@ -1,91 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-dark-primary text-text-primary antialiased;
-    font-family: 'Inter', sans-serif;
+/* CORRECCIÓN: 
+  Envolvemos todas las clases personalizadas en '@layer utilities' 
+  para que Tailwind las reconozca, tal como lo pidió el error de Vercel.
+*/
+@layer utilities {
+  /* Estilos personalizados */
+  .bg-dark-primary {
+    background-color: #0D1B2A; /* Color de fondo oscuro principal */
   }
 
-  /* Custom Scrollbar for a more modern look */
+  .bg-dark-secondary {
+    background-color: #1B263B; /* Color de fondo oscuro secundario */
+  }
+
+  .text-dark-primary {
+    color: #E0E1DD; /* Color de texto principal en modo oscuro */
+  }
+
+  .text-dark-secondary {
+    color: #C1C2C5; /* Color de texto secundario en modo oscuro */
+  }
+
+  .border-dark-primary {
+    border-color: #415A77; /* Color de borde en modo oscuro */
+  }
+
+  /* Estilos para scrollbars (si los quieres mantener) */
+  /* Webkit (Chrome, Safari) */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
+
   ::-webkit-scrollbar-track {
-    background: #1B263B; /* dark-secondary */
-  }
-  ::-webkit-scrollbar-thumb {
-    background-color: #4A5568; /* A shade of gray */
+    background: #f1f1f1;
     border-radius: 10px;
-    border: 2px solid #1B263B; /* dark-secondary */
   }
+
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+  }
+
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #718096;
+    background: #555;
   }
-}
-/* --- Estilos para SettingsPage y ScheduleGrid --- */
 
-/* Evita que la página salte al arrastrar en la grilla */
-.select-none {
-  user-select: none;
-}
-
-/* Mejora el layout de los formularios en SettingsPage */
-.form-control {
-  margin-bottom: 0.5rem;
-}
-
-.form-control .label {
-  padding-bottom: 0.25rem;
-}
-
-/* Ajustes para la grilla de horarios */
-.schedule-grid-container {
-  display: grid;
-  /* 1 columna para nombres de día, 48 para slots (asumiendo 30 min) */
-  grid-template-columns: 60px repeat(48, 1fr);
-  gap: 1px;
-  background-color: #e5e7eb; /* Color de fondo para los 'borders' */
-  border: 1px solid #e5e7eb;
-  overflow-x: auto;
-}
-
-.schedule-header {
-  grid-column: span 2; /* Cada hora ocupa 2 slots de 30 min */
-  text-align: center;
-  font-size: 0.75rem;
-  padding: 4px;
-  background-color: white;
-  color: #4b5563;
-}
-
-.schedule-day-label {
-  text-align: right;
-  padding: 8px 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  background-color: white;
-}
-
-.schedule-cell {
-  height: 2rem;
-  cursor: pointer;
-  background-color: #f3f4f6; /* Celda cerrada */
-  transition: background-color 0.1s ease;
-}
-
-.schedule-cell:hover {
-  background-color: #d1d5db; /* Hover en celda cerrada */
-}
-
-.schedule-cell.is-open {
-  background-color: #10b981; /* Celda abierta (verde) */
-}
-
-.schedule-cell.is-open:hover {
-  background-color: #059669; /* Hover en celda abierta */
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+  }
 }
