@@ -262,7 +262,10 @@ const SettingsPage = () => {
               <input type="text" value={mpPublicKey} onChange={(e) => setMpPublicKey(e.target.value)} className="input input-bordered w-full" />
             </div>
             <div className="form-control">
-              <label className="label"><span className="label-text">MP Access Token</span></labe>
+              {/* --- ESTA ES LA LÍNEA CORREGIDA --- */}
+              <label className="label"><span className="label-text">MP Access Token</span></label>
+            </div>
+            <div className="form-control">
               <input type="password" value={mpAccessToken} onChange={(e) => setMpAccessToken(e.target.value)} className="input input-bordered w-full" />
             </div>
             <div className="form-control">
