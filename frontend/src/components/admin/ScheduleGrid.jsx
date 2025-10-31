@@ -20,10 +20,10 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
   const [isPainting, setIsPainting] = useState(false);
   const [paintMode, setPaintMode] = useState(true); // true = pintar 'abierto', false = pintar 'cerrado'
 
+  // totalSlots será 48 si slotDuration es 30
   const totalSlots = useMemo(() => (24 * 60) / slotDuration, [slotDuration]);
 
   // --- 1. "De-traductor" (API -> Grilla Visual) ---
-  // Convierte los 21 campos de la API en la grilla visual de 7x48
   useEffect(() => {
     const timeToSlotIndex = (time) => {
       if (!time) return -1;
@@ -40,36 +40,29 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
         let endSlot = timeToSlotIndex(openingHours[`${dayKey}_CLOSING_HOUR`]);
         
         // Lógica para cierre a medianoche "00:00"
-        if (endSlot === 0 && openingHours[`${dayKey}_CLOSING_HOUR`] !== '00:00') {
-           // Si la hora es 00:00, puede ser el final del día
-        }
+        // Si el cierre es 00:00 y la apertura no, significa que cierra al final del día.
         if (endSlot === 0 && startSlot !== 0) {
-            endSlot = totalSlots; // Significa que cierra al final del día (24:00)
+            endSlot = totalSlots; // totalSlots (ej. 48) representa 24:00
         }
 
-        if (startSlot === -1 || endSlot === -1) {
-           // Error en los datos, lo dejamos cerrado
-        }
-        else if (startSlot === 0 && endSlot === totalSlots) {
-            // Caso 24h
+        if (startSlot === 0 && endSlot === totalSlots) {
+             // Caso 24h
              for (let i = 0; i < totalSlots; i++) daySlots[i] = true;
         }
-        else if (startSlot < endSlot) {
+        else if (startSlot > -1 && endSlot > -1 && startSlot < endSlot) {
           // Caso normal (ej: 08:00 a 17:00)
           for (let i = startSlot; i < endSlot; i++) daySlots[i] = true;
         }
-        // No manejamos start > end porque la API lo guarda por día
-        // (ej: LUN: 8-24, MAR: 0-2)
       }
       return daySlots;
     });
     setGrid(newGrid);
-  }, [openingHours, slotDuration, totalSlots]); // Recalcular si cambian las props
+  }, [openingHours, slotDuration, totalSlots]);
 
   // --- 2. Lógica de "Pintar" ---
   const handleMouseDown = (dayIndex, slotIndex) => {
     setIsPainting(true);
-    const currentMode = !grid[dayIndex][slotIndex]; // Pinta lo opuesto a la celda clickeada
+    const currentMode = !grid[dayIndex][slotIndex];
     setPaintMode(currentMode);
     toggleCell(dayIndex, slotIndex, currentMode);
   };
@@ -83,15 +76,12 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
   const handleMouseUp = () => {
     if (isPainting) {
       setIsPainting(false);
-      // Cuando terminamos de pintar, "traducimos" la grilla a los 21 campos
       translateGridToApi();
     }
   };
   
-  // Función helper para actualizar el estado de la grilla
   const toggleCell = (dayIndex, slotIndex, newState) => {
     setGrid(prevGrid => {
-      // Evitar mutación del estado
       const newGrid = prevGrid.map(day => [...day]); 
       newGrid[dayIndex][slotIndex] = newState;
       return newGrid;
@@ -99,7 +89,6 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
   };
 
   // --- 3. "Traductor" (Grilla Visual -> API) ---
-  // Convierte la grilla visual de 7x48 a los 21 campos que la API entiende
   const translateGridToApi = useCallback(() => {
     const slotIndexToTime = (index) => {
       const totalMinutes = index * slotDuration;
@@ -127,7 +116,7 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
         newSchedule[`${dayKey}_OPENING_HOUR`] = slotIndexToTime(firstOpenSlot);
         
         // El horario de cierre es el *inicio* del siguiente slot
-        // Ej: si el último slot es 23:30, el cierre es 24:00 (que guardamos como 00:00)
+        // Ej: si el último slot es 23:30 (índice 47), el cierre es slotIndexToTime(48) -> "24:00"
         const closingTime = slotIndexToTime(lastOpenSlot + 1);
         
         // Si el cierre es "24:00", la API lo espera como "00:00"
@@ -135,7 +124,6 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
       }
     });
 
-    // Llamar al callback de SettingsPage con los datos traducidos
     onScheduleChange(newSchedule);
   }, [grid, slotDuration, onScheduleChange]);
 
@@ -145,13 +133,13 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
 
   const renderHeaders = () => {
     const headers = [];
-    const slotsPerHour = 60 / slotDuration;
+    const slotsPerHour = 60 / slotDuration; // Será 2 si slotDuration es 30
     for (let h = 0; h < 24; h++) {
       headers.push(
         <div 
           key={h} 
           className="text-center text-xs text-gray-500"
-          style={{ gridColumn: `span ${slotsPerHour}` }} // Ocupa 2 celdas si slot=30
+          style={{ gridColumn: `span ${slotsPerHour}` }} // Cada hora ocupa 'slotsPerHour' columnas
         >
           {String(h).padStart(2, '0')}:00
         </div>
@@ -165,8 +153,9 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
       <div 
         className="grid items-center gap-px"
         style={{ 
+          // 1 columna para label + 'totalSlots' columnas para horas
           gridTemplateColumns: `60px repeat(${totalSlots}, minmax(10px, 1fr))`,
-          minWidth: `${60 + totalSlots * 10}px` // Asegura un ancho mínimo
+          minWidth: `${60 + totalSlots * 10}px` 
         }}
       >
         {/* Fila de Headers (Horas) */}
@@ -174,17 +163,17 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
         
         {/* --- ESTA ES LA SECCIÓN CORREGIDA --- */}
         <div 
-          className="grid" // Quitamos el 'col-span-48' que fallaba
+          className="grid"
           style={{
-            gridColumn: '2 / -1', // Estilo en línea para que ocupe todas las columnas de slots
-            gridTemplateColumns: `repeat(24, 1fr)`,
-            gap: '1px' // Gap de 1px entre los headers
+            gridColumn: '2 / -1', // Ocupa el espacio de todas las columnas de slots
+            // La grilla INTERNA debe tener 'totalSlots' (48) columnas
+            gridTemplateColumns: `repeat(${totalSlots}, 1fr)`, 
+            gap: '1px'
           }}
         >
           {renderHeaders()}
         </div>
         {/* --- FIN DE LA SECCIÓN CORREGIDA --- */}
-
 
         {/* Filas de Días y Slots */}
         {DAY_NAMES_ES.map((dayName, dayIndex) => (
