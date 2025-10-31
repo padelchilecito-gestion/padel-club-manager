@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
+import jwt from 'jsonwebtoken'; // <-- 1. Importar 'jsonwebtoken'
 import User from '../models/User.js';
-import generateToken from '../utils/generateToken.js';
+// import generateToken from '../utils/generateToken.js'; // <-- 2. Eliminar la importación que falla
 import logActivity from '../utils/logActivity.js';
 
 // @desc    Auth user & get token
@@ -12,12 +13,16 @@ const loginUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email });
 
   if (user && (await user.matchPassword(password))) {
-    const token = generateToken(user._id);
+    
+    // 3. Reemplazar la función 'generateToken' por la implementación directa
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '30d' // La cookie expira en 30 días
+    });
 
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'none', // CAMBIADO DE 'strict' A 'none'
+      sameSite: 'none', 
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
@@ -49,7 +54,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     httpOnly: true,
     expires: new Date(0),
     secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'none', // CAMBIADO DE 'strict' A 'none'
+    sameSite: 'none', 
   });
   res.status(200).json({ message: 'Sesión cerrada exitosamente' });
 });
@@ -68,7 +73,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
       role: user.role,
     });
   } else {
-    res.status(4404);
+    res.status(404);
     throw new Error('Usuario no encontrado');
   }
 });
