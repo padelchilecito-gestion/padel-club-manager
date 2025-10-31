@@ -27,3 +27,65 @@
     background-color: #718096;
   }
 }
+/* --- Estilos para SettingsPage y ScheduleGrid --- */
+
+/* Evita que la página salte al arrastrar en la grilla */
+.select-none {
+  user-select: none;
+}
+
+/* Mejora el layout de los formularios en SettingsPage */
+.form-control {
+  margin-bottom: 0.5rem;
+}
+
+.form-control .label {
+  padding-bottom: 0.25rem;
+}
+
+/* Ajustes para la grilla de horarios */
+.schedule-grid-container {
+  display: grid;
+  /* 1 columna para nombres de día, 48 para slots (asumiendo 30 min) */
+  grid-template-columns: 60px repeat(48, 1fr);
+  gap: 1px;
+  background-color: #e5e7eb; /* Color de fondo para los 'borders' */
+  border: 1px solid #e5e7eb;
+  overflow-x: auto;
+}
+
+.schedule-header {
+  grid-column: span 2; /* Cada hora ocupa 2 slots de 30 min */
+  text-align: center;
+  font-size: 0.75rem;
+  padding: 4px;
+  background-color: white;
+  color: #4b5563;
+}
+
+.schedule-day-label {
+  text-align: right;
+  padding: 8px 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: white;
+}
+
+.schedule-cell {
+  height: 2rem;
+  cursor: pointer;
+  background-color: #f3f4f6; /* Celda cerrada */
+  transition: background-color 0.1s ease;
+}
+
+.schedule-cell:hover {
+  background-color: #d1d5db; /* Hover en celda cerrada */
+}
+
+.schedule-cell.is-open {
+  background-color: #10b981; /* Celda abierta (verde) */
+}
+
+.schedule-cell.is-open:hover {
+  background-color: #059669; /* Hover en celda abierta */
+}
