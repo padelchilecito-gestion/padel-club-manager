@@ -7,7 +7,7 @@ import logActivity from '../utils/logActivity.js';
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, password }_ = req.body;
+  const { email, password } = req.body;
 
   const user = await User.findOne({ email });
 
