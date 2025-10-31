@@ -131,8 +131,6 @@ const checkAuthStatus = asyncHandler(async (req, res) => {
     });
   }
 });
-
-
 export {
   loginUser,
   logoutUser,
