@@ -1,29 +1,98 @@
-// frontend/src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
-// CORRECCIÓN 1: Importar el servicio de configuración (settingService)
-import settingService from '../../services/settingService'; 
-import { FullPageLoading, ErrorMessage } from '../../components/ui/Feedback';
+import { getSettings, updateSettings } from '../../services/settingService';
+import { toast } from 'react-hot-toast';
+import ScheduleGrid from '../../components/admin/ScheduleGrid'; // Importamos el nuevo componente
+
+// Constantes para los días de la semana (buena práctica)
+const DAYS_OF_WEEK = [
+  'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'
+];
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [saveStatus, setSaveStatus] = useState(''); // 'success', 'error', ''
+  
+  // Estados para TODOS los campos. Usamos camelCase para el estado de React.
+  // 1. Información del Club
+  const [clubNombre, setClubNombre] = useState('');
+  const [clubDireccion, setClubDireccion] = useState('');
+  const [clubTelefono, setClubTelefono] = useState('');
+  const [clubEmail, setClubEmail] = useState('');
+  const [clubWhatsapp, setClubWhatsapp] = useState('');
+  const [adminWhatsapp, setAdminWhatsapp] = useState('');
 
+  // 2. Configuración de Reservas
+  const [slotDuration, setSlotDuration] = useState('30');
+  const [bookingLeadTime, setBookingLeadTime] = useState('15');
+  const [bookingCancelCutoff, setBookingCancelCutoff] = useState('30');
+  const [maxBookingsPerUser, setMaxBookingsPerUser] = useState('20');
+
+  // 3. Configuración de Pagos y Moneda
+  const [currency, setCurrency] = useState('ARS');
+  const [enablePayments, setEnablePayments] = useState('true');
+  const [mpPublicKey, setMpPublicKey] = useState('');
+  const [mpAccessToken, setMpAccessToken] = useState('');
+  const [mpWebhookSecret, setMpWebhookSecret] = useState('');
+
+  // 4. Tienda
+  const [shopEnabled, setShopEnabled] = useState('true');
+
+  // 5. Horarios (los 21 campos que usará el ScheduleGrid)
+  // Mantenemos estos 21 estados, pero el usuario los editará visualmente.
+  const [openingHours, setOpeningHours] = useState({
+    MONDAY_IS_OPEN: "true", MONDAY_OPENING_HOUR: "08:00", MONDAY_CLOSING_HOUR: "23:00",
+    TUESDAY_IS_OPEN: "true", TUESDAY_OPENING_HOUR: "08:00", TUESDAY_CLOSING_HOUR: "23:00",
+    WEDNESDAY_IS_OPEN: "true", WEDNESDAY_OPENING_HOUR: "08:00", WEDNESDAY_CLOSING_HOUR: "23:00",
+    THURSDAY_IS_OPEN: "true", THURSDAY_OPENING_HOUR: "08:00", THURSDAY_CLOSING_HOUR: "23:00",
+    FRIDAY_IS_OPEN: "true", FRIDAY_OPENING_HOUR: "08:00", FRIDAY_CLOSING_HOUR: "23:00",
+    SATURDAY_IS_OPEN: "true", SATURDAY_OPENING_HOUR: "08:00", SATURDAY_CLOSING_HOUR: "23:00",
+    SUNDAY_IS_OPEN: "true", SUNDAY_OPENING_HOUR: "08:00", SUNDAY_CLOSING_HOUR: "23:00",
+  });
+
+  // --- Carga de Datos (Traducción API -> Estado) ---
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        setError(null);
-        setSaveStatus('');
-        
-        // CORRECCIÓN 2: Llamar a la función como 'settingService.getSettings()'
-        const settingsData = await settingService.getSettings(); 
-        
-        setSettings(settingsData || {});
-      } catch (err) {
-        console.error(err);
-        setError(err.message || 'Error al cargar la configuración.');
+        const { data } = await getSettings();
+        if (data) {
+          setSettings(data);
+          // 1. Info Club
+          setClubNombre(data.CLUB_NOMBRE || '');
+          setClubDireccion(data.CLUB_DIRECCION || '');
+          setClubTelefono(data.CLUB_TELEFONO || '');
+          setClubEmail(data.CLUB_EMAIL || '');
+          setClubWhatsapp(data.CLUB_WHATSAPP || '');
+          setAdminWhatsapp(data.CLUB_ADMIN_WHATSAPP || '');
+          
+          // 2. Reservas
+          setSlotDuration(data.SLOT_DURATION || '30');
+          setBookingLeadTime(data.bookingLeadTime || '15');
+          setBookingCancelCutoff(data.bookingCancelCutoff || '30');
+          setMaxBookingsPerUser(data.maxBookingsPerUser || '20');
+
+          // 3. Pagos
+          setCurrency(data.CURRENCY || 'ARS');
+          setEnablePayments(data.enablePayments || 'true');
+          setMpPublicKey(data.mpPublicKey || '');
+          setMpAccessToken(data.mpAccessToken || '');
+          setMpWebhookSecret(data.mpWebhookSecret || '');
+
+          // 4. Tienda
+          setShopEnabled(data.SHOP_ENABLED || 'true');
+
+          // 5. Horarios
+          const loadedHours = {};
+          DAYS_OF_WEEK.forEach(day => {
+            loadedHours[`${day}_IS_OPEN`] = data[`${day}_IS_OPEN`] || "false";
+            loadedHours[`${day}_OPENING_HOUR`] = data[`${day}_OPENING_HOUR`] || "00:00";
+            loadedHours[`${day}_CLOSING_HOUR`] = data[`${day}_CLOSING_HOUR`] || "00:00";
+          });
+          setOpeningHours(loadedHours);
+        }
+      } catch (error) {
+        toast.error('Error al cargar la configuración');
+        console.error(error);
       } finally {
         setIsLoading(false);
       }
@@ -31,155 +100,190 @@ const SettingsPage = () => {
     fetchSettings();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setSettings(prevSettings => ({
-      ...prevSettings,
-      [name]: value,
-    }));
-  };
+  // --- Guardado de Datos (Traducción Estado -> API) ---
+  const handleSaveSettings = async () => {
+    // 1. Construir el objeto "Traductor" con los nombres de la API
+    const apiSettingsData = {
+      // Info Club
+      CLUB_NOMBRE: clubNombre,
+      CLUB_DIRECCION: clubDireccion,
+      CLUB_TELEFONO: clubTelefono,
+      CLUB_EMAIL: clubEmail,
+      CLUB_WHATSAPP: clubWhatsapp,
+      CLUB_ADMIN_WHATSAPP: adminWhatsapp,
+      
+      // Reservas
+      SLOT_DURATION: slotDuration,
+      bookingLeadTime: bookingLeadTime,
+      bookingCancelCutoff: bookingCancelCutoff,
+      maxBookingsPerUser: maxBookingsPerUser,
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setSaveStatus('');
-    setError(null);
-    
+      // Pagos
+      CURRENCY: currency,
+      enablePayments: enablePayments,
+      mpPublicKey: mpPublicKey,
+      mpAccessToken: mpAccessToken,
+      mpWebhookSecret: mpWebhookSecret,
+      
+      // Tienda
+      SHOP_ENABLED: shopEnabled,
+
+      // Horarios (vienen del estado 'openingHours', que fue actualizado por ScheduleGrid)
+      ...openingHours
+    };
+
+    // 2. Filtrar campos no deseados o de solo lectura si es necesario
+    // (Por ahora, enviamos todo lo que la API parece esperar)
+
     try {
-      // (Asumiendo que tienes un 'updateSettings' en tu servicio)
-      // Reemplaza esto con tu función real si es diferente
-      // await settingService.updateSettings(settings); 
-      
-      // *** Mockup si 'updateSettings' no existe aún en el servicio ***
-      // Esta es una simulación. Necesitarás implementar la función en settingService.js
-      // y la ruta PUT/POST en el backend para que guarde de verdad.
-      console.log('Guardando configuración (simulado):', settings);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular espera de red
-      // --- Fin Simulación ---
-
-      setSaveStatus('success');
-    } catch (err) {
-      console.error(err);
-      setError(err.message || 'Error al guardar la configuración.');
-      setSaveStatus('error');
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => setSaveStatus(''), 3000); // Limpiar mensaje de estado
+      const { data } = await updateSettings(apiSettingsData);
+      setSettings(data);
+      toast.success('Configuración guardada exitosamente');
+    } catch (error) {
+      toast.error('Error al guardar: ' + (error.response?.data?.message || error.message));
+      console.error(error);
     }
   };
 
-  if (isLoading && !Object.keys(settings).length) {
-    return <FullPageLoading text="Cargando configuración..." />;
-  }
-
-  if (error && !Object.keys(settings).length) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <ErrorMessage message={error} />
-      </div>
-    );
-  }
-
-  const renderStatusMessage = () => {
-    if (saveStatus === 'success') {
-      return <div className="text-green-400">Configuración guardada con éxito.</div>;
-    }
-    if (saveStatus === 'error') {
-      return <ErrorMessage message={error || 'Error al guardar.'} />;
-    }
-    return null;
+  // Esta función es llamada por el componente ScheduleGrid
+  const handleScheduleChange = (newSchedule) => {
+    setOpeningHours(prev => ({ ...prev, ...newSchedule }));
   };
 
+  if (isLoading) {
+    return <div className="p-6">Cargando configuración...</div>;
+  }
+
+  // --- Renderizado del Formulario ---
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold text-purple-400 mb-8">
-        Configuración del Club
-      </h1>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">Configuración del Club</h1>
       
-      {error && <ErrorMessage message={error} />}
-
-      <form onSubmit={handleSubmit} className="space-y-6 bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div className="space-y-8">
         
-        {/* Duración del Turno */}
-        <div>
-          <label htmlFor="SLOT_DURATION" className="block text-sm font-medium text-gray-400 mb-1">
-            Duración del Turno (en minutos)
-          </label>
-          <input
-            type="number"
-            id="SLOT_DURATION"
-            name="SLOT_DURATION"
-            value={settings.SLOT_DURATION || ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            placeholder="Ej. 60"
-          />
-        </div>
-
-        {/* Moneda */}
-        <div>
-          <label htmlFor="CURRENCY" className="block text-sm font-medium text-gray-400 mb-1">
-            Símbolo de Moneda
-          </label>
-          <input
-            type="text"
-            id="CURRENCY"
-            name="CURRENCY"
-            value={settings.CURRENCY || ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            placeholder="Ej. $"
-          />
-        </div>
-
-        {/* WhatsApp del Club */}
-        <div>
-          <label htmlFor="CLUB_WHATSAPP" className="block text-sm font-medium text-gray-400 mb-1">
-            Número de WhatsApp (con código de país)
-          </label>
-          <input
-            type="text"
-            id="CLUB_WHATSAPP"
-            name="CLUB_WHATSAPP"
-            value={settings.CLUB_WHATSAPP || ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            placeholder="Ej. 5493825123456"
-          />
-        </div>
-
-        {/* Link de Mercado Pago */}
-        <div>
-          <label htmlFor="MP_LINK" className="block text-sm font-medium text-gray-400 mb-1">
-            Link de Pago (Mercado Pago u otro)
-          </label>
-          <input
-            type="text"
-            id="MP_LINK"
-            name="MP_LINK"
-            value={settings.MP_LINK || ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 text-gray-200 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            placeholder="https://mpago.la/..."
-          />
-        </div>
-
-        {/* Botón de Guardar */}
-        <div className="flex items-center justify-between">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="px-6 py-2 font-semibold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-          >
-            {isLoading ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
-          
-          <div className="min-h-[1.5em]">
-            {renderStatusMessage()}
+        {/* Sección 1: Información del Club */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Información General</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text">Nombre del Club</span></label>
+              <input type="text" value={clubNombre} onChange={(e) => setClubNombre(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Dirección</span></label>
+              <input type="text" value={clubDireccion} onChange={(e) => setClubDireccion(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Email</span></label>
+              <input type="email" value={clubEmail} onChange={(e) => setClubEmail(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Teléfono (Público)</span></label>
+              <input type="text" value={clubTelefono} onChange={(e) => setClubTelefono(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">WhatsApp (Reservas)</span></label>
+              <input type="text" value={clubWhatsapp} onChange={(e) => setClubWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">WhatsApp (Admin)</span></label>
+              <input type="text" value={adminWhatsapp} onChange={(e) => setAdminWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" />
+            </div>
           </div>
         </div>
 
-      </form>
+        {/* Sección 2: Configuración de Horarios (NUEVO COMPONENTE) */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Horarios de Apertura</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Haz clic y arrastra sobre la grilla para "pintar" los horarios de apertura.
+            Tu problema de 8:00 a 02:00 se resuelve pintando de 8:00 a 23:30 un día, y de 00:00 a 02:00 el día siguiente.
+          </p>
+          <ScheduleGrid
+            slotDuration={parseInt(slotDuration, 10)}
+            openingHours={openingHours}
+            onScheduleChange={handleScheduleChange}
+          />
+        </div>
+
+        {/* Sección 3: Configuración de Reservas */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Reservas</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text">Duración del Turno (min)</span></label>
+              <select value={slotDuration} onChange={(e) => setSlotDuration(e.target.value)} className="select select-bordered w-full">
+                <option value="30">30 min</option>
+                <option value="60">60 min</option>
+                <option value="90">90 min</option>
+              </select>
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Antelación mín. para reservar (min)</span></label>
+              <input type="number" value={bookingLeadTime} onChange={(e) => setBookingLeadTime(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Tiempo límite para cancelar (min)</span></label>
+              <input type="number" value={bookingCancelCutoff} onChange={(e) => setBookingCancelCutoff(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Máx. reservas activas por usuario</span></label>
+              <input type="number" value={maxBookingsPerUser} onChange={(e) => setMaxBookingsPerUser(e.target.value)} className="input input-bordered w-full" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Sección 4: Pagos y Tienda */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Pagos y Tienda</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text">Moneda</span></label>
+              <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} className="input input-bordered w-full" placeholder="Ej: ARS" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Habilitar Tienda</span></label>
+              <select value={shopEnabled} onChange={(e) => setShopEnabled(e.target.value)} className="select select-bordered w-full">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">Habilitar Pagos (Mercado Pago)</span></label>
+              <select value={enablePayments} onChange={(e) => setEnablePayments(e.target.value)} className="select select-bordered w-full">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text">MP Public Key</span></label>
+              <input type="text" value={mpPublicKey} onChange={(e) => setMpPublicKey(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">MP Access Token</span></labe>
+              <input type="password" value={mpAccessToken} onChange={(e) => setMpAccessToken(e.target.value)} className="input input-bordered w-full" />
+            </div>
+            <div className="form-control">
+              <label className="label"><span className="label-text">MP Webhook Secret</span></label>
+              <input type="password" value={mpWebhookSecret} onChange={(e) => setMpWebhookSecret(e.target.value)} className="input input-bordered w-full" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Botón de Guardar Fijo */}
+      <div className="mt-8">
+        <button 
+          onClick={handleSaveSettings} 
+          className="btn btn-primary w-full md:w-auto"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Guardando...' : 'Guardar Configuración'}
+        </button>
+      </div>
     </div>
   );
 };
