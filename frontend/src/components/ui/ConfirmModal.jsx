@@ -20,14 +20,14 @@ export const ConfirmModal = ({
   if (!isOpen) return null;
   
   const colorClasses = {
-    red: 'bg-red-600 hover:bg-red-700 focus-visible:ring-red-500',
-    blue: 'bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-500',
+    red: 'bg-danger hover:bg-red-700 focus-visible:ring-red-500',
+    blue: 'bg-primary hover:bg-blue-700 focus-visible:ring-blue-500',
     green: 'bg-green-600 hover:bg-green-700 focus-visible:ring-green-500',
   };
 
   const iconColorClasses = {
-    red: 'text-red-600',
-    blue: 'text-blue-600',
+    red: 'text-danger',
+    blue: 'text-primary',
     green: 'text-green-600',
   };
 
@@ -45,7 +45,7 @@ export const ConfirmModal = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-60" />
+          <div className="fixed inset-0 bg-black bg-opacity-70" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -59,11 +59,11 @@ export const ConfirmModal = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all border border-gray-700">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-dark-secondary p-6 text-left align-middle shadow-xl transition-all border border-text-secondary/20">
                 <div className="absolute top-0 right-0 pt-4 pr-4">
                   <button
                     type="button"
-                    className="rounded-md bg-gray-800 text-gray-400 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 focus:ring-offset-gray-800"
+                    className="rounded-md bg-dark-secondary text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-text-secondary/50 focus:ring-offset-2 focus:ring-offset-dark-secondary"
                     onClick={onClose}
                   >
                     <span className="sr-only">Cerrar</span>
@@ -72,15 +72,15 @@ export const ConfirmModal = ({
                 </div>
                 
                 <div className="sm:flex sm:items-start">
-                  <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gray-700 sm:mx-0 sm:h-10 sm:w-10 ${iconColorClasses[confirmColor]}`}>
+                  <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-dark-primary sm:mx-0 sm:h-10 sm:w-10 ${iconColorClasses[confirmColor]}`}>
                     <ExclamationTriangleIcon className="h-6 w-6" aria-hidden="true" />
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-white">
+                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-text-primary">
                       {title}
                     </Dialog.Title>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-text-secondary">
                         {message}
                       </p>
                     </div>
@@ -97,7 +97,7 @@ export const ConfirmModal = ({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex w-full justify-center rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-sm font-medium text-gray-200 shadow-sm hover:bg-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 mt-3 sm:mt-0"
+                    className="inline-flex w-full justify-center rounded-md border border-text-secondary/50 bg-dark-primary px-4 py-2 text-sm font-medium text-text-primary shadow-sm hover:bg-opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-text-secondary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-secondary mt-3 sm:mt-0"
                     onClick={onClose}
                   >
                     {cancelText}
