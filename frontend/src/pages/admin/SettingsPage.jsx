@@ -30,15 +30,16 @@ const SettingsPage = () => {
   // 3. Configuración de Pagos y Moneda
   const [currency, setCurrency] = useState('ARS');
   const [enablePayments, setEnablePayments] = useState('true');
-  const [mpPublicKey, setMpPublicKey] = useState('');
-  const [mpAccessToken, setMpAccessToken] = useState('');
-  const [mpWebhookSecret, setMpWebhookSecret] = useState('');
+  
+  // *** ELIMINADOS LOS ESTADOS DE MERCADO PAGO ***
+  // const [mpPublicKey, setMpPublicKey] = useState('');
+  // const [mpAccessToken, setMpAccessToken] = useState('');
+  // const [mpWebhookSecret, setMpWebhookSecret] = useState('');
 
   // 4. Tienda
   const [shopEnabled, setShopEnabled] = useState('true');
 
   // 5. Horarios (los 21 campos que usará el ScheduleGrid)
-  // Mantenemos estos 21 estados, pero el usuario los editará visualmente.
   const [openingHours, setOpeningHours] = useState({
     MONDAY_IS_OPEN: "true", MONDAY_OPENING_HOUR: "08:00", MONDAY_CLOSING_HOUR: "23:00",
     TUESDAY_IS_OPEN: "true", TUESDAY_OPENING_HOUR: "08:00", TUESDAY_CLOSING_HOUR: "23:00",
@@ -54,7 +55,7 @@ const SettingsPage = () => {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        const { data } = await getSettings();
+        const { data } = await getSettings(); //
         if (data) {
           setSettings(data);
           // 1. Info Club
@@ -74,9 +75,8 @@ const SettingsPage = () => {
           // 3. Pagos
           setCurrency(data.CURRENCY || 'ARS');
           setEnablePayments(data.enablePayments || 'true');
-          setMpPublicKey(data.mpPublicKey || '');
-          setMpAccessToken(data.mpAccessToken || '');
-          setMpWebhookSecret(data.mpWebhookSecret || '');
+          
+          // *** ELIMINADA LA CARGA DE CLAVES MP ***
 
           // 4. Tienda
           setShopEnabled(data.SHOP_ENABLED || 'true');
@@ -121,9 +121,8 @@ const SettingsPage = () => {
       // Pagos
       CURRENCY: currency,
       enablePayments: enablePayments,
-      mpPublicKey: mpPublicKey,
-      mpAccessToken: mpAccessToken,
-      mpWebhookSecret: mpWebhookSecret,
+      
+      // *** ELIMINADAS LAS CLAVES MP DEL GUARDADO ***
       
       // Tienda
       SHOP_ENABLED: shopEnabled,
@@ -132,16 +131,16 @@ const SettingsPage = () => {
       ...openingHours
     };
 
-    // 2. Filtrar campos no deseados o de solo lectura si es necesario
-    // (Por ahora, enviamos todo lo que la API parece esperar)
-
     try {
-      const { data } = await updateSettings(apiSettingsData);
+      setIsLoading(true); // Deshabilita el botón mientras guarda
+      const { data } = await updateSettings(apiSettingsData); //
       setSettings(data);
       toast.success('Configuración guardada exitosamente');
     } catch (error) {
       toast.error('Error al guardar: ' + (error.response?.data?.message || error.message));
       console.error(error);
+    } finally {
+      setIsLoading(false); // Vuelve a habilitar el botón
     }
   };
 
@@ -150,7 +149,8 @@ const SettingsPage = () => {
     setOpeningHours(prev => ({ ...prev, ...newSchedule }));
   };
 
-  if (isLoading) {
+  // No mostramos el formulario hasta que 'isLoading' sea false
+  if (isLoading && Object.keys(settings).length === 0) {
     return <div className="p-6">Cargando configuración...</div>;
   }
 
@@ -167,27 +167,27 @@ const SettingsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Nombre del Club</span></label>
-              <input type="text" value={clubNombre} onChange={(e) => setClubNombre(e.target.value)} className="input input-bordered w-full" />
+              <input type="text" value={clubNombre} onChange={(e) => setClubNombre(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Dirección</span></label>
-              <input type="text" value={clubDireccion} onChange={(e) => setClubDireccion(e.target.value)} className="input input-bordered w-full" />
+              <input type="text" value={clubDireccion} onChange={(e) => setClubDireccion(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Email</span></label>
-              <input type="email" value={clubEmail} onChange={(e) => setClubEmail(e.target.value)} className="input input-bordered w-full" />
+              <input type="email" value={clubEmail} onChange={(e) => setClubEmail(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Teléfono (Público)</span></label>
-              <input type="text" value={clubTelefono} onChange={(e) => setClubTelefono(e.target.value)} className="input input-bordered w-full" />
+              <input type="text" value={clubTelefono} onChange={(e) => setClubTelefono(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">WhatsApp (Reservas)</span></label>
-              <input type="text" value={clubWhatsapp} onChange={(e) => setClubWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" />
+              <input type="text" value={clubWhatsapp} onChange={(e) => setClubWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">WhatsApp (Admin)</span></label>
-              <input type="text" value={adminWhatsapp} onChange={(e) => setAdminWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" />
+              <input type="text" value={adminWhatsapp} onChange={(e) => setAdminWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" disabled={isLoading} />
             </div>
           </div>
         </div>
@@ -212,7 +212,7 @@ const SettingsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Duración del Turno (min)</span></label>
-              <select value={slotDuration} onChange={(e) => setSlotDuration(e.target.value)} className="select select-bordered w-full">
+              <select value={slotDuration} onChange={(e) => setSlotDuration(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
                 <option value="30">30 min</option>
                 <option value="60">60 min</option>
                 <option value="90">90 min</option>
@@ -220,64 +220,55 @@ const SettingsPage = () => {
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Antelación mín. para reservar (min)</span></label>
-              <input type="number" value={bookingLeadTime} onChange={(e) => setBookingLeadTime(e.target.value)} className="input input-bordered w-full" />
+              <input type="number" value={bookingLeadTime} onChange={(e) => setBookingLeadTime(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Tiempo límite para cancelar (min)</span></label>
-              <input type="number" value={bookingCancelCutoff} onChange={(e) => setBookingCancelCutoff(e.target.value)} className="input input-bordered w-full" />
+              <input type="number" value={bookingCancelCutoff} onChange={(e) => setBookingCancelCutoff(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Máx. reservas activas por usuario</span></label>
-              <input type="number" value={maxBookingsPerUser} onChange={(e) => setMaxBookingsPerUser(e.target.value)} className="input input-bordered w-full" />
+              <input type="number" value={maxBookingsPerUser} onChange={(e) => setMaxBookingsPerUser(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
             </div>
           </div>
         </div>
         
-        {/* Sección 4: Pagos y Tienda */}
+        {/* Sección 4: Pagos y Tienda (MODIFICADA) */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4 text-gray-700">Pagos y Tienda</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Moneda</span></label>
-              <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} className="input input-bordered w-full" placeholder="Ej: ARS" />
+              <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} className="input input-bordered w-full" placeholder="Ej: ARS" disabled={isLoading} />
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Habilitar Tienda</span></label>
-              <select value={shopEnabled} onChange={(e) => setShopEnabled(e.target.value)} className="select select-bordered w-full">
+              <select value={shopEnabled} onChange={(e) => setShopEnabled(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
                 <option value="true">Sí</option>
                 <option value="false">No</option>
               </select>
             </div>
             <div className="form-control">
               <label className="label"><span className="label-text">Habilitar Pagos (Mercado Pago)</span></label>
-              <select value={enablePayments} onChange={(e) => setEnablePayments(e.target.value)} className="select select-bordered w-full">
+              <select value={enablePayments} onChange={(e) => setEnablePayments(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
                 <option value="true">Sí</option>
                 <option value="false">No</option>
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 mt-4">
-            <div className="form-control">
-              <label className="label"><span className="label-text">MP Public Key</span></label>
-              <input type="text" value={mpPublicKey} onChange={(e) => setMpPublicKey(e.target.value)} className="input input-bordered w-full" />
-            </div>
-            <div className="form-control">
-              {/* --- ESTA ES LA LÍNEA CORREGIDA --- */}
-              <label className="label"><span className="label-text">MP Access Token</span></label>
-            </div>
-            <div className="form-control">
-              <input type="password" value={mpAccessToken} onChange={(e) => setMpAccessToken(e.target.value)} className="input input-bordered w-full" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">MP Webhook Secret</span></label>
-              <input type="password" value={mpWebhookSecret} onChange={(e) => setMpWebhookSecret(e.target.value)} className="input input-bordered w-full" />
-            </div>
+          
+          {/* --- SECCIÓN DE CLAVES MP ELIMINADA --- */}
+          <div className="mt-4 p-4 bg-gray-50 rounded">
+            <p className="text-sm text-gray-600">
+              <strong>Nota:</strong> Las credenciales de Mercado Pago (Public Key, Access Token, Webhook Secret) se configuran de forma segura en las <strong>variables de entorno</strong> del servidor (Vercel / Render) y no desde esta pantalla.
+            </p>
           </div>
+
         </div>
 
       </div>
 
-      {/* Botón de Guardar Fijo */}
+      {/* Botón de Guardar Fijo (ESTÁ AQUÍ AL FINAL) */}
       <div className="mt-8">
         <button 
           onClick={handleSaveSettings} 
