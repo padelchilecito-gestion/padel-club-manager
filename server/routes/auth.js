@@ -1,19 +1,19 @@
-import express from 'express';
-import {
-  loginUser, // <-- CAMBIADO DE 'authUser' A 'loginUser'
+const express = require('express');
+const {
+  loginUser, // <-- Corregido de 'authUser'
   logoutUser,
   getUserProfile,
   updateUserProfile,
   checkAuthStatus
-} from '../controllers/authController.js';
-import { protect, admin } from '../middlewares/authMiddleware.js';
+} = require('../controllers/authController.js'); // <-- Convertido a 'require'
+const { protect } = require('../middlewares/authMiddleware.js'); // <-- Convertido a 'require'
 
 const router = express.Router();
 
-router.post('/login', loginUser); // <-- La función importada ahora coincide
+router.post('/login', loginUser);
 router.post('/logout', protect, logoutUser);
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateUserProfile);
-router.get('/status', protect, checkAuthStatus); // 'protect' aquí verifica el token
+router.get('/status', protect, checkAuthStatus); 
 
-export default router;
+module.exports = router; // <-- Convertido a 'module.exports'
