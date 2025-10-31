@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+// Determina la URL base.
+// Si VITE_API_URL está definida, la usamos y le agregamos /api
+// Si no, usamos el localhost de desarrollo que ya incluye /api
+const baseUrl = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : 'http://localhost:5001/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+  baseURL: baseUrl,
   withCredentials: true,
 });
 
