@@ -1,22 +1,19 @@
-import asyncHandler from 'express-async-handler';
-import jwt from 'jsonwebtoken'; // <-- 1. Importar 'jsonwebtoken'
-import User from '../models/User.js';
-// import generateToken from '../utils/generateToken.js'; // <-- 2. Eliminar la importación que falla
-import logActivity from '../utils/logActivity.js';
+const asyncHandler = require('express-async-handler');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User.js');
+const logActivity = require('../utils/logActivity.js');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body; // <-- Mantenemos 'email' porque tu modelo User.js usa email, no username.
 
   const user = await User.findOne({ email });
 
   if (user && (await user.matchPassword(password))) {
-    
-    // 3. Reemplazar la función 'generateToken' por la implementación directa
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '30d' // La cookie expira en 30 días
+      expiresIn: '30d'
     });
 
     res.cookie('jwt', token, {
@@ -112,8 +109,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/status
 // @access  Public (depends on cookie)
 const checkAuthStatus = asyncHandler(async (req, res) => {
-  // El middleware 'protect' ya se habrá ejecutado si hay un token
-  // Si req.user existe, el token es válido.
   if (req.user) {
     res.json({
       isAuthenticated: true,
@@ -132,8 +127,8 @@ const checkAuthStatus = asyncHandler(async (req, res) => {
   }
 });
 
-
-export {
+// Exportamos usando module.exports
+module.exports = {
   loginUser,
   logoutUser,
   getUserProfile,
