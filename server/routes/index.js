@@ -1,40 +1,41 @@
 const express = require('express');
+const path = require('path');
+const authRoutes = require('./auth.js');
+const userRoutes = require('./users.js');
+const courtRoutes = require('./courts.js');
+const bookingRoutes = require('./bookings.js');
+const productRoutes = require('./products.js');
+const saleRoutes = require('./sales.js');
+const reportRoutes = require('./reports.js');
+const settingRoutes = require('./settings.js');
+const logRoutes = require('./logs.js');
+const paymentRoutes = require('./payments.js');
+const cashboxRoutes = require('./cashbox.js');
+// const debugRoutes = require('../debug/routes.js'); // Descomentar si es necesario
+
 const router = express.Router();
-const { version } = require('../package.json');
-
-// @desc    Get API Version
-// @route   GET /api/version
-// @access  Public
-router.get('/version', (req, res) => {
-  res.json({ version: version });
-});
-
-// Import all route files
-const userRoutes = require('./users');
-const authRoutes = require('./auth');
-const courtRoutes = require('./courts');
-const bookingRoutes = require('./bookings');
-const productRoutes = require('./products');
-const saleRoutes = require('./sales');
-const cashboxRoutes = require('./cashbox');
-const paymentRoutes = require('./payments');
-const reportRoutes = require('./reports');
-const logRoutes = require('./logs');
-const settingRoutes = require('./settings');
 
 console.log('[Routes] Index router loaded.');
 
-// Mount all routes onto the main router
-router.use('/users', userRoutes);
-router.use('/auth', authRoutes);
-router.use('/courts', courtRoutes);
-router.use('/bookings', bookingRoutes);
-router.use('/products', productRoutes);
-router.use('/sales', saleRoutes);
-router.use('/cashbox', cashboxRoutes);
-router.use('/payments', paymentRoutes);
-router.use('/reports', reportRoutes);
-router.use('/logs', logRoutes);
-router.use('/settings', settingRoutes);
+// API routes
+router.use('/api/auth', authRoutes);
+router.use('/api/users', userRoutes);
+router.use('/api/courts', courtRoutes);
+router.use('/api/bookings', bookingRoutes);
+router.use('/api/products', productRoutes);
+router.use('/api/sales', saleRoutes);
+router.use('/api/reports', reportRoutes);
+router.use('/api/settings', settingRoutes);
+router.use('/api/logs', logRoutes);
+router.use('/api/payments', paymentRoutes);
+router.use('/api/cashbox', cashboxRoutes);
+// router.use('/api/debug', debugRoutes);
+
+// Ruta para verificar la versión (útil para health checks)
+router.get('/api/version', (req, res) => {
+  res.json({ version: process.env.npm_package_version || '1.0.0' });
+});
+
+// ... (El resto del archivo que sirve el frontend)
 
 module.exports = router;
