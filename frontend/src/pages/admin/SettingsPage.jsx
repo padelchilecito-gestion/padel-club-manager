@@ -12,7 +12,6 @@ const SettingsPage = () => {
   const [settings, setSettings] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   
-  // Estados para TODOS los campos. Usamos camelCase para el estado de React.
   // 1. Información del Club
   const [clubNombre, setClubNombre] = useState('');
   const [clubDireccion, setClubDireccion] = useState('');
@@ -30,16 +29,11 @@ const SettingsPage = () => {
   // 3. Configuración de Pagos y Moneda
   const [currency, setCurrency] = useState('ARS');
   const [enablePayments, setEnablePayments] = useState('true');
-  
-  // *** ELIMINADOS LOS ESTADOS DE MERCADO PAGO ***
-  // const [mpPublicKey, setMpPublicKey] = useState('');
-  // const [mpAccessToken, setMpAccessToken] = useState('');
-  // const [mpWebhookSecret, setMpWebhookSecret] = useState('');
 
   // 4. Tienda
   const [shopEnabled, setShopEnabled] = useState('true');
 
-  // 5. Horarios (los 21 campos que usará el ScheduleGrid)
+  // 5. Horarios
   const [openingHours, setOpeningHours] = useState({
     MONDAY_IS_OPEN: "true", MONDAY_OPENING_HOUR: "08:00", MONDAY_CLOSING_HOUR: "23:00",
     TUESDAY_IS_OPEN: "true", TUESDAY_OPENING_HOUR: "08:00", TUESDAY_CLOSING_HOUR: "23:00",
@@ -75,8 +69,6 @@ const SettingsPage = () => {
           // 3. Pagos
           setCurrency(data.CURRENCY || 'ARS');
           setEnablePayments(data.enablePayments || 'true');
-          
-          // *** ELIMINADA LA CARGA DE CLAVES MP ***
 
           // 4. Tienda
           setShopEnabled(data.SHOP_ENABLED || 'true');
@@ -102,7 +94,6 @@ const SettingsPage = () => {
 
   // --- Guardado de Datos (Traducción Estado -> API) ---
   const handleSaveSettings = async () => {
-    // 1. Construir el objeto "Traductor" con los nombres de la API
     const apiSettingsData = {
       // Info Club
       CLUB_NOMBRE: clubNombre,
@@ -122,17 +113,15 @@ const SettingsPage = () => {
       CURRENCY: currency,
       enablePayments: enablePayments,
       
-      // *** ELIMINADAS LAS CLAVES MP DEL GUARDADO ***
-      
       // Tienda
       SHOP_ENABLED: shopEnabled,
 
-      // Horarios (vienen del estado 'openingHours', que fue actualizado por ScheduleGrid)
+      // Horarios
       ...openingHours
     };
 
     try {
-      setIsLoading(true); // Deshabilita el botón mientras guarda
+      setIsLoading(true);
       const { data } = await updateSettings(apiSettingsData); //
       setSettings(data);
       toast.success('Configuración guardada exitosamente');
@@ -140,30 +129,35 @@ const SettingsPage = () => {
       toast.error('Error al guardar: ' + (error.response?.data?.message || error.message));
       console.error(error);
     } finally {
-      setIsLoading(false); // Vuelve a habilitar el botón
+      setIsLoading(false);
     }
   };
 
-  // Esta función es llamada por el componente ScheduleGrid
   const handleScheduleChange = (newSchedule) => {
     setOpeningHours(prev => ({ ...prev, ...newSchedule }));
   };
 
-  // No mostramos el formulario hasta que 'isLoading' sea false
   if (isLoading && Object.keys(settings).length === 0) {
-    return <div className="p-6">Cargando configuración...</div>;
+    // Mantenemos una carga inicial simple
+    return <div>Cargando configuración...</div>;
   }
 
   // --- Renderizado del Formulario ---
+  // CAMBIO: Eliminamos el 'div' contenedor 'p-6 bg-gray-100 min-h-screen'
+  // para heredar el fondo 'bg-gray-200' del AdminLayout
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Configuración del Club</h1>
+    <>
+      {/* CAMBIO: Título H3 como en el Dashboard */}
+      <h3 className="text-gray-700 text-3xl font-medium">Configuración del Club</h3>
       
-      <div className="space-y-8">
+      {/* CAMBIO: Añadido 'mt-8' y 'space-y-6' para espaciado */}
+      <div className="mt-8 space-y-6">
         
         {/* Sección 1: Información del Club */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">Información General</h2>
+        {/* CAMBIO: 'shadow-lg' como en el Dashboard (en vez de shadow-md) */}
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          {/* CAMBIO: Título H4 como en el Dashboard */}
+          <h4 className="text-xl font-semibold mb-4 text-gray-700">Información General</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Nombre del Club</span></label>
@@ -192,12 +186,11 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        {/* Sección 2: Configuración de Horarios (NUEVO COMPONENTE) */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">Horarios de Apertura</h2>
+        {/* Sección 2: Configuración de Horarios */}
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h4 className="text-xl font-semibold mb-4 text-gray-700">Horarios de Apertura</h4>
           <p className="text-sm text-gray-500 mb-4">
             Haz clic y arrastra sobre la grilla para "pintar" los horarios de apertura.
-            Tu problema de 8:00 a 02:00 se resuelve pintando de 8:00 a 23:30 un día, y de 00:00 a 02:00 el día siguiente.
           </p>
           <ScheduleGrid
             slotDuration={parseInt(slotDuration, 10)}
@@ -207,8 +200,8 @@ const SettingsPage = () => {
         </div>
 
         {/* Sección 3: Configuración de Reservas */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">Reservas</h2>
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h4 className="text-xl font-semibold mb-4 text-gray-700">Reservas</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Duración del Turno (min)</span></label>
@@ -233,9 +226,9 @@ const SettingsPage = () => {
           </div>
         </div>
         
-        {/* Sección 4: Pagos y Tienda (MODIFICADA) */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">Pagos y Tienda</h2>
+        {/* Sección 4: Pagos y Tienda */}
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h4 className="text-xl font-semibold mb-4 text-gray-700">Pagos y Tienda</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label"><span className="label-text">Moneda</span></label>
@@ -257,10 +250,9 @@ const SettingsPage = () => {
             </div>
           </div>
           
-          {/* --- SECCIÓN DE CLAVES MP ELIMINADA --- */}
           <div className="mt-4 p-4 bg-gray-50 rounded">
             <p className="text-sm text-gray-600">
-              <strong>Nota:</strong> Las credenciales de Mercado Pago (Public Key, Access Token, Webhook Secret) se configuran de forma segura en las <strong>variables de entorno</strong> del servidor (Vercel / Render) y no desde esta pantalla.
+              <strong>Nota:</strong> Las credenciales de Mercado Pago se configuran en las <strong>variables de entorno</strong> del servidor.
             </p>
           </div>
 
@@ -268,8 +260,9 @@ const SettingsPage = () => {
 
       </div>
 
-      {/* Botón de Guardar Fijo (ESTÁ AQUÍ AL FINAL) */}
-      <div className="mt-8">
+      {/* Botón de Guardar Fijo */}
+      {/* CAMBIO: 'mt-6' en vez de 'mt-8' para ajustar el espacio */}
+      <div className="mt-6">
         <button 
           onClick={handleSaveSettings} 
           className="btn btn-primary w-full md:w-auto"
@@ -278,7 +271,7 @@ const SettingsPage = () => {
           {isLoading ? 'Guardando...' : 'Guardar Configuración'}
         </button>
       </div>
-    </div>
+    </>
   );
 };
 
