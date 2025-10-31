@@ -7,14 +7,11 @@ const SETTING_API_URL = '/settings';
  * Obtiene todas las configuraciones del sistema.
  * @returns {Promise<object>} La respuesta completa de Axios.
  */
-// Exportamos con 'export const' para que coincida con el import de SettingsPage.jsx
+// 1. Exportación "Nombrada" (para SettingsPage.jsx)
 export const getSettings = async () => {
     try {
         const response = await api.get(SETTING_API_URL);
-        
-        // SettingsPage.jsx espera la respuesta completa de axios 
-        // para desestructurar 'data' (const { data } = await getSettings())
-        // Así que devolvemos la respuesta completa.
+        // Devolvemos la respuesta completa de axios
         return response;
 
     } catch (error) {
@@ -28,7 +25,7 @@ export const getSettings = async () => {
  * @param {object} settingsData El objeto con las configuraciones a guardar.
  * @returns {Promise<object>} La respuesta completa de Axios.
  */
-// ESTA FUNCIÓN FALTABA. La añadimos y la exportamos.
+// 2. Exportación "Nombrada" (para SettingsPage.jsx)
 export const updateSettings = async (settingsData) => {
     try {
         // Usamos PUT para reemplazar/actualizar el objeto de configuración
@@ -40,4 +37,11 @@ export const updateSettings = async (settingsData) => {
     }
 };
 
-// Ya no necesitamos un 'export default'
+// 3. Creamos un objeto que contenga las funciones
+const settingService = {
+    getSettings,
+    updateSettings,
+};
+
+// 4. Exportación "Default" (para PublicLayout.jsx)
+export default settingService;
