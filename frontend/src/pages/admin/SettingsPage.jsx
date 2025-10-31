@@ -1,277 +1,165 @@
 import React, { useState, useEffect } from 'react';
-import { getSettings, updateSettings } from '../../services/settingService';
-import { toast } from 'react-hot-toast';
-import ScheduleGrid from '../../components/admin/ScheduleGrid'; // Importamos el nuevo componente
-
-// Constantes para los días de la semana (buena práctica)
-const DAYS_OF_WEEK = [
-  'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'
-];
+import settingService from '../../services/settingService';
+import toast from 'react-hot-toast';
 
 const SettingsPage = () => {
-  const [settings, setSettings] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // 1. Información del Club
-  const [clubNombre, setClubNombre] = useState('');
-  const [clubDireccion, setClubDireccion] = useState('');
-  const [clubTelefono, setClubTelefono] = useState('');
-  const [clubEmail, setClubEmail] = useState('');
-  const [clubWhatsapp, setClubWhatsapp] = useState('');
-  const [adminWhatsapp, setAdminWhatsapp] = useState('');
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // 2. Configuración de Reservas
-  const [slotDuration, setSlotDuration] = useState('30');
-  const [bookingLeadTime, setBookingLeadTime] = useState('15');
-  const [bookingCancelCutoff, setBookingCancelCutoff] = useState('30');
-  const [maxBookingsPerUser, setMaxBookingsPerUser] = useState('20');
-
-  // 3. Configuración de Pagos y Moneda
-  const [currency, setCurrency] = useState('ARS');
-  const [enablePayments, setEnablePayments] = useState('true');
-
-  // 4. Tienda
-  const [shopEnabled, setShopEnabled] = useState('true');
-
-  // 5. Horarios
-  const [openingHours, setOpeningHours] = useState({
-    MONDAY_IS_OPEN: "true", MONDAY_OPENING_HOUR: "08:00", MONDAY_CLOSING_HOUR: "23:00",
-    TUESDAY_IS_OPEN: "true", TUESDAY_OPENING_HOUR: "08:00", TUESDAY_CLOSING_HOUR: "23:00",
-    WEDNESDAY_IS_OPEN: "true", WEDNESDAY_OPENING_HOUR: "08:00", WEDNESDAY_CLOSING_HOUR: "23:00",
-    THURSDAY_IS_OPEN: "true", THURSDAY_OPENING_HOUR: "08:00", THURSDAY_CLOSING_HOUR: "23:00",
-    FRIDAY_IS_OPEN: "true", FRIDAY_OPENING_HOUR: "08:00", FRIDAY_CLOSING_HOUR: "23:00",
-    SATURDAY_IS_OPEN: "true", SATURDAY_OPENING_HOUR: "08:00", SATURDAY_CLOSING_HOUR: "23:00",
-    SUNDAY_IS_OPEN: "true", SUNDAY_OPENING_HOUR: "08:00", SUNDAY_CLOSING_HOUR: "23:00",
-  });
-
-  // --- Carga de Datos (Traducción API -> Estado) ---
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setIsLoading(true);
-        const { data } = await getSettings(); //
-        if (data) {
-          setSettings(data);
-          // 1. Info Club
-          setClubNombre(data.CLUB_NOMBRE || '');
-          setClubDireccion(data.CLUB_DIRECCION || '');
-          setClubTelefono(data.CLUB_TELEFONO || '');
-          setClubEmail(data.CLUB_EMAIL || '');
-          setClubWhatsapp(data.CLUB_WHATSAPP || '');
-          setAdminWhatsapp(data.CLUB_ADMIN_WHATSAPP || '');
-          
-          // 2. Reservas
-          setSlotDuration(data.SLOT_DURATION || '30');
-          setBookingLeadTime(data.bookingLeadTime || '15');
-          setBookingCancelCutoff(data.bookingCancelCutoff || '30');
-          setMaxBookingsPerUser(data.maxBookingsPerUser || '20');
-
-          // 3. Pagos
-          setCurrency(data.CURRENCY || 'ARS');
-          setEnablePayments(data.enablePayments || 'true');
-
-          // 4. Tienda
-          setShopEnabled(data.SHOP_ENABLED || 'true');
-
-          // 5. Horarios
-          const loadedHours = {};
-          DAYS_OF_WEEK.forEach(day => {
-            loadedHours[`${day}_IS_OPEN`] = data[`${day}_IS_OPEN`] || "false";
-            loadedHours[`${day}_OPENING_HOUR`] = data[`${day}_OPENING_HOUR`] || "00:00";
-            loadedHours[`${day}_CLOSING_HOUR`] = data[`${day}_CLOSING_HOUR`] || "00:00";
-          });
-          setOpeningHours(loadedHours);
-        }
-      } catch (error) {
-        toast.error('Error al cargar la configuración');
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchSettings();
   }, []);
 
-  // --- Guardado de Datos (Traducción Estado -> API) ---
-  const handleSaveSettings = async () => {
-    const apiSettingsData = {
-      // Info Club
-      CLUB_NOMBRE: clubNombre,
-      CLUB_DIRECCION: clubDireccion,
-      CLUB_TELEFONO: clubTelefono,
-      CLUB_EMAIL: clubEmail,
-      CLUB_WHATSAPP: clubWhatsapp,
-      CLUB_ADMIN_WHATSAPP: adminWhatsapp,
-      
-      // Reservas
-      SLOT_DURATION: slotDuration,
-      bookingLeadTime: bookingLeadTime,
-      bookingCancelCutoff: bookingCancelCutoff,
-      maxBookingsPerUser: maxBookingsPerUser,
-
-      // Pagos
-      CURRENCY: currency,
-      enablePayments: enablePayments,
-      
-      // Tienda
-      SHOP_ENABLED: shopEnabled,
-
-      // Horarios
-      ...openingHours
-    };
-
+  const fetchSettings = async () => {
     try {
-      setIsLoading(true);
-      const { data } = await updateSettings(apiSettingsData); //
-      setSettings(data);
-      toast.success('Configuración guardada exitosamente');
-    } catch (error) {
-      toast.error('Error al guardar: ' + (error.response?.data?.message || error.message));
-      console.error(error);
+      setLoading(true);
+      const data = await settingService.getSettings();
+      // Transforma el array de settings en un objeto para fácil acceso
+      const settingsObject = data.reduce((acc, setting) => {
+        acc[setting.key] = setting.value;
+        return acc;
+      }, {});
+      setSettings(settingsObject);
+    } catch (err) {
+      setError('No se pudieron cargar las configuraciones.');
+      toast.error('No se pudieron cargar las configuraciones.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleScheduleChange = (newSchedule) => {
-    setOpeningHours(prev => ({ ...prev, ...newSchedule }));
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
-  if (isLoading && Object.keys(settings).length === 0) {
-    // Mantenemos una carga inicial simple
-    return <div>Cargando configuración...</div>;
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      // Transforma el objeto de settings de nuevo a un array para la API
+      const settingsArray = Object.keys(settings).map(key => ({
+        key,
+        value: settings[key],
+      }));
+      
+      await settingService.updateSettings(settingsArray);
+      toast.success('Configuraciones guardadas con éxito');
+    } catch (err) {
+      toast.error('Error al guardar las configuraciones.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !settings) {
+    return <div className="p-8 text-center">Cargando configuraciones...</div>;
   }
 
-  // --- Renderizado del Formulario ---
-  // CAMBIO: Eliminamos el 'div' contenedor 'p-6 bg-gray-100 min-h-screen'
-  // para heredar el fondo 'bg-gray-200' del AdminLayout
+  if (error) {
+    return <div className="p-8 text-center text-error">{error}</div>;
+  }
+
   return (
-    <>
-      {/* CAMBIO: Título H3 como en el Dashboard */}
-      <h3 className="text-gray-700 text-3xl font-medium">Configuración del Club</h3>
-      
-      {/* CAMBIO: Añadido 'mt-8' y 'space-y-6' para espaciado */}
-      <div className="mt-8 space-y-6">
-        
-        {/* Sección 1: Información del Club */}
-        {/* CAMBIO: 'shadow-lg' como en el Dashboard (en vez de shadow-md) */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          {/* CAMBIO: Título H4 como en el Dashboard */}
-          <h4 className="text-xl font-semibold mb-4 text-gray-700">Información General</h4>
+    <div className="p-8">
+      <h1 className="text-4xl font-bold mb-8">
+        Configuración del Club
+      </h1>
+
+      <form onSubmit={handleSaveSettings} className="max-w-2xl space-y-8">
+        {/* Sección de Horarios */}
+        <div className="bg-base-200 p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold text-primary mb-4">Horarios de Apertura</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
-              <label className="label"><span className="label-text">Nombre del Club</span></label>
-              <input type="text" value={clubNombre} onChange={(e) => setClubNombre(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
+              <label className="label">
+                <span className="label-text">Hora de Apertura (HH:mm)</span>
+              </label>
+              <input
+                type="time"
+                name="clubOpeningTime"
+                value={settings?.clubOpeningTime || '09:00'}
+                onChange={handleInputChange}
+                className="input input-bordered w-full"
+              />
             </div>
             <div className="form-control">
-              <label className="label"><span className="label-text">Dirección</span></label>
-              <input type="text" value={clubDireccion} onChange={(e) => setClubDireccion(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Email</span></label>
-              <input type="email" value={clubEmail} onChange={(e) => setClubEmail(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Teléfono (Público)</span></label>
-              <input type="text" value={clubTelefono} onChange={(e) => setClubTelefono(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">WhatsApp (Reservas)</span></label>
-              <input type="text" value={clubWhatsapp} onChange={(e) => setClubWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">WhatsApp (Admin)</span></label>
-              <input type="text" value={adminWhatsapp} onChange={(e) => setAdminWhatsapp(e.target.value)} className="input input-bordered w-full" placeholder="Ej: 5493825123456" disabled={isLoading} />
+              <label className="label">
+                <span className="label-text">Hora de Cierre (HH:mm)</span>
+              </label>
+              <input
+                type="time"
+                name="clubClosingTime"
+                value={settings?.clubClosingTime || '23:00'}
+                onChange={handleInputChange}
+                className="input input-bordered w-full"
+              />
             </div>
           </div>
         </div>
 
-        {/* Sección 2: Configuración de Horarios */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h4 className="text-xl font-semibold mb-4 text-gray-700">Horarios de Apertura</h4>
-          <p className="text-sm text-gray-500 mb-4">
-            Haz clic y arrastra sobre la grilla para "pintar" los horarios de apertura.
-          </p>
-          <ScheduleGrid
-            slotDuration={parseInt(slotDuration, 10)}
-            openingHours={openingHours}
-            onScheduleChange={handleScheduleChange}
-          />
-        </div>
-
-        {/* Sección 3: Configuración de Reservas */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h4 className="text-xl font-semibold mb-4 text-gray-700">Reservas</h4>
+        {/* Sección de Reservas */}
+        <div className="bg-base-200 p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold text-primary mb-4">Configuración de Reservas</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
-              <label className="label"><span className="label-text">Duración del Turno (min)</span></label>
-              <select value={slotDuration} onChange={(e) => setSlotDuration(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
-                <option value="30">30 min</option>
-                <option value="60">60 min</option>
-                <option value="90">90 min</option>
-              </select>
+              <label className="label">
+                <span className="label-text">Duración del Turno (minutos)</span>
+              </label>
+              <input
+                type="number"
+                name="bookingSlotDuration"
+                value={settings?.bookingSlotDuration || 60}
+                onChange={handleInputChange}
+                className="input input-bordered w-full"
+                min="30"
+                step="15"
+              />
             </div>
             <div className="form-control">
-              <label className="label"><span className="label-text">Antelación mín. para reservar (min)</span></label>
-              <input type="number" value={bookingLeadTime} onChange={(e) => setBookingLeadTime(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
+              <label className="label">
+                <span className="label-text">Días de antelación para reservar</span>
+              </label>
+              <input
+                type="number"
+                name="bookingMaxDaysInAdvance"
+                value={settings?.bookingMaxDaysInAdvance || 7}
+                onChange={handleInputChange}
+                className="input input-bordered w-full"
+                min="1"
+              />
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Tiempo límite para cancelar (min)</span></label>
-              <input type="number" value={bookingCancelCutoff} onChange={(e) => setBookingCancelCutoff(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Máx. reservas activas por usuario</span></label>
-              <input type="number" value={maxBookingsPerUser} onChange={(e) => setMaxBookingsPerUser(e.target.value)} className="input input-bordered w-full" disabled={isLoading} />
-            </div>
+          </div>
+          <div className="form-control mt-4">
+            <label className="label cursor-pointer">
+              <span className="label-text">¿Requerir pago para confirmar reserva?</span>
+              <input
+                type="checkbox"
+                name="requirePaymentForBooking"
+                checked={settings?.requirePaymentForBooking || false}
+                onChange={handleInputChange}
+                className="toggle toggle-primary"
+              />
+            </label>
           </div>
         </div>
-        
-        {/* Sección 4: Pagos y Tienda */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h4 className="text-xl font-semibold mb-4 text-gray-700">Pagos y Tienda</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-control">
-              <label className="label"><span className="label-text">Moneda</span></label>
-              <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} className="input input-bordered w-full" placeholder="Ej: ARS" disabled={isLoading} />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Habilitar Tienda</span></label>
-              <select value={shopEnabled} onChange={(e) => setShopEnabled(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
-                <option value="true">Sí</option>
-                <option value="false">No</option>
-              </select>
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Habilitar Pagos (Mercado Pago)</span></label>
-              <select value={enablePayments} onChange={(e) => setEnablePayments(e.target.value)} className="select select-bordered w-full" disabled={isLoading}>
-                <option value="true">Sí</option>
-                <option value="false">No</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-4 bg-gray-50 rounded">
-            <p className="text-sm text-gray-600">
-              <strong>Nota:</strong> Las credenciales de Mercado Pago se configuran en las <strong>variables de entorno</strong> del servidor.
-            </p>
-          </div>
 
+        {/* Botón de Guardar */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            disabled={loading}
+          >
+            {loading ? <span className="loading loading-spinner"></span> : 'Guardar Cambios'}
+          </button>
         </div>
-
-      </div>
-
-      {/* Botón de Guardar Fijo */}
-      {/* CAMBIO: 'mt-6' en vez de 'mt-8' para ajustar el espacio */}
-      <div className="mt-6">
-        <button 
-          onClick={handleSaveSettings} 
-          className="btn btn-primary w-full md:w-auto"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Guardando...' : 'Guardar Configuración'}
-        </button>
-      </div>
-    </>
+      </form>
+    </div>
   );
 };
 
