@@ -37,45 +37,29 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
       
       if (isOpen) {
         const startSlot = timeToSlotIndex(openingHours[`${dayKey}_OPENING_HOUR`]);
-        // Ajuste: El cierre "00:00" del día siguiente es slot 48 (o totalSlots)
         let endSlot = timeToSlotIndex(openingHours[`${dayKey}_CLOSING_HOUR`]);
         
-        // Lógica para horarios que terminan a medianoche (ej: 08:00 a 00:00)
-        // Ojo: Tu API guarda "23:00" si cierra a las 23:00, "02:00" si cierra a las 02:00
-        // Asumimos que la lógica de la API es "horario de inicio en este día" y "horario de fin en este día"
-        // Si el horario cruza la medianoche (ej 8:00 a 2:00), la API guardaría:
-        // LUNES: 08:00 - 23:30 (o 24:00) y MARTES: 00:00 - 02:00
-        
-        // Esta grilla simplifica eso:
-        // LUNES: pintado de 08:00 a 23:30
-        // MARTES: pintado de 00:00 a 02:00
-        
+        // Lógica para cierre a medianoche "00:00"
+        if (endSlot === 0 && openingHours[`${dayKey}_CLOSING_HOUR`] !== '00:00') {
+           // Si la hora es 00:00, puede ser el final del día
+        }
+        if (endSlot === 0 && startSlot !== 0) {
+            endSlot = totalSlots; // Significa que cierra al final del día (24:00)
+        }
+
         if (startSlot === -1 || endSlot === -1) {
-           // Si el horario es 00:00 a 00:00, puede ser todo el día o nada del día.
-           // Si es 00:00 a 00:00 pero IS_OPEN es true, asumimos 24h
-           if (startSlot === 0 && endSlot === 0 && isOpen) {
+           // Error en los datos, lo dejamos cerrado
+        }
+        else if (startSlot === 0 && endSlot === totalSlots) {
+            // Caso 24h
              for (let i = 0; i < totalSlots; i++) daySlots[i] = true;
-           }
-           // Si no, lo dejamos cerrado (ya está en false)
         }
         else if (startSlot < endSlot) {
           // Caso normal (ej: 08:00 a 17:00)
           for (let i = startSlot; i < endSlot; i++) daySlots[i] = true;
-        } else if (startSlot > endSlot) {
-          // Caso de medianoche (ej: 20:00 a 04:00)
-          // Esto es lo que tu API maneja mal. La grilla lo soporta visualmente.
-          // LUN: 20:00 - 23:30
-          for (let i = startSlot; i < totalSlots; i++) daySlots[i] = true;
-          // MAR: 00:00 - 04:00 (esto debe estar en la fila de Martes)
-          // La API lo guarda así: LUN_CLOSING_HOUR: 04:00 (del día siguiente)
-          // PERO TU API TIENE CAMPOS POR DÍA.
-          // La única forma de que tu API actual funcione es:
-          // LUNES: 08:00 a 23:30 (o 24:00)
-          // MARTES: 00:00 a 02:00
-          
-          // El "de-traductor" debe ser simple y reflejar lo que la API guarda:
-          for (let i = startSlot; i < endSlot; i++) daySlots[i] = true;
         }
+        // No manejamos start > end porque la API lo guarda por día
+        // (ej: LUN: 8-24, MAR: 0-2)
       }
       return daySlots;
     });
@@ -143,15 +127,17 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
         newSchedule[`${dayKey}_OPENING_HOUR`] = slotIndexToTime(firstOpenSlot);
         
         // El horario de cierre es el *inicio* del siguiente slot
-        // Ej: si el último slot es 22:30, el cierre es 23:00
+        // Ej: si el último slot es 23:30, el cierre es 24:00 (que guardamos como 00:00)
         const closingTime = slotIndexToTime(lastOpenSlot + 1);
+        
+        // Si el cierre es "24:00", la API lo espera como "00:00"
         newSchedule[`${dayKey}_CLOSING_HOUR`] = closingTime === '24:00' ? '00:00' : closingTime;
       }
     });
 
     // Llamar al callback de SettingsPage con los datos traducidos
     onScheduleChange(newSchedule);
-  }, [grid, slotDuration, onScheduleChange, totalSlots]);
+  }, [grid, slotDuration, onScheduleChange]);
 
 
   // --- Renderizado de la Grilla ---
@@ -159,12 +145,13 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
 
   const renderHeaders = () => {
     const headers = [];
+    const slotsPerHour = 60 / slotDuration;
     for (let h = 0; h < 24; h++) {
       headers.push(
         <div 
           key={h} 
           className="text-center text-xs text-gray-500"
-          style={{ gridColumn: `span ${(60 / slotDuration)}` }} // Ocupa 2 celdas si slot=30
+          style={{ gridColumn: `span ${slotsPerHour}` }} // Ocupa 2 celdas si slot=30
         >
           {String(h).padStart(2, '0')}:00
         </div>
@@ -177,16 +164,27 @@ const ScheduleGrid = ({ slotDuration = 30, openingHours, onScheduleChange }) => 
     <div className="overflow-x-auto" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       <div 
         className="grid items-center gap-px"
-        style={{ gridTemplateColumns: `60px repeat(${totalSlots}, minmax(10px, 1fr))` }}
+        style={{ 
+          gridTemplateColumns: `60px repeat(${totalSlots}, minmax(10px, 1fr))`,
+          minWidth: `${60 + totalSlots * 10}px` // Asegura un ancho mínimo
+        }}
       >
         {/* Fila de Headers (Horas) */}
         <div /> {/* Celda vacía para la esquina */}
+        
+        {/* --- ESTA ES LA SECCIÓN CORREGIDA --- */}
         <div 
-          className="col-span-48 grid" 
-          style={{ gridTemplateColumns: `repeat(24, 1fr)` }}
+          className="grid" // Quitamos el 'col-span-48' que fallaba
+          style={{
+            gridColumn: '2 / -1', // Estilo en línea para que ocupe todas las columnas de slots
+            gridTemplateColumns: `repeat(24, 1fr)`,
+            gap: '1px' // Gap de 1px entre los headers
+          }}
         >
           {renderHeaders()}
         </div>
+        {/* --- FIN DE LA SECCIÓN CORREGIDA --- */}
+
 
         {/* Filas de Días y Slots */}
         {DAY_NAMES_ES.map((dayName, dayIndex) => (
