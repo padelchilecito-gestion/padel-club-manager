@@ -2,9 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.js');
-
-// CORRECCIÓN: Usamos { logActivity } para desestructurar la importación
-const { logActivity } = require('../utils/logActivity.js');
+const { logActivity } = require('../utils/logActivity.js'); // Esto ya estaba bien
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -26,8 +24,9 @@ const loginUser = asyncHandler(async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
-    // Esta línea (antes la 26) ahora funcionará
-    await logActivity(user._id, 'LOGIN_SUCCESS', `Usuario ${user.name} inició sesión`);
+    // CORRECCIÓN: Pasamos el objeto 'user' completo, no solo 'user._id'
+    // El 'user' que espera logActivity debe tener 'id' y 'username'
+    await logActivity(user, 'LOGIN_SUCCESS', `Usuario ${user.name} inició sesión`);
 
     res.json({
       _id: user._id,
@@ -36,7 +35,7 @@ const loginUser = asyncHandler(async (req, res) => {
       role: user.role,
     });
   } else {
-    // También fallaría aquí si no se corrigiera la importación
+    // Esto está bien, 'null' es un valor esperado por logActivity
     await logActivity(null, 'LOGIN_FAIL', `Intento fallido de inicio de sesión para ${email}`);
     res.status(401);
     throw new Error('Email o contraseña inválidos');
@@ -47,9 +46,9 @@ const loginUser = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Private
 const logoutUser = asyncHandler(async (req, res) => {
-  const userId = req.user?._id;
-  if (userId) {
-    await logActivity(userId, 'LOGOUT', `Usuario ${req.user.name} cerró sesión`);
+  // CORRECCIÓN: Pasamos el objeto 'req.user' completo
+  if (req.user) {
+    await logActivity(req.user, 'LOGOUT', `Usuario ${req.user.name} cerró sesión`);
   }
 
   res.cookie('jwt', '', {
@@ -96,7 +95,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
     const updatedUser = await user.save();
     
-    await logActivity(user._id, 'PROFILE_UPDATE', `Usuario ${user.name} actualizó su perfil`);
+    // CORRECCIÓN: Pasamos el 'updatedUser' completo
+    await logActivity(updatedUser, 'PROFILE_UPDATE', `Usuario ${updatedUser.name} actualizó su perfil`);
 
     res.json({
       _id: updatedUser._id,
