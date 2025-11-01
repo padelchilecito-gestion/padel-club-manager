@@ -1,3 +1,4 @@
+// server/routes/index.js - CORREGIDO
 const express = require('express');
 const path = require('path');
 const authRoutes = require('./auth.js');
@@ -18,21 +19,24 @@ const router = express.Router();
 console.log('[Routes] Index router loaded.');
 
 // API routes
-router.use('/api/auth', authRoutes);
-router.use('/api/users', userRoutes);
-router.use('/api/courts', courtRoutes);
-router.use('/api/bookings', bookingRoutes);
-router.use('/api/products', productRoutes);
-router.use('/api/sales', saleRoutes);
-router.use('/api/reports', reportRoutes);
-router.use('/api/settings', settingRoutes);
-router.use('/api/logs', logRoutes);
-router.use('/api/payments', paymentRoutes);
-router.use('/api/cashbox', cashboxRoutes);
-// router.use('/api/debug', debugRoutes);
+// CORRECCIÓN: Se quita el prefijo '/api' de todas las rutas.
+// server.js ya se encarga de añadirlo globalmente.
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/courts', courtRoutes);
+router.use('/bookings', bookingRoutes);
+router.use('/products', productRoutes);
+router.use('/sales', saleRoutes);
+router.use('/reports', reportRoutes);
+router.use('/settings', settingRoutes);
+router.use('/logs', logRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/cashbox', cashboxRoutes);
+// router.use('/debug', debugRoutes);
 
 // Ruta para verificar la versión (útil para health checks)
-router.get('/api/version', (req, res) => {
+// Esta ruta ahora será /api/version
+router.get('/version', (req, res) => {
   res.json({ version: process.env.npm_package_version || '1.0.0' });
 });
 
