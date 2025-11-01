@@ -1,7 +1,10 @@
+// server/controllers/authController.js - CORREGIDO
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.js');
-const logActivity = require('../utils/logActivity.js');
+
+// CORRECCIÓN: Usamos { logActivity } para desestructurar la importación
+const { logActivity } = require('../utils/logActivity.js');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -23,6 +26,7 @@ const loginUser = asyncHandler(async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
+    // Esta línea (antes la 26) ahora funcionará
     await logActivity(user._id, 'LOGIN_SUCCESS', `Usuario ${user.name} inició sesión`);
 
     res.json({
@@ -32,6 +36,7 @@ const loginUser = asyncHandler(async (req, res) => {
       role: user.role,
     });
   } else {
+    // También fallaría aquí si no se corrigiera la importación
     await logActivity(null, 'LOGIN_FAIL', `Intento fallido de inicio de sesión para ${email}`);
     res.status(401);
     throw new Error('Email o contraseña inválidos');
