@@ -1,13 +1,15 @@
+// frontend/src/services/api.js - CORREGIDO
 import axios from 'axios';
 
-// URLs base fijas para producción y desarrollo
-const PROD_API_URL = 'https://padel-club-backend.onrender.com/api';
+// CORRECCIÓN:
+// En producción (Vercel), usaremos una ruta relativa '/api'.
+// Vercel (via vercel.json) interceptará esto y lo redirigirá
+// a 'https://padel-club-backend.onrender.com/api'.
+const PROD_API_URL = '/api';
 const DEV_API_URL = 'http://localhost:5001/api';
 
 // Usamos la variable interna de Vite (import.meta.env.PROD)
 // para decidir qué URL usar.
-// Si (import.meta.env.PROD) es true (corriendo en Vercel/Producción), usa PROD_API_URL.
-// Si es false (corriendo en local), usa DEV_API_URL.
 const baseUrl = import.meta.env.PROD ? PROD_API_URL : DEV_API_URL;
 
 const api = axios.create({
