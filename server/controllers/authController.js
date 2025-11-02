@@ -24,15 +24,15 @@ const loginUser = asyncHandler(async (req, res) => {
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
-    await logActivity(user, 'LOGIN_SUCCESS', `Usuario ${user.username} inició sesión`);
+    await logActivity(user, 'USER_LOGIN', `Usuario ${user.username} inició sesión`);
 
     res.json({
       _id: user._id,
       username: user.username,
       role: user.role,
+      token: token
     });
   } else {
-    await logActivity(null, 'LOGIN_FAIL', `Intento fallido de inicio de sesión para ${username}`);
     res.status(401);
     throw new Error('Usuario o contraseña inválidos');
   }
