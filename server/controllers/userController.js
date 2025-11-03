@@ -1,4 +1,4 @@
-// server/controllers/userController.js (CORREGIDO)
+// server/controllers/userController.js
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 
@@ -67,12 +67,9 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 });
 
-// --- INICIO DE LA CORRECCIÓN ---
-// El export original solo incluía 'getUsers'.
 module.exports = {
   getUsers,
-  getUserById,    // <-- Añadido
-  updateUser,     // <-- Añadido
-  deleteUser,     // <-- Añadido
+  getUserById,
+  updateUser,
+  deleteUser,
 };
-// --- FIN DE LA CORRECCIÓN
