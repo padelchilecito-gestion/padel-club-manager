@@ -1,28 +1,29 @@
-// server/routes/cashbox.js
+// server/routes/cashbox.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  startSession,
-  endSession, // <-- Se importa 'endSession'
-  getSession,
-  addMovement,
-  getSummary,
+  // --- CORRECCIÓN DE NOMBRES ---
+  startCashboxSession,
+  endCashboxSession,
+  getActiveCashboxSession,
+  addCashboxMovement,
+  getCashboxSummary,
 } = require('../controllers/cashboxController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- Middleware correcto
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 const { 
   validateMovement, 
-  handleValidationErrors // <-- Validador correcto
+  handleValidationErrors 
 } = require('../validators/cashboxValidator');
 
-// Aplicar middlewares para todas las rutas
-router.use(protect);
-router.use(adminOrOperator); // <-- Middleware correcto
 
-// Rutas
-router.post('/start', startSession);
-router.post('/end', endSession); // <-- Ruta corregida
-router.get('/session', getSession);
-router.post('/movement', validateMovement, handleValidationErrors, addMovement); // <-- Ruta corregida
-router.get('/summary', getSummary);
+router.use(protect);
+router.use(adminOrOperator);
+
+// --- CORRECCIÓN DE NOMBRES ---
+router.post('/start', startCashboxSession);
+router.post('/end', endCashboxSession);
+router.get('/session', getActiveCashboxSession);
+router.post('/movement', validateMovement, handleValidationErrors, addCashboxMovement);
+router.get('/summary', getCashboxSummary);
 
 module.exports = router;
