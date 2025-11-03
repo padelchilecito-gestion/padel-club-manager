@@ -1,16 +1,22 @@
+// server/routes/sales.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
-const { createSale, getSales } = require('../controllers/saleController');
-const { protect } = require('../middlewares/authMiddleware');
+const {
+  createSale,
+  getSaleById,
+  getSales,
+} = require('../controllers/saleController');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
-// @route   POST api/sales
-// @desc    Create a new sale
-// @access  Operator/Admin
-router.post('/', protect, createSale);
+// Rutas protegidas (Admin u Operator)
+router.use(protect);
+router.use(adminOrOperator); // <-- CORREGIDO
 
-// @route   GET api/sales
-// @desc    Get all sales
-// @access  Operator/Admin
-router.get('/', protect, getSales);
+router.route('/')
+  .get(getSales)
+  .post(createSale);
+
+router.route('/:id')
+  .get(getSaleById);
 
 module.exports = router;
