@@ -9,17 +9,19 @@ const {
   deleteProduct,
 } = require('../controllers/productController');
 
-// --- INICIO DE LA CORRECCIÓN ---
-// Importamos 'adminOrOperator' en lugar de 'authorize'
+// Importamos el middleware correcto
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
-// --- FIN DE LA CORRECCIÓN ---
 
 // Rutas públicas
 router.get('/', getProducts);
-router.get('/:id', getProductById); // <- Esta era la línea 14 que daba error
+router.get('/:id', getProductById);
+
+// --- INICIO DE LA CORRECCIÓN ---
+// Se elimina la línea 18 ("router.get('/shop/:id', getProductForShop);")
+// porque la función 'getProductForShop' no existe en el controlador.
+// --- FIN DE LA CORRECCIÓN ---
 
 // Rutas protegidas (Admin u Operator)
-// Reemplazamos 'authorize' por 'adminOrOperator'
 router.post('/', protect, adminOrOperator, createProduct);
 router.put('/:id', protect, adminOrOperator, updateProduct);
 router.delete('/:id', protect, adminOrOperator, deleteProduct);
