@@ -1,18 +1,16 @@
-// server/routes/settings.js - CORREGIDO
-
+// server/routes/settings.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
-const { getSettings, updateSettings } = require('../controllers/settingController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const {
+  getSettings,
+  updateSettings,
+} = require('../controllers/settingController');
+const { protect, admin } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
-// @route   GET /api/settings
-// @desc    Get club settings
-// @access  Public
+// Rutas públicas
 router.get('/', getSettings);
 
-// @route   PUT /api/settings
-// @desc    Update club settings
-// @access  Private/Admin
-router.put('/', protect, admin, updateSettings); // <-- La corrección estaba aquí
+// Rutas protegidas (Solo Admin)
+router.put('/', protect, admin, updateSettings); // <-- CORREGIDO
 
 module.exports = router;
