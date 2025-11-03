@@ -3,7 +3,7 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Función para generar el token (ya la tenías)
+// Función para generar el token
 const generateTokenAndSetCookie = (res, userId, userRole) => {
   const token = jwt.sign({ id: userId, role: userRole }, process.env.JWT_SECRET, {
     expiresIn: '30d',
@@ -11,10 +11,8 @@ const generateTokenAndSetCookie = (res, userId, userRole) => {
 
   res.cookie('token', token, {
     httpOnly: true,
-    // --- ESTO ES CRÍTICO y depende de la variable NODE_ENV ---
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    // ----------------------------------------------------
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
   });
 };
@@ -95,7 +93,44 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// --- FUNCIÓN AÑADIDA ---
+// --- INICIO DE LA CORRECCIÓN ---
+// @desc    Actualizar perfil de usuario
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (user) {
+    user.name = req.body.name || user.name;
+    user.lastName = req.body.lastName || user.lastName;
+    user.email = req.body.email || user.email;
+    user.phone = req.body.phone || user.phone;
+    user.username = req.body.username || user.username;
+    
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
+
+    const updatedUser = await user.save();
+    
+    // Devolvemos los mismos datos que en el login/profile
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      lastName: updatedUser.lastName,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      phone: updatedUser.phone,
+    });
+  } else {
+    res.status(404);
+    throw new Error('Usuario no encontrado');
+  }
+});
+// --- FIN DE LA CORRECCIÓN ---
+
+
 // @desc    Cerrar sesión y limpiar cookie
 // @route   POST /api/auth/logout
 // @access  Public
@@ -109,13 +144,11 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Sesión cerrada exitosamente' });
 });
 
-// --- FUNCIÓN AÑADIDA ---
 // @desc    Verificar estado de autenticación
 // @route   GET /api/auth/check
 // @access  Private (usa 'protect')
 const checkAuthStatus = asyncHandler(async (req, res) => {
   // Si el middleware 'protect' pasa, req.user existe.
-  // Devolvemos los mismos datos que el login/profile.
   const user = await User.findById(req.user.id).select('-password');
    if (user) {
     res.json(user);
@@ -129,6 +162,7 @@ module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
-  logoutUser,       // <-- Añadido
-  checkAuthStatus,  // <-- Añadido
+  updateUserProfile, // <-- Ahora sí está exportada
+  logoutUser,
+  checkAuthStatus,
 };
