@@ -1,3 +1,4 @@
+// server/models/Booking.js (CORREGIDO)
 const mongoose = require('mongoose');
 
 const BookingSchema = new mongoose.Schema({
@@ -6,11 +7,29 @@ const BookingSchema = new mongoose.Schema({
     ref: 'Court',
     required: true,
   },
+  
+  // --- INICIO DE LA CORRECCIÓN ---
+  // 1. Campo 'user' para usuarios registrados (opcional)
   user: {
-    name: { type: String, required: true },
-    lastName: { type: String, required: false },
-    phone: { type: String, required: true },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false, // Es opcional, puede ser un invitado
   },
+  // 2. Campos para 'invitados' (que también aplican si el usuario está registrado)
+  clientName: {
+    type: String,
+    required: true,
+  },
+  clientLastName: {
+    type: String,
+    required: false,
+  },
+  clientPhone: {
+    type: String,
+    required: true,
+  },
+  // --- FIN DE LA CORRECCIÓN ---
+
   startTime: {
     type: Date,
     required: true,
@@ -25,7 +44,8 @@ const BookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'NoShow'],
+    // 3. Añadido 'AwaitingPayment' que usa el controlador
+    enum: ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'NoShow', 'AwaitingPayment'],
     default: 'Pending',
   },
   isPaid: {
@@ -34,8 +54,8 @@ const BookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    // --- ACTUALIZADO: Simplificado a 'QR' ---
-    enum: ['Efectivo', 'Mercado Pago', 'Transferencia', 'QR', 'Otro'],
+    // 4. Ajustados enums para coincidir con el controlador ('Cash', 'MercadoPago')
+    enum: ['Efectivo', 'MercadoPago', 'Transferencia', 'QR', 'Otro', 'Cash'],
     default: 'Efectivo',
   },
   createdAt: {
