@@ -36,7 +36,6 @@ export const registerUser = async (userData) => {
  */
 export const getUserProfile = async () => {
   try {
-    // No se necesita 'config' ni 'headers', axios (api) lo maneja.
     const { data } = await api.get(`${AUTH_API_URL}/profile`);
     return data;
   } catch (error) {
@@ -59,7 +58,7 @@ export const logoutUser = async () => {
 
 /**
  * Verifica el estado de autenticación (usado para cargar la app).
- * No se necesita 'token', la cookie se envía automáticamente.
+ * La cookie se envía automáticamente.
  */
 export const checkAuthStatus = async () => {
   try {
