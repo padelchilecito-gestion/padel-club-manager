@@ -5,8 +5,10 @@ const Booking = require('../models/Booking');
 const { logActivity } = require('../utils/logActivity');
 const { validationResult } = require('express-validator');
 
-// Obtener la sesión de caja activa
-const getActiveCashboxSession = async (req, res) => {
+// @desc    Get the active cashbox session
+// @route   GET /api/cashbox/session
+// @access  Admin/Operator
+const getCashboxSession = async (req, res) => {
   try {
     const activeSession = await CashboxSession.findOne({ user: req.user._id, endTime: null }).populate('user', 'name');
     res.json(activeSession);
@@ -16,8 +18,10 @@ const getActiveCashboxSession = async (req, res) => {
   }
 };
 
-// Iniciar una nueva sesión de caja
-const startCashboxSession = async (req, res) => {
+// @desc    Start a new cashbox session
+// @route   POST /api/cashbox/start
+// @access  Admin/Operator
+const startSession = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -52,8 +56,10 @@ const startCashboxSession = async (req, res) => {
   }
 };
 
-// Cerrar la sesión de caja activa
-const closeCashboxSession = async (req, res) => {
+// @desc    Close the active cashbox session
+// @route   POST /api/cashbox/end
+// @access  Admin/Operator
+const closeSession = async (req, res) => {
   const { notes } = req.body;
 
   try {
@@ -80,8 +86,10 @@ const closeCashboxSession = async (req, res) => {
   }
 };
 
-// Obtener reporte de la sesión activa
-const getActiveSessionReport = async (req, res) => {
+// @desc    Get a report of the active session
+// @route   GET /api/cashbox/summary
+// @access  Admin/Operator
+const getSessionReport = async (req, res) => {
   try {
     const session = await CashboxSession.findOne({ user: req.user._id, endTime: null });
     if (!session) {
@@ -97,8 +105,10 @@ const getActiveSessionReport = async (req, res) => {
   }
 };
 
-// Añadir un movimiento a la caja (entrada/salida)
-const addMovement = async (req, res) => {
+// @desc    Add a movement (IN/OUT) to the cashbox
+// @route   POST /api/cashbox/movement
+// @access  Admin/Operator
+const addCashboxMovement = async (req, res) => {
   const { type, amount, description } = req.body;
 
   try {
@@ -126,7 +136,7 @@ const addMovement = async (req, res) => {
   }
 };
 
-// --- Función Helper (Interna) ---
+// --- Helper Function (Internal) ---
 const getCashboxReportData = async (session) => {
   const sales = await Sale.find({
     status: 'Completed',
@@ -196,9 +206,9 @@ const getCashboxReportData = async (session) => {
 };
 
 module.exports = {
-  getActiveCashboxSession,  // Renamed from getSession
-  startCashboxSession,      // Renamed from startSession
-  closeCashboxSession,      // Renamed from endSession
-  getActiveSessionReport,   // Renamed from getSummary
-  addMovement,              // Added missing function
+  getCashboxSession,
+  startSession,
+  closeSession,
+  getSessionReport,
+  addCashboxMovement,
 };
