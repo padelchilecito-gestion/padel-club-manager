@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    loadUser, // Exportamos loadUser por si se necesita recargar el perfil
+    loadUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
