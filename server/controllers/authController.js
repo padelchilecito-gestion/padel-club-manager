@@ -1,36 +1,80 @@
-// server/controllers/authController.js - CORREGIDO
+// server/controllers/authController.js (CORREGIDO)
 const asyncHandler = require('express-async-handler');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User.js');
-const { logActivity } = require('../utils/logActivity.js');
 
-// @desc    Auth user & get token
+// Función para generar el token (ya la tenías)
+const generateTokenAndSetCookie = (res, userId, userRole) => {
+  const token = jwt.sign({ id: userId, role: userRole }, process.env.JWT_SECRET, {
+    expiresIn: '30d',
+  });
+
+  res.cookie('token', token, {
+    httpOnly: true,
+    // --- ESTO ES CRÍTICO para Vercel + Render ---
+    // Tu código original estaba bien, pero asegúrate de que NODE_ENV esté seteado en Render
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    // -------------------------------------------
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+  });
+};
+
+// @desc    Registrar un nuevo usuario
+// @route   POST /api/auth/register
+// @access  Public
+const registerUser = asyncHandler(async (req, res) => {
+  const { name, lastName, username, email, password, phone } = req.body;
+
+  const userExists = await User.findOne({ $or: [{ email }, { username }] });
+  if (userExists) {
+    res.status(400);
+    throw new Error('El usuario o email ya existe');
+  }
+
+  const user = await User.create({
+    name,
+    lastName,
+    username,
+    email,
+    password,
+    phone,
+  });
+
+  if (user) {
+    generateTokenAndSetCookie(res, user._id, user.role);
+    res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      lastName: user.lastName,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+    });
+  } else {
+    res.status(400);
+    throw new Error('Datos de usuario inválidos');
+  }
+});
+
+// @desc    Autenticar usuario y obtener token
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
-
-  const user = await User.findOne({ username });
+  const user = await User.findOne({ $or: [{ email: username }, { username: username }] });
 
   if (user && (await user.matchPassword(password))) {
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '30d'
-    });
-
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'none',
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
-
-    await logActivity(user, 'USER_LOGIN', `Usuario ${user.username} inició sesión`);
-
+    generateTokenAndSetCookie(res, user._id, user.role);
     res.json({
       _id: user._id,
+      name: user.name,
+      lastName: user.lastName,
       username: user.username,
+      email: user.email,
       role: user.role,
-      token: token
+      phone: user.phone,
     });
   } else {
     res.status(401);
@@ -38,95 +82,54 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Logout user / clear cookie
-// @route   POST /api/auth/logout
+// @desc    Obtener perfil de usuario
+// @route   GET /api/auth/profile
 // @access  Private
-const logoutUser = asyncHandler(async (req, res) => {
-  if (req.user) {
-    await logActivity(req.user, 'LOGOUT', `Usuario ${req.user.username} cerró sesión`);
+const getUserProfile = asyncHandler(async (req, res) => {
+  // req.user es asignado por el middleware 'protect'
+  const user = await User.findById(req.user.id).select('-password');
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(404);
+    throw new Error('Usuario no encontrado');
   }
+});
 
-  res.cookie('jwt', '', {
+// --- FUNCIÓN AÑADIDA ---
+// @desc    Cerrar sesión y limpiar cookie
+// @route   POST /api/auth/logout
+// @access  Public
+const logoutUser = asyncHandler(async (req, res) => {
+  res.cookie('token', '', {
     httpOnly: true,
-    expires: new Date(0),
-    secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'none', 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    expires: new Date(0), // Expira la cookie inmediatamente
   });
   res.status(200).json({ message: 'Sesión cerrada exitosamente' });
 });
 
-// @desc    Get user profile
-// @route   GET /api/auth/profile
-// @access  Private
-const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).select('-password');
-
-  if (user) {
-    res.json({
-      _id: user._id,
-      username: user.username,
-      role: user.role,
-    });
-  } else {
-    res.status(404);
-    throw new Error('Usuario no encontrado');
-  }
-});
-
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
-const updateUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-
-  if (user) {
-    user.username = req.body.username || user.username;
-
-    if (req.body.password) {
-      user.password = req.body.password;
-    }
-
-    const updatedUser = await user.save();
-    
-    await logActivity(updatedUser, 'PROFILE_UPDATE', `Usuario ${updatedUser.username} actualizó su perfil`);
-
-    res.json({
-      _id: updatedUser._id,
-      username: updatedUser.username,
-      role: updatedUser.role,
-    });
-  } else {
-    res.status(404);
-    throw new Error('Usuario no encontrado');
-  }
-});
-
-// @desc    Check auth status
-// @route   GET /api/auth/status
-// @access  Public (depends on cookie)
+// --- FUNCIÓN AÑADIDA ---
+// @desc    Verificar estado de autenticación
+// @route   GET /api/auth/check
+// @access  Private (usa 'protect')
 const checkAuthStatus = asyncHandler(async (req, res) => {
-  if (req.user) {
-    res.json({
-      isAuthenticated: true,
-      user: {
-        _id: req.user._id,
-        username: req.user.username,
-        role: req.user.role,
-      }
-    });
+  // Si el middleware 'protect' pasa, req.user existe.
+  // Devolvemos los mismos datos que el login/profile.
+  const user = await User.findById(req.user.id).select('-password');
+   if (user) {
+    res.json(user);
   } else {
-    res.json({
-      isAuthenticated: false,
-      user: null
-    });
+    res.status(404);
+    throw new Error('Usuario no encontrado');
   }
 });
 
-// Exportamos usando module.exports
 module.exports = {
+  registerUser,
   loginUser,
-  logoutUser,
   getUserProfile,
-  updateUserProfile,
-  checkAuthStatus
+  logoutUser,       // <-- Añadido
+  checkAuthStatus,  // <-- Añadido
 };
