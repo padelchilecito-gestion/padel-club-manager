@@ -3,33 +3,34 @@ const express = require('express');
 const router = express.Router();
 const {
   startSession,
-  endSession, // <-- CORREGIDO: Se importa 'endSession'
+  endSession,
   getSession,
   addMovement,
   getSummary,
 } = require('../controllers/cashboxController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+
+// --- INICIO DE LA CORRECCIÓN ---
+// Importamos AMBAS funciones del validador
 const { 
   validateMovement, 
-  handleValidationErrors // <-- CORREGIDO: Se importa el manejador
+  handleValidationErrors 
 } = require('../validators/cashboxValidator');
+// --- FIN DE LA CORRECCIÓN ---
 
-// Aplicar middlewares para todas las rutas
+
+// Todas estas rutas requieren rol de Admin u Operador
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO: Se usa 'adminOrOperator'
+router.use(adminOrOperator);
 
-// Rutas
 router.post('/start', startSession);
-
-// --- CORRECCIÓN DE LÍNEA 27 ---
-// La ruta era '/close' y usaba 'closeSession' que no existe
-router.post('/end', endSession); // <-- CORREGIDO: Usa '/end' y 'endSession'
-
+router.post('/end', endSession);
 router.get('/session', getSession);
 
-// --- CORRECCIÓN DE LÍNEA 17 ---
-// Faltaba 'handleValidationErrors'
+// --- INICIO DE LA CORRECCIÓN ---
+// Añadimos 'handleValidationErrors' después de las reglas de 'validateMovement'
 router.post('/movement', validateMovement, handleValidationErrors, addMovement);
+// --- FIN DE LA CORRECCIÓN ---
 
 router.get('/summary', getSummary);
 
