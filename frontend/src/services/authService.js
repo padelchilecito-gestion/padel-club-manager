@@ -1,54 +1,71 @@
-// frontend/src/services/authService.js
+// frontend/src/services/authService.js (CORREGIDO)
+import api from './api';
 
-import axios from 'axios';
+const AUTH_API_URL = '/auth';
 
-// CORRECCIÓN: Volvemos a las rutas relativas. Vercel (vercel.json)
-// se encargará de redirigirlas al backend.
-const API_URL = '/api/auth'; // Para Login
-const USER_API_URL = '/api/users'; // Para Registro y Perfil
-
-// Función para iniciar sesión
-export const loginUser = async (username, password) => { // <-- CORREGIDO (username)
-    try {
-        // Usar ruta relativa y 'username'
-        const response = await axios.post(`${API_URL}/login`, { username, password });
-        if (response.data.token) {
-            // localStorage.setItem('token', response.data.token);
-        }
-        return response.data;
-    } catch (error) {
-        throw error; // Re-lanza el error para que el AuthContext lo maneje
-    }
+/**
+ * Inicia sesión de un usuario.
+ * El token se recibirá como una cookie httpOnly, no en la respuesta JSON.
+ */
+export const loginUser = async (username, password) => {
+  try {
+    // La respuesta de login ahora solo devuelve datos del usuario
+    const { data } = await api.post(`${AUTH_API_URL}/login`, { username, password });
+    return data;
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
 };
 
-// Función para registrar un nuevo usuario
+/**
+ * Registra un nuevo usuario.
+ * El token se recibirá como una cookie httpOnly.
+ */
 export const registerUser = async (userData) => {
-    try {
-        // CORRECCIÓN: La ruta de registro está en USER_API_URL ('/api/users'), 
-        // no en API_URL ('/api/auth').
-        const response = await axios.post(USER_API_URL, userData); 
-        if (response.data.token) {
-            // localStorage.setItem('token', response.data.token);
-        }
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
+  try {
+    const { data } = await api.post(`${AUTH_API_URL}/register`, userData);
+    return data;
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
 };
 
-// **FUNCIÓN CORREGIDA: Obtener el perfil del usuario**
-// Añadimos 'export' para que AuthContext.jsx pueda importarla
-export const getUserProfile = async (token) => {
-    try {
-        const config = {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        };
-        // Usar ruta relativa
-        const response = await axios.get(`${USER_API_URL}/profile`, config); 
-        return response.data; // Debería devolver un objeto de usuario { id, name, email, role, etc. }
-    } catch (error) {
-        throw error;
-    }
+/**
+ * Obtiene el perfil del usuario autenticado.
+ * No se necesita 'token' como argumento, la cookie se envía automáticamente.
+ */
+export const getUserProfile = async () => {
+  try {
+    // No se necesita 'config' ni 'headers', axios (api) lo maneja.
+    const { data } = await api.get(`${AUTH_API_URL}/profile`);
+    return data;
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
+};
+
+/**
+ * Cierra la sesión del usuario.
+ * El backend se encargará de limpiar la cookie.
+ */
+export const logoutUser = async () => {
+  try {
+    const { data } = await api.post(`${AUTH_API_URL}/logout`);
+    return data;
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
+};
+
+/**
+ * Verifica el estado de autenticación (usado para cargar la app).
+ * No se necesita 'token', la cookie se envía automáticamente.
+ */
+export const checkAuthStatus = async () => {
+  try {
+    const { data } = await api.get(`${AUTH_API_URL}/check`);
+    return data; // Devuelve el usuario si la cookie es válida
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
 };
