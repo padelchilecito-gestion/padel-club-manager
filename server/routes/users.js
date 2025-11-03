@@ -1,26 +1,24 @@
-// server/routes/users.js (CORREGIDO)
+// server/routes/users.js
 const express = require('express');
 const router = express.Router();
 const {
-  // --- CORRECCIÓN DE NOMBRES ---
-  getAllUsers,
+  getUsers,
   getUserById,
-  updateUserById,
-  deleteUserById,
+  updateUser,
+  deleteUser,
 } = require('../controllers/userController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
+// Rutas protegidas (Solo Admin)
 router.use(protect);
 router.use(admin);
 
 router.route('/')
-  // --- CORRECCIÓN DE NOMBRES ---
-  .get(getAllUsers);
+  .get(getUsers);
 
 router.route('/:id')
   .get(getUserById)
-  // --- CORRECCIÓN DE NOMBRES ---
-  .put(updateUserById)
-  .delete(deleteUserById);
+  .put(updateUser)
+  .delete(deleteUser);
 
 module.exports = router;
