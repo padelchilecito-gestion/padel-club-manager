@@ -11,11 +11,10 @@ const generateTokenAndSetCookie = (res, userId, userRole) => {
 
   res.cookie('token', token, {
     httpOnly: true,
-    // --- ESTO ES CRÍTICO para Vercel + Render ---
-    // Tu código original estaba bien, pero asegúrate de que NODE_ENV esté seteado en Render
+    // --- ESTO ES CRÍTICO y depende de la variable NODE_ENV ---
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    // -------------------------------------------
+    // ----------------------------------------------------
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
   });
 };
