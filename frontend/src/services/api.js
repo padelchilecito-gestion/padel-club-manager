@@ -1,4 +1,4 @@
-// frontend/src/services/api.js - CORREGIDO
+// frontend/src/services/api.js (CORREGIDO)
 import axios from 'axios';
 
 // CORRECCIÓN:
@@ -6,7 +6,12 @@ import axios from 'axios';
 // Vercel (via vercel.json) interceptará esto y lo redirigirá
 // a 'https://padel-club-backend.onrender.com/api'.
 const PROD_API_URL = '/api';
-const DEV_API_URL = 'http://localhost:5001/api';
+
+// --- INICIO DE LA CORRECCIÓN ---
+// Se cambió el puerto de 5001 a 5000 para coincidir con el server/server.js
+const DEV_API_URL = 'http://localhost:5000/api';
+// --- FIN DE LA CORRECCIÓN ---
+
 
 // Usamos la variable interna de Vite (import.meta.env.PROD)
 // para decidir qué URL usar.
