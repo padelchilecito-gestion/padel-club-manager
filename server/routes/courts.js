@@ -1,35 +1,22 @@
+// server/routes/courts.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
   getCourts,
-  createCourt,
   getCourtById,
+  createCourt,
   updateCourt,
   deleteCourt,
-  // getPublicCourts, // <-- ELIMINADO (Causaba el error)
-  // getAvailabilityForPublic, // <-- ELIMINADO (Ruta vieja)
-  getAggregatedAvailability // Esta es la única función de disponibilidad que necesitamos
 } = require('../controllers/courtController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
-// --- RUTA DE DISPONIBILIDAD NUEVA Y ÚNICA ---
-// GET /api/courts/availability/:date
-// Obtiene la disponibilidad agregada para una fecha (para el TimeSlotFinder)
-router.get('/availability/:date', getAggregatedAvailability);
+// Rutas públicas
+router.get('/', getCourts);
+router.get('/:id', getCourtById);
 
-// --- Rutas de Admin (protegidas) ---
-router.route('/')
-  .get(protect, admin, getCourts)
-  .post(protect, admin, createCourt);
-
-router
-  .route('/:id')
-  .get(protect, admin, getCourtById)
-  .put(protect, admin, updateCourt)
-  .delete(protect, admin, deleteCourt);
-
-// --- RUTAS PÚBLICAS ANTIGUAS (ELIMINADAS) ---
-// router.get('/public', getPublicCourts); // <-- Causa del error
-// router.get('/availability/:date/:courtId', getAvailabilityForPublic); // <-- Ruta vieja
+// Rutas protegidas (Admin u Operator)
+router.post('/', protect, adminOrOperator, createCourt); // <-- CORREGIDO
+router.put('/:id', protect, adminOrOperator, updateCourt); // <-- CORREGIDO
+router.delete('/:id', protect, adminOrOperator, deleteCourt); // <-- CORREGIDO
 
 module.exports = router;
