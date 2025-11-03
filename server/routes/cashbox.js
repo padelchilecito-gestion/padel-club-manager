@@ -1,43 +1,24 @@
-// server/routes/cashbox.js - CON VALIDATOR COMENTADO TEMPORALMENTE
+// server/routes/cashbox.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  getActiveCashboxSession,
-  startCashboxSession,
-  closeCashboxSession,
-  getActiveSessionReport,
-  // getCashboxHistory, // Asegúrate de importar si usas estas funciones
-  // getSessionDetails
+  startSession,
+  endSession,
+  getSession,
+  addMovement,
+  getSummary,
 } = require('../controllers/cashboxController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { validateMovement } = require('../validators/cashboxValidator');
 
-// --- INICIO DE CORRECCIÓN TEMPORAL ---
-// Importar el validador (si existe)
- const { validateStartSession } = require('../validators/cashboxValidator'); 
-// --- FIN DE CORRECCIÓN TEMPORAL ---
+// Todas estas rutas requieren rol de Admin u Operador
+router.use(protect);
+router.use(adminOrOperator); // <-- CORREGIDO (reemplaza 'authorize')
 
-
-// Obtener sesión activa
-router.get('/session/active', protect, getActiveCashboxSession);
-
-// Iniciar sesión
-// --- CORRECCIÓN TEMPORAL: Comentado 'validateStartSession' ---
-router.post('/session/start', protect, /* validateStartSession, */ startCashboxSession);
-// --- FIN DE CORRECCIÓN TEMPORAL ---
-
-
-// Cerrar sesión
-router.post('/session/close', protect, closeCashboxSession);
-
-// Obtener reporte de sesión activa
-router.get('/session/report', protect, getActiveSessionReport); // <-- Esta es la línea 24 (ahora 28)
-
-// --- POTENCIALMENTE FALTAN ESTAS RUTAS! ---
-// // Obtener historial de sesiones (Ejemplo)
-// router.get('/history', protect, getCashboxHistory); 
-
-// // Obtener detalles de una sesión específica (Ejemplo)
-// router.get('/session/:id', protect, getSessionDetails);
-// --- ---
+router.post('/start', startSession);
+router.post('/end', endSession);
+router.get('/session', getSession);
+router.post('/movement', validateMovement, addMovement);
+router.get('/summary', getSummary);
 
 module.exports = router;
