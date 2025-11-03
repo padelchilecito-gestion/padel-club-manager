@@ -6,7 +6,6 @@ const User = require('../models/User');
 const protect = asyncHandler(async (req, res, next) => {
   let token;
 
-  // --- INICIO DE LA CORRECCIÓN ---
   // 1. Intentar leer el token desde la cookie httpOnly
   token = req.cookies.token;
 
@@ -14,7 +13,6 @@ const protect = asyncHandler(async (req, res, next) => {
   if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
-  // --- FIN DE LA CORRECCIÓN ---
 
   if (token) {
     try {
@@ -34,7 +32,6 @@ const protect = asyncHandler(async (req, res, next) => {
     } catch (error) {
       console.error('Error de autenticación:', error.message);
       res.status(401);
-      // Distinguir por qué falló
       if (error.name === 'JsonWebTokenError') {
         throw new Error('No autorizado, token inválido.');
       }
@@ -44,13 +41,12 @@ const protect = asyncHandler(async (req, res, next) => {
       throw new Error('No autorizado, token fallido.');
     }
   } else {
-    // Este es el error que estabas viendo en el navegador
     res.status(401);
     throw new Error('No autorizado, no hay token');
   }
 });
 
-// El middleware de Admin está bien, solo verifica el rol.
+// El middleware de Admin está bien
 const admin = (req, res, next) => {
   if (req.user && (req.user.role === 'Admin')) {
     next();
@@ -65,7 +61,11 @@ const adminOrOperator = (req, res, next) => {
   if (req.user && (req.user.role === 'Admin' || req.user.role === 'Operator')) {
     next();
   } else {
-    res.status(4G3); // Corregido de 4G3 a 403
+    
+    // --- INICIO DE LA CORRECCIÓN ---
+    res.status(403); // Corregido de 4G3 a 403
+    // --- FIN DE LA CORRECCIÓN ---
+    
     throw new Error('No autorizado, se requiere rol de Admin u Operador');
   }
 };
