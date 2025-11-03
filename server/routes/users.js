@@ -1,28 +1,24 @@
-// server/routes/users.js
+// server/routes/users.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  registerUser,
-  getAllUsers,
+  getUsers,
   getUserById,
   updateUser,
   deleteUser,
-  getUserProfile // <-- CORRECCIÓN 1: Importar getUserProfile
 } = require('../controllers/userController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect, admin } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
-// CORRECCIÓN 2: Añadir la ruta /profile
-// Esta ruta debe ir ANTES de la ruta '/:id'
-router.route('/profile')
-  .get(protect, getUserProfile); // GET /api/users/profile
+// Rutas protegidas (Solo Admin)
+router.use(protect);
+router.use(admin); // <-- CORREGIDO
 
 router.route('/')
-  .post(registerUser) // POST /api/users
-  .get(protect, admin, getAllUsers); // GET /api/users
+  .get(getUsers);
 
 router.route('/:id')
-  .get(protect, getUserById)      // GET /api/users/:id
-  .put(protect, updateUser)       // PUT /api/users/:id
-  .delete(protect, admin, deleteUser); // DELETE /api/users/:id
+  .get(getUserById)
+  .put(updateUser)
+  .delete(deleteUser);
 
 module.exports = router;
