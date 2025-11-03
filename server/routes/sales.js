@@ -1,4 +1,4 @@
-// server/routes/sales.js (CORREGIDO)
+// server/routes/sales.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -19,9 +19,14 @@ router.route('/')
   .get(getAllSales)
   .post(createSale);
 
+
+// The routes for getSaleById, updateSaleStatus, and deleteSale have been removed
+// because the corresponding controller functions do not exist.
+
 router.route('/:id')
   .get(getSaleById)
   .put(updateSaleStatus)
   .delete(deleteSale);
+
 
 module.exports = router;

@@ -1,4 +1,4 @@
-// server/controllers/cashboxController.js - CORREGIDO
+// server/controllers/cashboxController.js
 const CashboxSession = require('../models/CashboxSession');
 const Sale = require('../models/Sale');
 const Booking = require('../models/Booking');
@@ -23,15 +23,11 @@ const startCashboxSession = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  // --- INICIO DE LA CORRECCIÓN ---
-  // El startAmount debe leerse desde req.body
   const { startAmount } = req.body;
 
-  // Validar que startAmount se recibió
   if (startAmount === undefined || startAmount === null || startAmount < 0) {
     return res.status(400).json({ message: 'El monto inicial (startAmount) es requerido y debe ser positivo.' });
   }
-  // --- FIN DE LA CORRECCIÓN ---
 
   try {
     const activeSession = await CashboxSession.findOne({ user: req.user._id, endTime: null });
@@ -41,7 +37,7 @@ const startCashboxSession = async (req, res) => {
 
     const newSession = new CashboxSession({
       user: req.user._id,
-      startAmount: parseFloat(startAmount), // <-- USAR EL VALOR DE REQ.BODY
+      startAmount: parseFloat(startAmount),
       startTime: new Date(),
     });
 
@@ -71,7 +67,7 @@ const closeCashboxSession = async (req, res) => {
     session.endTime = new Date();
     session.endAmount = report.calculatedEndAmount;
     session.notes = notes || '';
-    session.report = report; // Guardar el reporte calculado en la sesión
+    session.report = report;
 
     await session.save();
     
@@ -101,17 +97,45 @@ const getActiveSessionReport = async (req, res) => {
   }
 };
 
+// Añadir un movimiento a la caja (entrada/salida)
+const addMovement = async (req, res) => {
+  const { type, amount, description } = req.body;
+
+  try {
+    const session = await CashboxSession.findOne({ user: req.user._id, endTime: null });
+    if (!session) {
+      return res.status(404).json({ message: 'No hay sesión de caja activa para registrar un movimiento' });
+    }
+
+    const movement = {
+      type,
+      amount: parseFloat(amount),
+      description,
+      timestamp: new Date(),
+    };
+
+    session.movements.push(movement);
+    await session.save();
+
+    logActivity(req.user._id, 'CASHBOX_MOVEMENT', `Registró movimiento de ${type}: $${amount} - ${description}`);
+    res.status(201).json(session);
+
+  } catch (error) {
+    console.error('Error adding cashbox movement:', error);
+    res.status(500).json({ message: 'Error al registrar el movimiento de caja' });
+  }
+};
+
 // --- Función Helper (Interna) ---
 const getCashboxReportData = async (session) => {
   const sales = await Sale.find({
     status: 'Completed',
-    createdAt: { $gte: session.startTime }
+    createdAt: { $gte: session.startTime, $lte: session.endTime || new Date() }
   });
 
   const bookings = await Booking.find({
     isPaid: true,
-    // Asumimos que la reserva se paga cuando se confirma, o necesitamos un 'paidAt'
-    updatedAt: { $gte: session.startTime } 
+    updatedAt: { $gte: session.startTime, $lte: session.endTime || new Date() }
   });
 
   let totalSales = 0;
@@ -136,28 +160,20 @@ const getCashboxReportData = async (session) => {
   let otherBookings = 0;
 
   bookings.forEach(booking => {
-    // Solo contar reservas hechas *después* del inicio de la sesión
-    // Esto es un proxy, idealmente 'paidAt' sería mejor
-    if (booking.updatedAt >= session.startTime && booking.createdAt < session.startTime) {
-       // Si se creó antes pero se pagó durante la sesión
-       totalBookings += booking.price;
-    } else if (booking.createdAt >= session.startTime) {
-       // Si se creó Y pagó durante la sesión
-       totalBookings += booking.price;
-    }
-    
-    // (Este bloque asume que el booking.paymentMethod se setea correctamente)
+    totalBookings += booking.price;
     if (booking.paymentMethod === 'Efectivo') {
       cashBookings += booking.price;
     } else if (booking.paymentMethod === 'Mercado Pago') {
       mpBookings += booking.price;
-    } else if (booking.paymentMethod !== 'Pending') { // Asumir 'other' si no es pendiente
+    } else if (booking.paymentMethod !== 'Pending') {
       otherBookings += booking.price;
     }
   });
+
+  const movementsIn = session.movements.filter(m => m.type === 'IN').reduce((acc, m) => acc + m.amount, 0);
+  const movementsOut = session.movements.filter(m => m.type === 'OUT').reduce((acc, m) => acc + m.amount, 0);
   
-  // Total efectivo esperado en caja
-  const calculatedEndAmount = session.startAmount + cashSales + cashBookings;
+  const calculatedEndAmount = session.startAmount + cashSales + cashBookings + movementsIn - movementsOut;
 
   return {
     startAmount: session.startAmount,
@@ -169,6 +185,8 @@ const getCashboxReportData = async (session) => {
     cashBookings,
     mpBookings,
     otherBookings,
+    movementsIn,
+    movementsOut,
     totalCash: cashSales + cashBookings,
     totalMP: mpSales + mpBookings,
     totalOther: otherSales + otherBookings,
@@ -177,10 +195,10 @@ const getCashboxReportData = async (session) => {
   };
 };
 
-
 module.exports = {
-  getActiveCashboxSession,
-  startCashboxSession,
-  closeCashboxSession,
-  getActiveSessionReport,
+  getActiveCashboxSession,  // Renamed from getSession
+  startCashboxSession,      // Renamed from startSession
+  closeCashboxSession,      // Renamed from endSession
+  getActiveSessionReport,   // Renamed from getSummary
+  addMovement,              // Added missing function
 };
