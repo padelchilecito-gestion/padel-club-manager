@@ -2,25 +2,25 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getUsers,
+  // --- CORRECCIÓN DE NOMBRES ---
+  getAllUsers,
   getUserById,
-  updateUser,
-  deleteUser,
-} = require('../controllers/userController'); // <-- CORREGIDO: Se quitó getMe
-const { protect, admin } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+  updateUserById,
+  deleteUserById,
+} = require('../controllers/userController');
+const { protect, admin } = require('../middlewares/authMiddleware');
 
-// Rutas protegidas (Solo Admin)
 router.use(protect);
-router.use(admin); // <-- CORREGIDO
+router.use(admin);
 
 router.route('/')
-  .get(getUsers);
+  // --- CORRECCIÓN DE NOMBRES ---
+  .get(getAllUsers);
 
 router.route('/:id')
   .get(getUserById)
-  .put(updateUser)
-  .delete(deleteUser);
-
-// La ruta '/me' se eliminó porque ahora la maneja '/api/auth/profile'
+  // --- CORRECCIÓN DE NOMBRES ---
+  .put(updateUserById)
+  .delete(deleteUserById);
 
 module.exports = router;
