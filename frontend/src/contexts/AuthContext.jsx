@@ -1,69 +1,62 @@
-// frontend/src/contexts/AuthContext.jsx
+// frontend/src/contexts/AuthContext.jsx (CORREGIDO)
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom'; // Importar useLocation
-import { loginUser, registerUser, getUserProfile } from '../services/authService';
+import { useNavigate, useLocation } from 'react-router-dom';
+// Importamos los servicios actualizados (sin manejo de token)
+import { loginUser, registerUser, getUserProfile, logoutUser, checkAuthStatus } from '../services/authService';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true); // Empezamos en true
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const location = useLocation(); // Hook para acceder a la ubicación actual
+  const location = useLocation();
 
+  // loadUser ahora verifica la cookie llamando al endpoint /check
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        setAuthLoading(true);
-        const profile = await getUserProfile(token);
-        setUser(profile);
-        setError(null);
-      } catch (err) {
-        console.error("Error al cargar perfil de usuario:", err);
-        setError(err.message || "Error al cargar el perfil de usuario.");
-        localStorage.removeItem('token'); // Token inválido o expirado
-        setUser(null);
-      } finally {
-        setAuthLoading(false);
-      }
-    } else {
+    try {
+      setAuthLoading(true);
+      // checkAuthStatus usa la cookie httpOnly automáticamente
+      const profile = await checkAuthStatus();
+      setUser(profile);
+      setError(null);
+    } catch (err) {
       setUser(null);
+      // No seteamos error aquí, es normal no estar logueado
+    } finally {
       setAuthLoading(false);
     }
-  }, []); // Dependencias vacías, loadUser no necesita ser recreado
+  }, []);
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
 
-  // CORREGIDO: Aceptar 'username' en lugar de 'email'
-  const login = async (username, password) => { 
+  const login = async (username, password) => {
     setAuthLoading(true);
     setError(null);
     try {
-      // CORREGIDO: Pasar 'username'
-      const data = await loginUser(username, password); 
-      localStorage.setItem('token', data.token);
+      // 1. loginUser ahora setea la cookie
+      const profile = await loginUser(username, password);
       
-      // Recargar usuario inmediatamente para tener el rol actualizado
-      const profile = await getUserProfile(data.token); 
-      setUser(profile); // Actualizar el estado del usuario aquí
+      // 2. Seteamos el usuario en el estado
+      setUser(profile);
 
-      // Redirigir basado en el rol del usuario que ACABA de loguearse
+      // 3. Redirigir
       const from = location.state?.from?.pathname || '/';
       if (profile.role === 'Admin' || profile.role === 'Operator') {
-        navigate('/admin'); // Siempre ir a admin si es admin/operator
+        navigate('/admin');
       } else if (from !== '/login' && from !== '/') {
-        navigate(from); // Ir a la página previa si no era login o inicio
+        navigate(from);
       } else {
-        navigate('/'); // Por defecto al inicio para usuarios normales o si 'from' era login/inicio
+        navigate('/');
       }
-      return data;
+      return profile;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Error de inicio de sesión.';
+      const errorMessage = err.message || 'Error de inicio de sesión.';
       setError(errorMessage);
+      setUser(null); // Asegurarse de que no hay usuario
       throw new Error(errorMessage);
     } finally {
       setAuthLoading(false);
@@ -74,25 +67,31 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true);
     setError(null);
     try {
-      const data = await registerUser(userData);
-      localStorage.setItem('token', data.token);
-      await loadUser();
-      navigate('/'); 
-      return data;
+      // registerUser también setea la cookie
+      const profile = await registerUser(userData);
+      setUser(profile);
+      navigate('/');
+      return profile;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Error de registro.';
+      const errorMessage = err.message || 'Error de registro.';
       setError(errorMessage);
+      setUser(null);
       throw new Error(errorMessage);
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setUser(null);
-    setError(null);
-    navigate('/');
+  const logout = useCallback(async () => {
+    try {
+      await logoutUser(); // Llama al backend para limpiar la cookie
+    } catch (err) {
+      console.error("Error al hacer logout:", err);
+    } finally {
+      setUser(null);
+      setError(null);
+      navigate('/');
+    }
   }, [navigate]);
 
   const value = {
@@ -102,7 +101,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    loadUser,
+    loadUser, // Exportamos loadUser por si se necesita recargar el perfil
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
