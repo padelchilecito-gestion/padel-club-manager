@@ -8,15 +8,20 @@ const {
   updateProduct,
   deleteProduct,
 } = require('../controllers/productController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+
+// --- INICIO DE LA CORRECCIÓN ---
+// Importamos 'adminOrOperator' en lugar de 'authorize'
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+// --- FIN DE LA CORRECCIÓN ---
 
 // Rutas públicas
 router.get('/', getProducts);
-router.get('/:id', getProductById);
+router.get('/:id', getProductById); // <- Esta era la línea 14 que daba error
 
 // Rutas protegidas (Admin u Operator)
-router.post('/', protect, adminOrOperator, createProduct); // <-- CORREGIDO
-router.put('/:id', protect, adminOrOperator, updateProduct); // <-- CORREGIDO
-router.delete('/:id', protect, adminOrOperator, deleteProduct); // <-- CORREGIDO
+// Reemplazamos 'authorize' por 'adminOrOperator'
+router.post('/', protect, adminOrOperator, createProduct);
+router.put('/:id', protect, adminOrOperator, updateProduct);
+router.delete('/:id', protect, adminOrOperator, deleteProduct);
 
 module.exports = router;
