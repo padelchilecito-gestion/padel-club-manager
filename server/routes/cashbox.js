@@ -8,12 +8,12 @@ const {
   addMovement,
   getSummary,
 } = require('../controllers/cashboxController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 const { validateMovement } = require('../validators/cashboxValidator');
 
 // Todas estas rutas requieren rol de Admin u Operador
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO (reemplaza 'authorize')
+router.use(adminOrOperator); // <-- CORREGIDO
 
 router.post('/start', startSession);
 router.post('/end', endSession);
