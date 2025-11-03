@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getCourts,
+  // --- CORRECCIÓN DE NOMBRES ---
+  getAllCourts,
   getCourtById,
   createCourt,
   updateCourt,
@@ -10,11 +11,10 @@ const {
 } = require('../controllers/courtController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Rutas públicas
-router.get('/', getCourts);
+// --- CORRECCIÓN DE NOMBRES ---
+router.get('/', getAllCourts);
 router.get('/:id', getCourtById);
 
-// Rutas protegidas (Admin u Operator)
 router.post('/', protect, adminOrOperator, createCourt);
 router.put('/:id', protect, adminOrOperator, updateCourt);
 router.delete('/:id', protect, adminOrOperator, deleteCourt);
