@@ -8,7 +8,7 @@ const {
   updateCourt,
   deleteCourt,
 } = require('../controllers/courtController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
 // Rutas públicas
 router.get('/', getCourts);
