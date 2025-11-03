@@ -4,23 +4,24 @@ const router = express.Router();
 const {
   createSale,
   getSaleById,
-  getSales,
-  updateSaleStatus, // <-- CORREGIDO: Faltaba importar
-  deleteSale,       // <-- CORREGIDO: Faltaba importar
+  // --- CORRECCIÓN DE NOMBRES ---
+  getAllSales,
+  updateSaleStatus,
+  deleteSale,
 } = require('../controllers/saleController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Aplicamos middlewares
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO
+router.use(adminOrOperator);
 
 router.route('/')
-  .get(getSales)
+  // --- CORRECCIÓN DE NOMBRES ---
+  .get(getAllSales) // <-- Esta era la línea 22
   .post(createSale);
 
 router.route('/:id')
   .get(getSaleById)
-  .put(updateSaleStatus)  // <-- CORREGIDO: Faltaba esta ruta
-  .delete(deleteSale);    // <-- CORREGIDO: Faltaba esta ruta
+  .put(updateSaleStatus)
+  .delete(deleteSale);
 
 module.exports = router;
