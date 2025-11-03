@@ -6,24 +6,21 @@ const {
   createBookingQRDynamic,
   receiveWebhook,
   receiveWebhookQR,
-  createPosPreference,
+  createPosPreference // <-- AÑADIR ESTO
 } = require('../controllers/paymentController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
-// Para reservas (botón web y QR) - accesible por cualquier usuario logueado
+// Para reservas (botón web y QR)
 router.post('/create-booking-preference', protect, createBookingPreference);
 router.post('/create-booking-qr', protect, createBookingQRDynamic);
 
-// Para ventas del POS - accesible solo por admin o operadores
-router.post(
-  '/create-pos-preference',
-  protect,
-  adminOrOperator,
-  createPosPreference
-);
+// --- AÑADIR ESTA NUEVA RUTA ---
+// Para ventas del POS
+router.post('/create-pos-preference', protect, createPosPreference);
+// ------------------------------
 
-// Webhooks - rutas públicas para recibir notificaciones de Mercado Pago
+// Webhooks
 router.post('/webhook', receiveWebhook);
-router.post('/webhook-qr', receiveWebhookQR);
+router.post('/webhook-qr', receiveWebhookQR); // Mantenido por si acaso
 
 module.exports = router;
