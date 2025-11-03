@@ -14,9 +14,10 @@ const { protect } = require('../middlewares/authMiddleware');
 router.post('/create-booking-preference', protect, createBookingPreference);
 router.post('/create-booking-qr', protect, createBookingQRDynamic);
 
+const { adminOrOperator } = require('../middlewares/authMiddleware');
 // --- AÑADIR ESTA NUEVA RUTA ---
 // Para ventas del POS
-router.post('/create-pos-preference', protect, createPosPreference);
+router.post('/create-pos-preference', protect, adminOrOperator, createPosPreference);
 // ------------------------------
 
 // Webhooks
