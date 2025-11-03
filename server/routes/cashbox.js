@@ -1,4 +1,4 @@
-// server/routes/cashbox.js (VERSIÓN FINAL Y CORRECTA)
+// server/routes/cashbox.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -13,7 +13,6 @@ const {
   validateMovement, 
   handleValidationErrors // <-- Validador correcto
 } = require('../validators/cashboxValidator');
-
 
 // Aplicar middlewares para todas las rutas
 router.use(protect);
