@@ -6,25 +6,21 @@ const {
   getUserById,
   updateUser,
   deleteUser,
-} = require('../controllers/userController'); // <-- CORREGIDO: No se importa 'getMe'
-
-// --- INICIO DE LA CORRECCIÓN ---
-// Importamos 'admin' en lugar de 'authorize'
-const { protect, admin } = require('../middlewares/authMiddleware');
+} = require('../controllers/userController'); // <-- CORREGIDO: Se quitó getMe
+const { protect, admin } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
 // Rutas protegidas (Solo Admin)
 router.use(protect);
-router.use(admin); // <-- CORREGIDO: Reemplaza 'authorize(['Admin'])'
-// --- FIN DE LA CORRECCIÓN ---
+router.use(admin); // <-- CORREGIDO
 
 router.route('/')
-  .get(getUsers); // <-- Esta línea (que era la 21) ya no tendrá el error
+  .get(getUsers);
 
 router.route('/:id')
   .get(getUserById)
   .put(updateUser)
   .delete(deleteUser);
 
-// Se elimina la ruta '/me' porque se maneja en auth.js como '/profile'
+// La ruta '/me' se eliminó porque ahora la maneja '/api/auth/profile'
 
 module.exports = router;
