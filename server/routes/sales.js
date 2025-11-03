@@ -5,18 +5,27 @@ const {
   createSale,
   getSaleById,
   getSales,
+  updateSaleStatus, // <-- Esta función faltaba en la importación original
+  deleteSale,       // <-- Esta función faltaba en la importación original
 } = require('../controllers/saleController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
-// Rutas protegidas (Admin u Operator)
+// --- INICIO DE LA CORRECCIÓN ---
+// Importamos 'adminOrOperator' en lugar de 'authorize'
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+
+// Aplicamos los middlewares para todas las rutas de ventas
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO
+router.use(adminOrOperator); // <-- Reemplaza 'authorize(['Admin', 'Operator'])'
+// --- FIN DE LA CORRECCIÓN ---
 
 router.route('/')
   .get(getSales)
   .post(createSale);
 
 router.route('/:id')
-  .get(getSaleById);
+  .get(getSaleById)
+  // Estas rutas faltaban en tu archivo original
+  .put(updateSaleStatus) 
+  .delete(deleteSale);
 
 module.exports = router;
