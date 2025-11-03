@@ -7,17 +7,20 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
-} = require('../controllers/productController'); // <-- CORREGIDO: Se quitó getProductForShop
+  getProductsForShop, // <-- Tu controlador sí tiene estas funciones
+  getProductForShop,  // <-- Tu controlador sí tiene estas funciones
+} = require('../controllers/productController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
 // Rutas públicas
 router.get('/', getProducts);
+router.get('/shop', getProductsForShop); // <-- Ruta pública para la tienda
 router.get('/:id', getProductById);
-// Se eliminaron las rutas '/shop' y '/shop/:id' que estaban rotas
+router.get('/shop/:id', getProductForShop); // <-- Ruta pública para la tienda
 
 // Rutas protegidas (Admin u Operator)
-router.post('/', protect, adminOrOperator, createProduct); // <-- CORREGIDO
-router.put('/:id', protect, adminOrOperator, updateProduct); // <-- CORREGIDO
-router.delete('/:id', protect, adminOrOperator, deleteProduct); // <-- CORREGIDO
+router.post('/', protect, adminOrOperator, createProduct);
+router.put('/:id', protect, adminOrOperator, updateProduct);
+router.delete('/:id', protect, adminOrOperator, deleteProduct);
 
 module.exports = router;
