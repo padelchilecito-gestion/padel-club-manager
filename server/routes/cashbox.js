@@ -2,23 +2,28 @@
 const express = require('express');
 const router = express.Router();
 const {
-  startSession,
-  endSession,
-  getSession,
-  addMovement,
-  getSummary,
+  // --- CORRECCIÓN DE NOMBRES ---
+  startCashboxSession,
+  endCashboxSession,
+  getActiveCashboxSession,
+  addCashboxMovement,
+  getCashboxSummary,
 } = require('../controllers/cashboxController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
-const { validateMovement } = require('../validators/cashboxValidator');
+const { 
+  validateMovement, 
+  handleValidationErrors 
+} = require('../validators/cashboxValidator');
 
-// Todas estas rutas requieren rol de Admin u Operador
+
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO
+router.use(adminOrOperator);
 
-router.post('/start', startSession);
-router.post('/end', endSession);
-router.get('/session', getSession);
-router.post('/movement', validateMovement, addMovement);
-router.get('/summary', getSummary);
+// --- CORRECCIÓN DE NOMBRES ---
+router.post('/start', startCashboxSession);
+router.post('/end', endCashboxSession);
+router.get('/session', getActiveCashboxSession);
+router.post('/movement', validateMovement, handleValidationErrors, addCashboxMovement);
+router.get('/summary', getCashboxSummary);
 
 module.exports = router;
