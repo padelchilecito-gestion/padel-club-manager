@@ -15,8 +15,8 @@ router.get('/', getCourts);
 router.get('/:id', getCourtById);
 
 // Rutas protegidas (Admin u Operator)
-router.post('/', protect, adminOrOperator, createCourt); // <-- CORREGIDO
-router.put('/:id', protect, adminOrOperator, updateCourt); // <-- CORREGIDO
-router.delete('/:id', protect, adminOrOperator, deleteCourt); // <-- CORREGIDO
+router.post('/', protect, adminOrOperator, createCourt);
+router.put('/:id', protect, adminOrOperator, updateCourt);
+router.delete('/:id', protect, adminOrOperator, deleteCourt);
 
 module.exports = router;
