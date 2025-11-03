@@ -1,67 +1,65 @@
 // server/server.js
 const express = require('express');
 const dotenv = require('dotenv');
-const http = require('http');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
+const http = require('http'); // Necesario para socket.io
+const cors = require('cors'); // Importar CORS
 const connectDB = require('./config/db');
-const { setupSocketIO } = require('./config/socket');
+// --- CORRECCIÓN DE IMPORTACIÓN ---
+const { setupSocketIO } = require('./config/socket'); // Cambiado de initSocket
 const allRoutes = require('./routes/index');
-const { errorHandler, notFound } = require('./middlewares/errorMiddleware');
 
-// Load environment variables
+// Cargar variables de entorno
 dotenv.config();
 
-// Connect to Database
+// Conectar a la base de datos
 connectDB();
 
 const app = express();
 
-// CORS Configuration
-const clientURL = process.env.CLIENT_URL;
-const allowedOrigins = [clientURL, 'http://localhost:5173'];
+// --- Configurar CORS ---
+// (Mantenemos la corrección anterior de la barra inclinada '/')
+const allowedOrigins = [
+  'https://padel-club-manager-xi.vercel.app', // Tu frontend en Vercel
+  'https://padel-club-manager-xi.vercel.app/', // Con trailing slash
+  'http://localhost:5173' // Para desarrollo local
+];
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+  origin: function (origin, callback) {
+    // Permitir solicitudes sin origen (como Postman) o si el origen está en la lista
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
   credentials: true,
 };
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions)); // <-- APLICAR MIDDLEWARE DE CORS
 
-// Express Middlewares
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // Use cookie-parser
+// Middlewares de Express
+app.use(express.json()); // Para parsear JSON
+app.use(express.urlencoded({ extended: true })); // Para parsear form-data
 
-// API Routes
+// Rutas de la API
 app.use('/api', allRoutes);
 
-// Welcome Route
+// Ruta de bienvenida
 app.get('/', (req, res) => {
-  res.send('Padel Club Manager API is running.');
+  res.send('API de Padel Club Manager funcionando.');
 });
 
-// Error Handling Middlewares
-app.use(notFound);
-app.use(errorHandler);
-
-// Create HTTP Server
+// Crear servidor HTTP
 const server = http.createServer(app);
 
-// Initialize Socket.io
-const io = setupSocketIO(server, allowedOrigins);
-app.set('socketio', io);
+// --- CORRECCIÓN DE LLAMADA A FUNCIÓN (Punto 4 del colega) ---
+// Inicializar Socket.io y guardar la instancia en la app de Express
+const io = setupSocketIO(server, allowedOrigins); // Cambiado de initSocket
+app.set('socketio', io); // Guardar 'io' para usarlo en los controladores
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

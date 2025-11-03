@@ -1,17 +1,17 @@
-// server/routes/products.js
+// server/routes/products.js - CORREGIDO
 const express = require('express');
 const router = express.Router();
 const {
-  getProducts,
+  getAllProducts,    // ✅ Nombre correcto
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
 } = require('../controllers/productController');
-const { protect, adminOrOperator }_require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
 // Rutas públicas
-router.get('/', getProducts);
+router.get('/', getAllProducts);
 router.get('/:id', getProductById);
 
 // Rutas protegidas (Admin u Operator)

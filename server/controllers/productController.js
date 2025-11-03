@@ -38,7 +38,7 @@ const createProduct = async (req, res) => {
 // @desc    Get all products
 // @route   GET /api/products
 // @access  Public
-const getProducts = async (req, res) => {
+const getAllProducts = async (req, res) => {
   if (process.env.NODE_ENV === 'test') {
     const mockProducts = [
       { _id: '1', name: 'Gatorade', category: 'Bebidas', price: 800, stock: 25, showInShop: true },
@@ -153,7 +153,7 @@ const deleteProduct = async (req, res) => {
 
 module.exports = {
   createProduct,
-  getProducts,
+  getAllProducts,
   getProductById,
   updateProduct,
   deleteProduct,

@@ -1,20 +1,26 @@
-// server/routes/sales.js
+// server/routes/sales.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
   createSale,
+  getSaleById,
   getSales,
+  updateSaleStatus, // <-- CORREGIDO: Faltaba importar
+  deleteSale,       // <-- CORREGIDO: Faltaba importar
 } = require('../controllers/saleController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
 
+// Aplicamos middlewares
 router.use(protect);
-router.use(adminOrOperator);
+router.use(adminOrOperator); // <-- CORREGIDO
 
 router.route('/')
   .get(getSales)
   .post(createSale);
 
-// The routes for getSaleById, updateSaleStatus, and deleteSale have been removed
-// because the corresponding controller functions do not exist.
+router.route('/:id')
+  .get(getSaleById)
+  .put(updateSaleStatus)  // <-- CORREGIDO: Faltaba esta ruta
+  .delete(deleteSale);    // <-- CORREGIDO: Faltaba esta ruta
 
 module.exports = router;
