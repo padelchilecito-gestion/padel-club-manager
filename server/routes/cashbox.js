@@ -1,24 +1,28 @@
-// server/routes/cashbox.js (CORREGIDO)
+// server/routes/cashbox.js
 const express = require('express');
 const router = express.Router();
 const {
+  getCashboxSession,
   startSession,
-  endSession,
-  getSession,
-  addMovement,
-  getSummary,
+  closeSession,
+  getSessionReport,
+  addCashboxMovement,
 } = require('../controllers/cashboxController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
-const { validateMovement } = require('../validators/cashboxValidator');
+const {
+  validateCashboxStart,
+  validateMovement,
+} = require('../validators/cashboxValidator');
+const { handleValidationErrors } = require('../middlewares/validationMiddleware');
 
-// Todas estas rutas requieren rol de Admin u Operador
+// All routes are protected and require Admin or Operator role
 router.use(protect);
-router.use(adminOrOperator); // <-- CORREGIDO
+router.use(adminOrOperator);
 
-router.post('/start', startSession);
-router.post('/end', endSession);
-router.get('/session', getSession);
-router.post('/movement', validateMovement, addMovement);
-router.get('/summary', getSummary);
+router.post('/start', validateCashboxStart, handleValidationErrors, startSession);
+router.post('/end', closeSession);
+router.get('/session', getCashboxSession);
+router.post('/movement', validateMovement, handleValidationErrors, addCashboxMovement);
+router.get('/summary', getSessionReport);
 
 module.exports = router;

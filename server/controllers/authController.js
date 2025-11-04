@@ -1,9 +1,9 @@
-// server/controllers/authController.js (CORREGIDO Y FINALIZADO)
+// server/controllers/authController.js
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Función para generar el token
+// Generate Token and Set Cookie
 const generateTokenAndSetCookie = (res, userId, userRole) => {
   const token = jwt.sign({ id: userId, role: userRole }, process.env.JWT_SECRET, {
     expiresIn: '30d',
@@ -11,29 +11,17 @@ const generateTokenAndSetCookie = (res, userId, userRole) => {
 
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // --- INICIO DE LA CORRECCIÓN DE DOMINIO ---
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'strict',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   };
 
-  // ESTA ES LA LÍNEA CLAVE
-  // Se cambió "FRONTEND_URL" por "CLIENT_URL" para que coincida con tu variable de entorno
-  if (isProduction && process.env.CLIENT_URL) {
-    try {
-      cookieOptions.domain = new URL(process.env.CLIENT_URL).hostname;
-    } catch (error) {
-      console.error('La CLIENT_URL no es una URL válida:', process.env.CLIENT_URL);
-    }
-  }
-  // --- FIN DE LA CORRECCIÓN DE DOMINIO ---
-
-  res.cookie('token', token, cookieOptions); // Usamos las opciones configuradas
+  res.cookie('token', token, cookieOptions);
 };
 
-// @desc    Registrar un nuevo usuario
+// @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
@@ -41,11 +29,11 @@ const registerUser = asyncHandler(async (req, res) => {
   const userExists = await User.findOne({ $or: [{ email }, { username }] });
   if (userExists) {
     res.status(400);
-    throw new Error('El usuario o email ya existe');
+    throw new Error('User or email already exists');
   }
   const user = await User.create({ name, lastName, username, email, password, phone });
   if (user) {
-    generateTokenAndSetCookie(res, user._id, user.role); // <- Llama a la función corregida
+    generateTokenAndSetCookie(res, user._id, user.role);
     res.status(201).json({
       _id: user._id,
       name: user.name,
@@ -57,18 +45,18 @@ const registerUser = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(400);
-    throw new Error('Datos de usuario inválidos');
+    throw new Error('Invalid user data');
   }
 });
 
-// @desc    Autenticar usuario y obtener token
+// @desc    Authenticate user and get token
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   const user = await User.findOne({ $or: [{ email: username }, { username: username }] });
   if (user && (await user.matchPassword(password))) {
-    generateTokenAndSetCookie(res, user._id, user.role); // <- Llama a la función corregida
+    generateTokenAndSetCookie(res, user._id, user.role);
     res.json({
       _id: user._id,
       name: user.name,
@@ -80,11 +68,11 @@ const loginUser = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(401);
-    throw new Error('Usuario o contraseña inválidos');
+    throw new Error('Invalid username or password');
   }
 });
 
-// @desc    Obtener perfil de usuario
+// @desc    Get user profile
 // @route   GET /api/auth/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -93,11 +81,11 @@ const getUserProfile = asyncHandler(async (req, res) => {
     res.json(user);
   } else {
     res.status(404);
-    throw new Error('Usuario no encontrado');
+    throw new Error('User not found');
   }
 });
 
-// @desc    Actualizar perfil de usuario
+// @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateUserProfile = asyncHandler(async (req, res) => {
@@ -123,48 +111,37 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(404);
-    throw new Error('Usuario no encontrado');
+    throw new Error('User not found');
   }
 });
 
-// @desc    Cerrar sesión y limpiar cookie
+// @desc    Logout user and clear cookie
 // @route   POST /api/auth/logout
 // @access  Public
 const logoutUser = asyncHandler(async (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // --- CORRECCIÓN DE DOMINIO PARA LOGOUT ---
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'strict',
-    expires: new Date(0), // Expira la cookie inmediatamente
+    expires: new Date(0),
   };
 
-  // Se cambió "FRONTEND_URL" por "CLIENT_URL"
-  if (isProduction && process.env.CLIENT_URL) {
-    try {
-      cookieOptions.domain = new URL(process.env.CLIENT_URL).hostname;
-    } catch (error) {
-      console.error('La CLIENT_URL no es una URL válida:', process.env.CLIENT_URL);
-    }
-  }
-  // --- FIN DE LA CORRECCIÓN ---
-
   res.cookie('token', '', cookieOptions);
-  res.status(200).json({ message: 'Sesión cerrada exitosamente' });
+  res.status(200).json({ message: 'Logged out successfully' });
 });
 
-// @desc    Verificar estado de autenticación
+// @desc    Check authentication status
 // @route   GET /api/auth/check
-// @access  Private (usa 'protect')
+// @access  Private
 const checkAuthStatus = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
    if (user) {
     res.json(user);
   } else {
     res.status(404);
-    throw new Error('Usuario no encontrado');
+    throw new Error('User not found');
   }
 });
 
