@@ -1,10 +1,16 @@
-// server/routes/settings.js (CONSISTENT IMPORT FIX)
+// server/routes/settings.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
-const settingController = require('../controllers/settingController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const {
+  getSettings,
+  updateSettings,
+} = require('../controllers/settingController');
+const { protect, admin } = require('../middlewares/authMiddleware'); // Se importa 'admin'
 
-router.get('/', settingController.getSettings);
-router.put('/', protect, admin, settingController.updateSettings);
+// Ruta pública
+router.get('/', getSettings);
+
+// Ruta protegida (Solo Admin)
+router.put('/', protect, admin, updateSettings); // Se usa 'admin'
 
 module.exports = router;
