@@ -1,4 +1,4 @@
-// server/routes/reports.js (CORREGIDO)
+// server/routes/reports.js (CORRECTED)
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,9 +7,8 @@ const {
   getTopSellingProducts,
   getCourtOccupancy,
 } = require('../controllers/reportController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- CORREGIDO
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Reemplazamos 'authorize' por 'adminOrOperator' en todas las rutas
 router.get('/dashboard', protect, adminOrOperator, getDashboardData);
 router.get('/revenue-last-30-days', protect, adminOrOperator, getRevenueLast30Days);
 router.get('/top-selling-products', protect, adminOrOperator, getTopSellingProducts);

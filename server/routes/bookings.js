@@ -1,4 +1,4 @@
-// server/routes/bookings.js (CORREGIDO)
+// server/routes/bookings.js (CORRECTED)
 const express = require('express');
 const router = express.Router();
 const {

@@ -1,4 +1,4 @@
-// server/routes/auth.js (CORREGIDO)
+// server/routes/auth.js (CORRECTED)
 const express = require('express');
 const router = express.Router();
 const {

@@ -1,4 +1,4 @@
-// server/routes/courts.js (CORREGIDO)
+// server/routes/courts.js (CORRECTED)
 const express = require('express');
 const router = express.Router();
 const {
