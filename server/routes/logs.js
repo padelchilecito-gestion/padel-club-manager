@@ -1,9 +1,10 @@
-// server/routes/logs.js (CONSISTENT IMPORT FIX)
+// server/routes/logs.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
-const logController = require('../controllers/logController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { getLogs } = require('../controllers/logController');
+const { protect, admin } = require('../middlewares/authMiddleware'); // Se importa 'admin'
 
-router.get('/', protect, admin, logController.getLogs);
+// Se usa el middleware 'admin'
+router.get('/', protect, admin, getLogs);
 
 module.exports = router;
