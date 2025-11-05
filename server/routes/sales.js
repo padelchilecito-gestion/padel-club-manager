@@ -3,24 +3,25 @@ const express = require('express');
 const router = express.Router();
 const {
   createSale,
-  getSales,
   getSaleById,
-  updateSale,
+  // --- CORRECCIÓN DE NOMBRES ---
+  getAllSales,
+  updateSaleStatus,
   deleteSale,
 } = require('../controllers/saleController');
-const { protect, admin, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Apply general protection and Operator access to all routes
 router.use(protect);
 router.use(adminOrOperator);
 
 router.route('/')
-  .get(getSales)
+  // --- CORRECCIÓN DE NOMBRES ---
+  .get(getAllSales) // <-- Esta era la línea 22
   .post(createSale);
 
 router.route('/:id')
   .get(getSaleById)
-  .put(admin, updateSale)      // <-- Only Admin can update
-  .delete(admin, deleteSale);  // <-- Only Admin can delete
+  .put(updateSaleStatus)
+  .delete(deleteSale);
 
 module.exports = router;

@@ -2,31 +2,28 @@
 const express = require('express');
 const router = express.Router();
 const {
+  // --- CORRECCIÓN DE NOMBRES ---
   startCashboxSession,
-  closeCashboxSession,
+  endCashboxSession,
   getActiveCashboxSession,
-  getActiveSessionReport,
-  addMovement,
+  addCashboxMovement,
+  getCashboxSummary,
 } = require('../controllers/cashboxController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
-const { validateMovement } = require('../validators/cashboxValidator');
-const { handleValidationErrors } = require('../middlewares/validationMiddleware');
+const { 
+  validateMovement, 
+  handleValidationErrors 
+} = require('../validators/cashboxValidator');
 
-// All routes require Operator or Admin role
+
 router.use(protect);
 router.use(adminOrOperator);
 
+// --- CORRECCIÓN DE NOMBRES ---
 router.post('/start', startCashboxSession);
-router.post('/close', closeCashboxSession);
-router.get('/current', getActiveCashboxSession);
-router.get('/report', getActiveSessionReport);
-
-// Route for adding a cash movement (income/expense)
-router.post(
-  '/movement',
-  validateMovement,
-  handleValidationErrors,
-  addMovement
-);
+router.post('/end', endCashboxSession);
+router.get('/session', getActiveCashboxSession);
+router.post('/movement', validateMovement, handleValidationErrors, addCashboxMovement);
+router.get('/summary', getCashboxSummary);
 
 module.exports = router;
