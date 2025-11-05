@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // --- CORRECCIÓN DE NOMBRES (a los originales) ---
+  // Se usan los nombres exactos de tu controlador
   getProducts,
   getProductById,
   createProduct,
@@ -13,7 +13,7 @@ const {
 } = require('../controllers/productController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- CORRECCIÓN DE NOMBRES ---
+// Se usan los nombres de función correctos
 router.get('/', getProducts);
 router.get('/shop', getProductsForShop);
 router.get('/:id', getProductById);
