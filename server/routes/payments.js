@@ -1,24 +1,14 @@
-// server/routes/payments.js
+// server/routes/payments.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  createBookingPreference,
-  createBookingQRDynamic,
-  receiveWebhook,
-  receiveWebhookQR,
-  createPosPreference
-} = require('../controllers/paymentController');
+const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// Para reservas (botón web y QR)
-router.post('/create-booking-preference', protect, createBookingPreference);
-router.post('/create-booking-qr', protect, createBookingQRDynamic);
+router.post('/create-booking-preference', protect, paymentController.createBookingPreference);
+router.post('/create-booking-qr', protect, paymentController.createBookingQRDynamic);
+router.post('/create-pos-preference', protect, paymentController.createPosPreference);
 
-// Para ventas del POS
-router.post('/create-pos-preference', protect, createPosPreference);
-
-// Webhooks
-router.post('/webhook', receiveWebhook);
-router.post('/webhook-qr', receiveWebhookQR);
+router.post('/webhook', paymentController.receiveWebhook);
+router.post('/webhook-qr', paymentController.receiveWebhookQR);
 
 module.exports = router;

@@ -1,26 +1,21 @@
-// server/routes/users.js (CORRECTED)
+// server/routes/users.js (DIAGNOSTIC IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  // --- CORRECCIÓN DE NOMBRES ---
-  getAllUsers,
-  getUserById,
-  updateUserById,
-  deleteUserById,
-} = require('../controllers/userController');
+// --- FIX: Import the entire controller object ---
+const userController = require('../controllers/userController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
 router.use(protect);
 router.use(admin);
 
 router.route('/')
-  // --- CORRECCIÓN DE NOMBRES ---
-  .get(getAllUsers);
+  // --- FIX: Use the controller object to access the function ---
+  .get(userController.getUsers);
 
 router.route('/:id')
-  .get(getUserById)
-  // --- CORRECCIÓN DE NOMBRES ---
-  .put(updateUserById)
-  .delete(deleteUserById);
+  // --- FIX: Use the controller object to access functions ---
+  .get(userController.getUserById)
+  .put(userController.updateUser)
+  .delete(userController.deleteUser);
 
 module.exports = router;

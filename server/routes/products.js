@@ -1,26 +1,14 @@
-// server/routes/products.js (CORREGIDO)
+// server/routes/products.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  // --- CORRECCIÓN DE NOMBRES ---
-  getAllProducts,
-  getProductById,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  getProductsForShop,
-  getProductForShop,
-} = require('../controllers/productController');
+const productController = require('../controllers/productController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- CORRECCIÓN DE NOMBRES ---
-router.get('/', getAllProducts);
-router.get('/shop', getProductsForShop);
-router.get('/:id', getProductById);
-router.get('/shop/:id', getProductForShop);
+router.get('/', productController.getAllProducts);
+router.get('/:id', productController.getProductById);
 
-router.post('/', protect, adminOrOperator, createProduct);
-router.put('/:id', protect, adminOrOperator, updateProduct);
-router.delete('/:id', protect, adminOrOperator, deleteProduct);
+router.post('/', protect, adminOrOperator, productController.createProduct);
+router.put('/:id', protect, adminOrOperator, productController.updateProduct);
+router.delete('/:id', protect, adminOrOperator, productController.deleteProduct);
 
 module.exports = router;

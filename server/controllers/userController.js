@@ -69,10 +69,12 @@ const deleteUser = asyncHandler(async (req, res) => {
 
 // --- INICIO DE LA CORRECCIÓN ---
 // El export original solo incluía 'getUsers'.
-module.exports = {
+const userController = {
   getUsers,
   getUserById,    // <-- Añadido
   updateUser,     // <-- Añadido
   deleteUser,     // <-- Añadido
 };
+
+module.exports = userController;
 // --- FIN DE LA CORRECCIÓN
