@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // --- CORRECCIÓN DE NOMBRES (a los originales) ---
+  // Se usa el nombre exacto de tu controlador
   getCourts,
   getCourtById,
   createCourt,
@@ -11,7 +11,7 @@ const {
 } = require('../controllers/courtController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- CORRECCIÓN DE NOMBRES ---
+// Se usa el nombre de función correcto
 router.get('/', getCourts);
 router.get('/:id', getCourtById);
 
