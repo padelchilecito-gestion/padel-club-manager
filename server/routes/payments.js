@@ -1,14 +1,18 @@
-// server/routes/payments.js (CONSISTENT IMPORT FIX)
+// server/routes/payments.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
-const paymentController = require('../controllers/paymentController');
+const {
+  createMercadoPagoPreference,
+  handleMercadoPagoWebhook,
+  getPaymentStatus,
+} = require('../controllers/paymentController');
 const { protect } = require('../middlewares/authMiddleware');
 
-router.post('/create-booking-preference', protect, paymentController.createBookingPreference);
-router.post('/create-booking-qr', protect, paymentController.createBookingQRDynamic);
-router.post('/create-pos-preference', protect, paymentController.createPosPreference);
+// Webhook de Mercado Pago (es público)
+router.post('/webhook', handleMercadoPagoWebhook);
 
-router.post('/webhook', paymentController.receiveWebhook);
-router.post('/webhook-qr', paymentController.receiveWebhookQR);
+// Rutas protegidas
+router.post('/create-preference', protect, createMercadoPagoPreference);
+router.get('/status/:id', protect, getPaymentStatus);
 
 module.exports = router;
