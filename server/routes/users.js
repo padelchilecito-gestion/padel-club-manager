@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // --- CORRECCIÓN DE NOMBRES (a los originales) ---
+  // Se usan los nombres exactos de tu controlador
   getUsers,
   getUserById,
   updateUser,
@@ -11,15 +11,13 @@ const {
 const { protect, admin } = require('../middlewares/authMiddleware');
 
 router.use(protect);
-router.use(admin);
+router.use(admin); // Se usa el middleware correcto
 
 router.route('/')
-  // --- CORRECCIÓN DE NOMBRES ---
-  .get(getUsers); // <-- Esta era la línea 18
+  .get(getUsers); // Se usa el nombre de función correcto
 
 router.route('/:id')
   .get(getUserById)
-  // --- CORRECCIÓN DE NOMBRES ---
   .put(updateUser)
   .delete(deleteUser);
 
