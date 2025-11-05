@@ -1,33 +1,22 @@
-// server/routes/bookings.js (CORRECTED)
+// server/routes/bookings.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  createBooking,
-  createBookingCash,
-  createBookingMercadoPago,
-  getBookings,
-  getBookingById,
-  updateBooking,
-  deleteBooking,
-} = require('../controllers/bookingController');
+const bookingController = require('../controllers/bookingController');
 const { protect, admin, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- Rutas Públicas ---
-router.post('/cash', createBookingCash);
-router.post('/mercadopago', createBookingMercadoPago);
+router.post('/cash', bookingController.createBookingCash);
+router.post('/mercadopago', bookingController.createBookingMercadoPago);
 
-// --- Rutas Protegidas ---
 router.route('/')
-  .get(protect, adminOrOperator, getBookings)
-  .post(protect, createBooking);
+  .get(protect, adminOrOperator, bookingController.getBookings)
+  .post(protect, bookingController.createBooking);
 
-// Ruta para que un cliente vea sus propias reservas
 router.route('/mybookings')
-  .get(protect, getBookings);
+  .get(protect, bookingController.getBookings);
 
 router.route('/:id')
-  .get(protect, getBookingById)
-  .put(protect, adminOrOperator, updateBooking)
-  .delete(protect, adminOrOperator, deleteBooking);
+  .get(protect, bookingController.getBookingById)
+  .put(protect, adminOrOperator, bookingController.updateBooking)
+  .delete(protect, adminOrOperator, bookingController.deleteBooking);
 
 module.exports = router;

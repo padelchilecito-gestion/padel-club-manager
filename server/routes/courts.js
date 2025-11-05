@@ -1,22 +1,14 @@
-// server/routes/courts.js (CORRECTED)
+// server/routes/courts.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  // --- CORRECCIÓN DE NOMBRES ---
-  getAllCourts,
-  getCourtById,
-  createCourt,
-  updateCourt,
-  deleteCourt,
-} = require('../controllers/courtController');
+const courtController = require('../controllers/courtController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- CORRECCIÓN DE NOMBRES ---
-router.get('/', getAllCourts);
-router.get('/:id', getCourtById);
+router.get('/', courtController.getCourts);
+router.get('/:id', courtController.getCourtById);
 
-router.post('/', protect, adminOrOperator, createCourt);
-router.put('/:id', protect, adminOrOperator, updateCourt);
-router.delete('/:id', protect, adminOrOperator, deleteCourt);
+router.post('/', protect, adminOrOperator, courtController.createCourt);
+router.put('/:id', protect, adminOrOperator, courtController.updateCourt);
+router.delete('/:id', protect, adminOrOperator, courtController.deleteCourt);
 
 module.exports = router;

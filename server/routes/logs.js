@@ -1,10 +1,9 @@
-// server/routes/logs.js (CORRECTED)
+// server/routes/logs.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const { getLogs } = require('../controllers/logController');
+const logController = require('../controllers/logController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
-// Solo Admin puede ver los logs
-router.get('/', protect, admin, getLogs);
+router.get('/', protect, admin, logController.getLogs);
 
 module.exports = router;

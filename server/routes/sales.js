@@ -1,27 +1,19 @@
-// server/routes/sales.js (CORRECTED & RESTORED)
+// server/routes/sales.js (CONSISTENT IMPORT FIX)
 const express = require('express');
 const router = express.Router();
-const {
-  createSale,
-  getSaleById,
-  // --- CORRECCIÓN DE NOMBRES ---
-  getAllSales,
-  updateSaleStatus,
-  deleteSale,
-} = require('../controllers/saleController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+const saleController = require('../controllers/saleController');
+const { protect, admin, adminOrOperator } = require('../middlewares/authMiddleware');
 
 router.use(protect);
 router.use(adminOrOperator);
 
 router.route('/')
-  // --- CORRECCIÓN DE NOMBRES ---
-  .get(getAllSales) // <-- Esta era la línea 22
-  .post(createSale);
+  .get(saleController.getSales)
+  .post(saleController.createSale);
 
 router.route('/:id')
-  .get(getSaleById)
-  .put(updateSaleStatus)
-  .delete(deleteSale);
+  .get(saleController.getSaleById)
+  .put(admin, saleController.updateSale)
+  .delete(admin, saleController.deleteSale);
 
 module.exports = router;
