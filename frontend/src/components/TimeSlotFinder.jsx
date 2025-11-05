@@ -7,7 +7,7 @@ import 'react-day-picker/dist/style.css'; // Importar estilos
 import { format, isBefore, startOfToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 // Importar la función CORRECTA para la disponibilidad agregada
-import { getAggregatedAvailability } from '../services/courtService'; 
+import { getAggregatedAvailability } from '../services/courtService';
 import { InlineLoading } from './ui/Feedback';
 
 // Este componente recibe la configuración del club desde HomePage
@@ -20,13 +20,13 @@ const TimeSlotFinder = ({ settings }) => {
   // Función para cargar la disponibilidad *agregada* (de todas las canchas)
   const fetchAvailability = useCallback(async (date) => {
     if (!date) return;
-    
+
     setLoadingSlots(true);
     setError(null);
     try {
       const dateString = date.toISOString();
       // Usamos la función del courtService, no del bookingService
-      const data = await getAggregatedAvailability(dateString); 
+      const data = await getAggregatedAvailability(dateString);
       setAvailableSlots(data.availableSlots || []);
     } catch (err) {
       console.error("Error fetching aggregated availability:", err);
@@ -78,7 +78,7 @@ const TimeSlotFinder = ({ settings }) => {
         <h3 className="text-xl font-semibold text-cyan-400 mb-4 capitalize">
           Horarios para el {format(selectedDate, 'EEEE dd MMM', { locale: es })}
         </h3>
-        
+
         {loadingSlots ? (
           <InlineLoading text="Buscando horarios..." />
         ) : error ? (
@@ -90,7 +90,7 @@ const TimeSlotFinder = ({ settings }) => {
                 // Formatear la hora
                 const timeString = `${slot.hour.toString().padStart(2, '0')}:${slot.minute.toString().padStart(2, '0')}`;
                 const hasAvailability = slot.availableCourts > 0;
-                
+
                 return (
                   <div
                     key={index}

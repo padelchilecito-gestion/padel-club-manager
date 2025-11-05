@@ -178,9 +178,38 @@ const getCashboxReportData = async (session) => {
 };
 
 
+const addMovement = async (req, res) => {
+  const { type, amount, description } = req.body;
+
+  try {
+    const session = await CashboxSession.findOne({ endTime: null });
+    if (!session) {
+      return res.status(404).json({ message: 'No hay sesión de caja activa' });
+    }
+
+    const movement = {
+      type,
+      amount: parseFloat(amount),
+      description,
+      user: req.user._id,
+    };
+
+    session.movements.push(movement);
+    await session.save();
+
+    logActivity(req.user._id, 'CASHBOX_MOVEMENT', `${type} de $${amount} - ${description}`);
+    res.status(201).json(session);
+
+  } catch (error) {
+    console.error('Error adding cashbox movement:', error);
+    res.status(500).json({ message: 'Error al agregar el movimiento de caja' });
+  }
+};
+
 module.exports = {
   getActiveCashboxSession,
   startCashboxSession,
   closeCashboxSession,
   getActiveSessionReport,
+  addMovement,
 };

@@ -1,4 +1,4 @@
-// server/routes/cashbox.js (CORREGIDO)
+// server/routes/cashbox.js (CORRECTED & RESTORED)
 const express = require('express');
 const router = express.Router();
 const {

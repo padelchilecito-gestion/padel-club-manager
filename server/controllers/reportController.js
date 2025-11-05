@@ -1,4 +1,3 @@
-// server/controllers/reportController.js
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
@@ -15,11 +14,11 @@ const getDashboardData = async (req, res) => {
 
     // 1. Daily Revenue (from sales and paid bookings)
     const salesToday = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startOfToday, $lte: endOfToday }, status: 'Completed' } },
+      { $match: { createdAt: { $gte: startOfToday, $lte: endOfToday } } },
       { $group: { _id: null, total: { $sum: '$total' } } },
     ]);
     const bookingsToday = await Booking.aggregate([
-      { $match: { startTime: { $gte: startOfToday, $lte: endOfToday }, isPaid: true, status: 'Confirmed' } },
+      { $match: { startTime: { $gte: startOfToday, $lte: endOfToday }, isPaid: true } },
       { $group: { _id: null, total: { $sum: '$price' } } },
     ]);
     const dailyRevenue = (salesToday[0]?.total || 0) + (bookingsToday[0]?.total || 0);
@@ -42,8 +41,8 @@ const getDashboardData = async (req, res) => {
       lowStockProducts,
     });
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -66,6 +65,7 @@ const getRevenueLast30Days = async (req, res) => {
             { $sort: { _id: 1 } },
         ]);
         
+        // This report could be enhanced to include paid bookings as well.
         res.json(sales);
     } catch (error) {
         console.error(error);

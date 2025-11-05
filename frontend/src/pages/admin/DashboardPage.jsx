@@ -65,7 +65,7 @@ const DashboardPage = () => {
               {data.upcomingBookings.map(booking => (
                 <li key={booking._id} className="flex justify-between items-center border-b border-gray-700 py-2">
                   <div>
-                    <p className="font-semibold">{booking.user ? booking.user.name : booking.clientName}</p>
+                    <p className="font-semibold">{booking.user.name}</p>
                     <p className="text-sm text-text-secondary">{booking.court.name}</p>
                   </div>
                   <p className="font-mono text-primary">{format(new Date(booking.startTime), 'HH:mm')}</p>

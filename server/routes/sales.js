@@ -1,4 +1,4 @@
-// server/routes/sales.js (CORREGIDO)
+// server/routes/sales.js (CORRECTED & RESTORED)
 const express = require('express');
 const router = express.Router();
 const {

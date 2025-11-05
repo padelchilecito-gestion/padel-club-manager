@@ -6,7 +6,7 @@ const {
   createBookingQRDynamic,
   receiveWebhook,
   receiveWebhookQR,
-  createPosPreference // <-- AÑADIR ESTO
+  createPosPreference
 } = require('../controllers/paymentController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -14,13 +14,11 @@ const { protect } = require('../middlewares/authMiddleware');
 router.post('/create-booking-preference', protect, createBookingPreference);
 router.post('/create-booking-qr', protect, createBookingQRDynamic);
 
-// --- AÑADIR ESTA NUEVA RUTA ---
 // Para ventas del POS
 router.post('/create-pos-preference', protect, createPosPreference);
-// ------------------------------
 
 // Webhooks
 router.post('/webhook', receiveWebhook);
-router.post('/webhook-qr', receiveWebhookQR); // Mantenido por si acaso
+router.post('/webhook-qr', receiveWebhookQR);
 
 module.exports = router;
