@@ -4,7 +4,7 @@ const router = express.Router();
 const {
   createSale,
   getSaleById,
-  // --- CORRECCIÓN DE NOMBRES (a los originales) ---
+  // Se usa el nombre exacto de tu controlador
   getSales,
   updateSaleStatus,
   deleteSale,
@@ -12,11 +12,10 @@ const {
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
 router.use(protect);
-router.use(adminOrOperator);
+router.use(adminOrOperator); // Se usa el middleware correcto
 
 router.route('/')
-  // --- CORRECCIÓN DE NOMBRES ---
-  .get(getSales)
+  .get(getSales) // Se usa el nombre de función correcto
   .post(createSale);
 
 router.route('/:id')
