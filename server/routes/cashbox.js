@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // --- CORRECCIÓN DE NOMBRES (a los originales) ---
+  // Se usan los nombres exactos de tu controlador
   startSession,
   endSession,
   getSession,
@@ -12,18 +12,18 @@ const {
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 const { 
   validateMovement, 
-  handleValidationErrors 
+  handleValidationErrors // Se importa el manejador de validación
 } = require('../validators/cashboxValidator');
 
 
 router.use(protect);
-router.use(adminOrOperator);
+router.use(adminOrOperator); // Se usa el middleware correcto
 
-// --- CORRECCIÓN DE NOMBRES ---
+// Se usan los nombres de función correctos
 router.post('/start', startSession);
 router.post('/end', endSession);
 router.get('/session', getSession);
-router.post('/movement', validateMovement, handleValidationErrors, addMovement);
+router.post('/movement', validateMovement, handleValidationErrors, addMovement); // Se añade el manejador
 router.get('/summary', getSummary);
 
 module.exports = router;
