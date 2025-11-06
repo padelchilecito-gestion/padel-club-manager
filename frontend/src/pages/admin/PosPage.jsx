@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/PosPage.jsx (VERSIÓN FINAL COMPLETA)
+// frontend/src/pages/admin/PosPage.jsx (VERSIÓN FINAL LIMPIA)
 import React, { useState, useEffect } from 'react';
 // 1. Importaciones corregidas (con llaves)
 import { getProducts } from '../../services/productService';
@@ -113,12 +113,12 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
           <button
             onClick={onRegisterSale}
             disabled={cart.length === 0}
-className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
+            className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
           >
             Registrar (Efectivo)
           </button>
           <button
-            onClick={onShowQR}Next 
+            onClick={onShowQR}
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
@@ -133,7 +133,6 @@ className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opac
 
 // Componente principal de la página
 const PosPage = () => {
-source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +142,7 @@ source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unex
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await getProducts(); // Llamada con importación nombrada
+      const data = await getProducts(); // Llamada correcta
       setProducts(data.filter(p => p.stock > 0)); 
     } catch (error) {
       toast.error('Error al cargar productos');
@@ -172,8 +171,7 @@ source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unex
         return prevCart.map((item) =>
           item.productId === product._id
             ? { ...item, quantity: item.quantity + 1 }
-to 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
-            : item
+	  		  : item
         );
       }
       return [...prevCart, { 
@@ -182,7 +180,8 @@ to 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpect
         price: product.price, 
         quantity: 1,
         stock: product.stock 
-      }]; // 2. Error de sintaxis de 'id' eliminado
+      }]; // 2. Error de sintaxis de '_id' eliminado
+Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
     });
   };
 
@@ -191,10 +190,8 @@ to 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpect
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
-      await createSale({ // Llamada con importación nombrada
-section 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
+      await createSale({ // Llamada correcta
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
-s 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
         total: total,
         paymentMethod: 'Efectivo',
         status: 'Completed'
@@ -224,7 +221,7 @@ s 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpecte
         status: 'AwaitingPayment'
       };
       
-      const newSale = await createSale(saleData); // Llamada con importación nombrada
+      const newSale = await createSale(saleData); // Llamada correcta
 
       setPendingSale(newSale);
       setShowQRModal(true);
@@ -255,7 +252,6 @@ s 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpecte
     <div className="p-4 h-full">
       
       {showQRModal && pendingSale && (
-source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
         <PosQRModal 
           saleId={pendingSale._id}
           items={pendingSale.items}
@@ -271,7 +267,7 @@ source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unex
         </div>
         <div className="h-full">
           <Cart 
-            cart={cart}s
+            cart={cart}
             setCart={setCart} 
             total={total} 
             onRegisterSale={handleRegisterSale}
