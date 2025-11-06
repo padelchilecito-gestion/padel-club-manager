@@ -114,17 +114,16 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             onClick={onRegisterSale}
             disabled={cart.length === 0}
             className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
-s        >
+          >
             Registrar (Efectivo)
           </button>
           <button
             onClick={onShowQR}
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
-section 18:30:22.973 184|  Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
+section 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
           >
             <QrCodeIcon className="h-6 w-6 mr-2" />
-  Data 18:30:22.973 184|  Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
             Pagar con MP (QR)
           </button>
         </div>
@@ -143,14 +142,15 @@ source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expe
   const [pendingSale, setPendingSale] = useState(null);
 
   const fetchProducts = async () => {
+source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
     try {
       setLoading(true);
       const data = await getProducts(); // Llamada correcta
       setProducts(data.filter(p => p.stock > 0)); 
-source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
     } catch (error) {
       toast.error('Error al cargar productos');
       console.error('Error en fetchProducts (POS Page):', error);
+all 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
     } finally {
       setLoading(false);
     }
@@ -163,11 +163,13 @@ source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expe
   const handleAddToCart = (product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.productId === product._id);
+section 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
       const stockAvailable = product.stock;
       const quantityInCart = existingItem ? existingItem.quantity : 0;
 
       if (quantityInCart >= stockAvailable) {
         toast.error(`Stock máximo alcanzado para ${product.name}`);
+source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
         return prevCart;
       }
 
@@ -176,16 +178,16 @@ source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expe
           item.productId === product._id
             ? { ...item, quantity: item.quantity + 1 }
 	  		  : item
+Note: 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
         );
       }
       return [...prevCart, { 
         productId: product._id, 
         name: product.name, 
-        price: product.price, 
+        price: product.price,s
         quantity: 1,
         stock: product.stock 
-      }]; // Esta es la línea 183. El error de "Note:" se ha eliminado.
-section 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
+      }]; // 2. Esta es la línea 183. El error de "Note:" estaba aquí.
     });
   };
 
@@ -251,6 +253,7 @@ s         total: total,
     setPendingSale(null);
   };
 
+  // 3. Este es el código que faltaba
   return (
     <div className="p-4 h-full">
       
@@ -272,6 +275,7 @@ source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expe
         <div className="h-full">
           <Cart 
             cart={cart}
+data 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
             setCart={setCart} 
             total={total} 
             onRegisterSale={handleRegisterSale}
