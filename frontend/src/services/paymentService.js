@@ -1,4 +1,4 @@
-// frontend/src/services/paymentService.js (CORREGIDO Y UNIFICADO)
+// frontend/src/services/paymentService.js (CORREGIDO)
 import api from './api';
 
 /**
@@ -6,9 +6,9 @@ import api from './api';
  * Puede recibir un 'saleId' o un 'bookingId'.
  * @param {object} paymentData - { items, totalAmount, saleId, bookingId }
  */
-export const createQrPayment = async (paymentData) => {
+const createQrPayment = async (paymentData) => {
   try {
-    // Llama a la nueva ruta unificada del backend
+    // Llama a la ruta unificada del backend
     const { data } = await api.post('/payments/create-qr', paymentData);
     return data;
   } catch (error) {
@@ -21,7 +21,7 @@ export const createQrPayment = async (paymentData) => {
  * Obtiene el estado de un pago desde MercadoPago.
  * @param {string} paymentId - El ID del pago de MP
  */
-export const getPaymentStatus = async (paymentId) => {
+const getPaymentStatus = async (paymentId) => {
   try {
     const { data } = await api.get(`/payments/status/${paymentId}`);
     return data;
@@ -31,16 +31,11 @@ export const getPaymentStatus = async (paymentId) => {
   }
 };
 
-// ////////////////////////////////////////////////////////////////////
-// LAS FUNCIONES ANTIGUAS YA NO SE USAN Y PUEDEN SER BORRADAS
-// ////////////////////////////////////////////////////////////////////
-
-// export const createPosPreference = async (saleData) => {
-//   try {
-//     const { data } = await api.post('/payments/create-pos-preference', saleData);
-//     return data;
-//   } catch (error) {
-//     console.error('Error al crear la preferencia de POS:', error.response?.data);
-//     throw new Error(error.response?.data?.message || 'Error al crear preferencia de POS');
-//   }
-// };
+// --- INICIO DE LA CORRECCIÓN ---
+// Exportamos un objeto como 'default' para que la importación
+// 'import paymentService from ...' funcione en los componentes.
+export default {
+  createQrPayment,
+  getPaymentStatus,
+};
+// --- FIN DE LA CORRECCIÓN ---
