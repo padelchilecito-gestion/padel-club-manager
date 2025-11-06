@@ -1,18 +1,13 @@
-// server/routes/payments.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  createMercadoPagoPreference,
-  handleMercadoPagoWebhook,
-  getPaymentStatus,
+  createBookingPreference,
+  receiveWebhook,
 } = require('../controllers/paymentController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// Webhook de Mercado Pago (es público)
-router.post('/webhook', handleMercadoPagoWebhook);
+router.post('/webhook', receiveWebhook);
 
-// Rutas protegidas
-router.post('/create-preference', protect, createMercadoPagoPreference);
-router.get('/status/:id', protect, getPaymentStatus);
+router.post('/create-preference', protect, createBookingPreference);
 
 module.exports = router;
