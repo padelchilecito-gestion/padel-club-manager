@@ -1,17 +1,20 @@
-// server/routes/reports.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
   getDashboardData,
   getRevenueLast30Days,
   getTopSellingProducts,
-  getCourtOccupancy,
+  getCourtOccupancy
 } = require('../controllers/reportController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect, admin } = require('../middlewares/authMiddleware');
 
-router.get('/dashboard', protect, adminOrOperator, getDashboardData);
-router.get('/revenue-last-30-days', protect, adminOrOperator, getRevenueLast30Days);
-router.get('/top-selling-products', protect, adminOrOperator, getTopSellingProducts);
-router.get('/court-occupancy', protect, adminOrOperator, getCourtOccupancy);
+// Proteger todas las rutas de reportes y requerir rol de Admin
+router.use(protect);
+router.use(admin);
+
+router.get('/dashboard', getDashboardData);
+router.get('/revenue-last-30-days', getRevenueLast30Days);
+router.get('/top-selling-products', getTopSellingProducts);
+router.get('/court-occupancy', getCourtOccupancy);
 
 module.exports = router;

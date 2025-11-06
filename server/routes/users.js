@@ -1,4 +1,3 @@
-// server/routes/users.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -9,6 +8,7 @@ const {
 } = require('../controllers/userController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
+// Todas las rutas en este archivo requieren protección y permisos de administrador
 router.use(protect);
 router.use(admin);
 

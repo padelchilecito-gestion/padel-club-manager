@@ -1,25 +1,19 @@
-// server/routes/payments.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  createMercadoPagoPreference,
+  createPosPreference,
   handleMercadoPagoWebhook,
-  getPaymentStatus,
-  createPosPreference, // <-- 1. Importar la nueva función
+  getPaymentStatus
 } = require('../controllers/paymentController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- 2. Importar middlewares
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Webhook de Mercado Pago (es público)
+// Ruta para crear preferencia de pago desde el POS
+router.post('/create-pos-preference', protect, adminOrOperator, createPosPreference);
+
+// Ruta pública para recibir notificaciones de Mercado Pago
 router.post('/webhook', handleMercadoPagoWebhook);
 
-// Ruta para reservas (protegida por login)
-router.post('/create-preference', protect, createMercadoPagoPreference);
-
-// --- INICIO DE LA CORRECCIÓN ---
-// 3. Añadir la nueva ruta para el POS (protegida por Admin/Operador)
-router.post('/create-pos-preference', protect, adminOrOperator, createPosPreference);
-// --- FIN DE LA CORRECCIÓN ---
-
-router.get('/status/:id', protect, getPaymentStatus);
+// Ruta para que un cliente o admin verifique el estado de un pago
+router.get('/status/:paymentId', protect, getPaymentStatus);
 
 module.exports = router;
