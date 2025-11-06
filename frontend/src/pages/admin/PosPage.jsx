@@ -1,9 +1,8 @@
 // frontend/src/pages/admin/PosPage.jsx (VERSIÓN LIMPIA Y CORREGIDA)
 import React, { useState, useEffect } from 'react';
-// --- INICIO CORRECCIÓN 1: Importar con llaves (named imports) ---
+// Importamos las funciones específicas que necesitamos
 import { getProducts } from '../../services/productService';
 import { createSale } from '../../services/saleService';
-// --- FIN CORRECCIÓN 1 ---
 import { toast } from 'react-hot-toast';
 import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
 import PosQRModal from '../../components/admin/PosQRModal';
@@ -114,11 +113,10 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
           <button
             onClick={onRegisterSale}
             disabled={cart.length === 0}
-            className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
+className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
           >
             Registrar (Efectivo)
           </button>
-          {/* --- INICIO CORRECCIÓN 2: Código del botón QR limpio --- */}
           <button
             onClick={onShowQR} 
             disabled={cart.length === 0}
@@ -127,7 +125,6 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             <QrCodeIcon className="h-6 w-6 mr-2" />
             Pagar con MP (QR)
           </button>
-          {/* --- FIN CORRECCIÓN 2 --- */}
         </div>
       </div>
     </div>
@@ -146,11 +143,9 @@ const PosPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      // --- INICIO CORRECCIÓN 3: Usar la función importada 'getProducts' ---
-      const data = await getProducts(); 
+      const data = await getProducts(); // Llamada correcta
       setProducts(data.filter(p => p.stock > 0)); 
     } catch (error) {
-      // Este error ya no debería ocurrir
       toast.error('Error al cargar productos');
       console.error('Error en fetchProducts (POS Page):', error);
     } finally {
@@ -186,7 +181,9 @@ const PosPage = () => {
         price: product.price, 
         quantity: 1,
         stock: product.stock 
-    _id   }];
+        // --- INICIO CORRECCIÓN 3: Eliminado el "_id" corrupto ---
+      }];
+        // --- FIN CORRECCIÓN 3 ---
     });
   };
 
@@ -195,15 +192,13 @@ const PosPage = () => {
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
-      // --- INICIO CORRECCIÓN 4: Usar la función importada 'createSale' ---
-      await createSale({
+      await createSale({ // Llamada correcta
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
         total: total,
         paymentMethod: 'Efectivo',
         status: 'Completed'
       });
       toast.success('Venta registrada (Efectivo)');
-section 18:10:09.215 3: // --- INICIO CORRECCIÓN 1: Importar servicios como 'default' ---
       setCart([]);
       fetchProducts(); 
     } catch (error) {
@@ -228,64 +223,6 @@ section 18:10:09.215 3: // --- INICIO CORRECCIÓN 1: Importar servicios como 'de
         status: 'AwaitingPayment'
       };
       
-      // --- INICIO CORRECCIÓN 5: Usar la función importada 'createSale' ---
-      const newSale = await createSale(saleData);
+      const newSale = await createSale(saleData); // Llamada correcta
 
       setPendingSale(newSale);
-      setShowQRModal(true);
-      toast.dismiss(toastId);
-
-    } catch (error) {
-      toast.dismiss(toastId);
-      toast.error('Error al iniciar la venta. Intente de nuevo.');
-      console.error("Error creating pending sale:", error);
-    }
-  };
-  
-  const handlePaymentSuccess = (paidSale) => {
-    toast.success('Venta registrada (Mercado Pago)');
-    setCart([]);
-    fetchProducts();
-    setShowQRModal(false); 
-    setPendingSale(null);
-  };
-
-  const handleQRModalClose = () => {
-    setShowQRModal(false);
-    setPendingSale(null);
-  };
-
-  return (
-    <div className="p-4 h-full">
-      
-      {/* Esta lógica de renderizado (con pendingSale) es correcta */}
-      {showQRModal && pendingSale && (
-        <PosQRModal 
-          saleId={pendingSale._id}
-          items={pendingSale.items}
-          totalAmount={pendingSale.total}
-          onClose={handleQRModalClose}
-          onPaymentSuccess={handlePaymentSuccess}
-        />
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-source 18:10:09.215 4: // (Asumiendo que tus otros archivos los importan así)
-        <div className="md:col-span-2 h-full">
-          <ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
-        </div>
-        <div className="h-full">
-          <Cart 
-            cart={cart} 
-            setCart={setCart} 
-            total={total} 
-            onRegisterSale={handleRegisterSale}
-            onShowQR={handleInitiateQRPayment}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default PosPage;
