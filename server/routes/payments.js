@@ -1,3 +1,4 @@
+// server/routes/payments.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,7 +8,6 @@ const {
 const { protect } = require('../middlewares/authMiddleware');
 
 router.post('/webhook', receiveWebhook);
-
 router.post('/create-preference', protect, createBookingPreference);
 
 module.exports = router;

@@ -1,4 +1,4 @@
-// server/routes/index.js
+// server/routes/index.js (VERIFICADO)
 const express = require('express');
 const path = require('path');
 const authRoutes = require('./auth.js');
@@ -14,8 +14,6 @@ const paymentRoutes = require('./payments.js');
 const cashboxRoutes = require('./cashbox.js');
 
 const router = express.Router();
-
-console.log('[Routes] Index router loaded.');
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);

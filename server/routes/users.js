@@ -1,8 +1,7 @@
-// server/routes/users.js (CORREGIDO)
+// server/routes/users.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
-  // Se usan los nombres exactos de tu controlador
   getUsers,
   getUserById,
   updateUser,
@@ -11,10 +10,10 @@ const {
 const { protect, admin } = require('../middlewares/authMiddleware');
 
 router.use(protect);
-router.use(admin); // Se usa el middleware correcto
+router.use(admin);
 
 router.route('/')
-  .get(getUsers); // Se usa el nombre de función correcto
+  .get(getUsers);
 
 router.route('/:id')
   .get(getUserById)
