@@ -222,7 +222,8 @@ const PosPage = () => {
         paymentMethod: 'MercadoPago',
         status: 'AwaitingPayment'
       };
-      
+
+            
       const newSale = await createSale(saleData); // Llamada correcta
 
       setPendingSale(newSale);
