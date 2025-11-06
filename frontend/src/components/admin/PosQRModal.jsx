@@ -1,20 +1,20 @@
 // frontend/src/components/admin/PosQRModal.jsx (CORREGIDO)
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, CheckCircleIcon, QrCodeIcon } from '@heroicons/react/24/solid';
-import paymentService from '../../services/paymentService'; // <-- CORRECCIÓN: Se quitaron las llaves {}
+import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import paymentService from '../../services/paymentService'; 
 import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
 
 function PosQRModal({ saleId, items, totalAmount, onClose, onPaymentSuccess }) {
-  const [qrCodeUrl, setQrCodeUrl] = useState(null);
+  const [qrCodeBase64, setQrCodeBase64] = useState(null); // Usaremos base64
   const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending', 'success', 'failure'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [preferenceId, setPreferenceId] = useState(null);
 
   useEffect(() => {
     const generateQR = async () => {
-      if (!saleId || !items || !totalAmount) {
+      // 1. Validación (Esta es la que te muestra el error)
+      if (!saleId || !items || items.length === 0 || !totalAmount) {
         setError("Faltan datos (ID de Venta, Items o Monto) para generar el QR.");
         setLoading(false);
         return;
@@ -24,20 +24,34 @@ function PosQRModal({ saleId, items, totalAmount, onClose, onPaymentSuccess }) {
       setError(null);
       setPaymentStatus('pending');
 
+      // 2. Mapear items al formato que espera el backend
+      // El backend espera: title, quantity, unit_price
+      const paymentItems = items.map(item => ({
+        id: item.product, // El ID del producto
+        title: item.name,   // El nombre del producto
+        quantity: item.quantity,
+        unit_price: item.price, // El precio unitario
+      }));
+
       try {
-        const data = await paymentService.generatePosQR({ 
+        // 3. Llamar a la función UNIFICADA
+        const data = await paymentService.createQrPayment({ 
           saleId, 
-          items,
+          items: paymentItems,
           totalAmount 
         });
         
-        // Asumiendo que MP devuelve la URL para el QR en 'init_point'
-        // Esto podría necesitar un generador de QR si 'init_point' es solo un string
-        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(data.init_point)}`);
-        setPreferenceId(data.preferenceId);
+        // 4. Usar el QR en base64 que devuelve MP (más fiable)
+        if (data.qr_code_base64) {
+          setQrCodeBase64(`data:image/jpeg;base64,${data.qr_code_base64}`);
+        } else {
+          // Fallback por si MP no devuelve el base64
+          setQrCodeBase64(`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(data.init_point)}`);
+        }
 
       } catch (err) {
         console.error("Error generating POS QR:", err);
+        // Mostrar el error que viene del backend
         setError(err.message || 'Error al generar el código QR.');
       } finally {
         setLoading(false);
@@ -48,27 +62,23 @@ function PosQRModal({ saleId, items, totalAmount, onClose, onPaymentSuccess }) {
   }, [saleId, items, totalAmount]);
 
   useEffect(() => {
-    if (!preferenceId) return;
-
-    // Escuchar eventos de socket para esta preferencia específica
-    const paymentTopic = `payment:status:${preferenceId}`;
-    
-    socket.on(paymentTopic, (data) => {
-      console.log(`Socket event received: ${paymentTopic}`, data);
-      if (data.status === 'approved') {
+    // 5. Escuchar el evento de socket correcto
+    const onSaleUpdate = (updatedSale) => {
+      // Verificar si la venta actualizada es esta y si está pagada
+      if (updatedSale._id === saleId && updatedSale.isPaid) {
+        console.log(`Socket event received: Venta ${saleId} pagada.`);
         setPaymentStatus('success');
-        onPaymentSuccess(data); // Notificar al componente padre
-      } else if (data.status === 'rejected' || data.status === 'cancelled' || data.status === 'failure') {
-        setPaymentStatus('failure');
-        setError('El pago fue rechazado o cancelado.');
+        onPaymentSuccess(updatedSale); // Notificar al componente padre
       }
-    });
+    };
+    
+    socket.on('saleUpdated', onSaleUpdate);
 
     // Limpieza al desmontar
     return () => {
-      socket.off(paymentTopic);
+      socket.off('saleUpdated', onSaleUpdate);
     };
-  }, [preferenceId, onPaymentSuccess]);
+  }, [saleId, onPaymentSuccess]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -94,9 +104,9 @@ function PosQRModal({ saleId, items, totalAmount, onClose, onPaymentSuccess }) {
           </div>
         )}
 
-        {!loading && !error && paymentStatus === 'pending' && qrCodeUrl && (
+        {!loading && !error && paymentStatus === 'pending' && qrCodeBase64 && (
           <div className="flex flex-col items-center">
-            <img src={qrCodeUrl} alt="Código QR de Mercado Pago" className="w-64 h-64 border rounded" />
+            <img src={qrCodeBase64} alt="Código QR de Mercado Pago" className="w-64 h-64 border rounded" />
             <p className="mt-4 text-lg font-bold text-gray-700">Total: ${totalAmount.toFixed(2)}</p>
             <p className="mt-2 text-sm text-gray-500">Esperando confirmación de pago...</p>
           </div>
