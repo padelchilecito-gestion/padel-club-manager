@@ -1,3 +1,4 @@
+// server/routes/cashbox.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -9,10 +10,11 @@ const {
 } = require('../controllers/cashboxController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 const { 
-  validateMovement, 
-  handleValidationErrors
+  validateMovement,
 } = require('../validators/cashboxValidator');
-
+const {
+  handleValidationErrors
+} = require('../middlewares/validationMiddleware');
 
 router.use(protect);
 router.use(adminOrOperator);

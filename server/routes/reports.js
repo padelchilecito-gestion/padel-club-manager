@@ -1,4 +1,4 @@
-// server/routes/reports.js (CORREGIDO)
+// server/routes/reports.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,9 +7,8 @@ const {
   getTopSellingProducts,
   getCourtOccupancy,
 } = require('../controllers/reportController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // Se importa 'adminOrOperator'
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Se usa el middleware 'adminOrOperator'
 router.get('/dashboard', protect, adminOrOperator, getDashboardData);
 router.get('/revenue-last-30-days', protect, adminOrOperator, getRevenueLast30Days);
 router.get('/top-selling-products', protect, adminOrOperator, getTopSellingProducts);

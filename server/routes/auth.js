@@ -1,4 +1,4 @@
-// server/routes/auth.js (CORREGIDO)
+// server/routes/auth.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,22 +7,15 @@ const {
   getUserProfile,
   updateUserProfile,
   logoutUser,
-  // Se elimina 'checkAuthStatus' porque no existe en el controlador
+  checkAuthStatus,
 } = require('../controllers/authController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
-// Rutas públicas
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 
-// Rutas protegidas (requieren token)
-
-// La ruta '/check' usa 'protect' y devuelve el 'req.user' que 'protect' ya encontró.
-// Esto soluciona el error 500 y es más eficiente.
-router.get('/check', protect, (req, res) => {
-  res.json(req.user);
-});
+router.get('/check', protect, checkAuthStatus);
 
 router.route('/profile')
   .get(protect, getUserProfile)

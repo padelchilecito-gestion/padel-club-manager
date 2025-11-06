@@ -1,9 +1,10 @@
+// server/routes/sales.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
   createSale,
-  getSaleById,
   getSales,
+  getSaleById,
   updateSale,
   deleteSale,
 } = require('../controllers/saleController');

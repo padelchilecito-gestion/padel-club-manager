@@ -1,4 +1,4 @@
-// server/routes/bookings.js (CORREGIDO)
+// server/routes/bookings.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -10,13 +10,11 @@ const {
   updateBooking,
   deleteBooking,
 } = require('../controllers/bookingController');
-const { protect, admin, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// --- Rutas Públicas ---
 router.post('/cash', createBookingCash);
 router.post('/mercadopago', createBookingMercadoPago);
 
-// --- Rutas Protegidas ---
 router.route('/')
   .get(protect, adminOrOperator, getBookings)
   .post(protect, createBooking);

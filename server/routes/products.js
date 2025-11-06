@@ -1,13 +1,14 @@
+// server/routes/products.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
   getAllProducts,
-  getProductsForShop,
   getProductById,
+  getProductsForShop,
   getProductForShop,
   createProduct,
   updateProduct,
-  deleteProduct,
+  deleteProduct
 } = require('../controllers/productController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
