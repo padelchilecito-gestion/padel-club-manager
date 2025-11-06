@@ -1,30 +1,28 @@
-// server/routes/bookings.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
-  createBooking,
   createBookingCash,
   createBookingMercadoPago,
   getBookings,
   getBookingById,
   updateBooking,
-  deleteBooking,
+  deleteBooking
 } = require('../controllers/bookingController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
+// Rutas Públicas para que cualquiera pueda crear una reserva
 router.post('/cash', createBookingCash);
 router.post('/mercadopago', createBookingMercadoPago);
 
-router.route('/')
-  .get(protect, adminOrOperator, getBookings)
-  .post(protect, createBooking);
+// A partir de aquí, se requiere estar autenticado
+router.use(protect);
 
-router.route('/mybookings')
-  .get(protect, getBookings);
+// Rutas para clientes, operadores y admins (el controlador filtra)
+router.get('/', getBookings);
+router.get('/:id', getBookingById);
 
-router.route('/:id')
-  .get(protect, getBookingById)
-  .put(protect, adminOrOperator, updateBooking)
-  .delete(protect, adminOrOperator, deleteBooking);
+// Rutas solo para operadores y admins
+router.put('/:id', adminOrOperator, updateBooking);
+router.delete('/:id', adminOrOperator, deleteBooking);
 
 module.exports = router;
