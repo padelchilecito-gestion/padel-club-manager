@@ -1,9 +1,9 @@
 // frontend/src/pages/admin/PosPage.jsx - CORREGIDO
 import React, { useState, useEffect } from 'react';
-// --- INICIO CORRECCIÓN 1: Importar servicios como 'default' ---
-// (Asumiendo que tus otros archivos los importan así)
-import productService from '../../services/productService';
-import saleService from '../../services/saleService';
+// --- INICIO CORRECCIÓN 1: Importar servicios con 'named' (* as) ---
+// Esto corrige el error de build de Vercel
+import * as productService from '../../services/productService';
+import * as saleService from '../../services/saleService';
 // --- FIN CORRECCIÓN 1 ---
 import { toast } from 'react-hot-toast';
 import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
@@ -93,17 +93,19 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
                 <p className="text-white font-semibold">{item.name}</p>
                 <p className="text-gray-400 text-sm">${item.price} x {item.quantity} = ${item.price * item.quantity}</p>
               </div>
-              <div className="flex items-center space-x-2">
+            S <div className="flex items-center space-x-2">
                 <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="bg-gray-700 p-1 rounded-full text-white">
                   <MinusIcon className="h-4 w-4" />
                 </button>
                 <span className="text-white font-bold w-6 text-center">{item.quantity}</span>
+section 18:10:09.215 6: import saleService from '../../services/saleService';
                 <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="bg-gray-700 p-1 rounded-full text-white">
                   <PlusIcon className="h-4 w-4" />
                 </button>
-                <button onClick={() => updateQuantity(item.productId, 0)} className="text-red-500 hover:text-red-400">
+  D               <button onClick={() => updateQuantity(item.productId, 0)} className="text-red-500 hover:text-red-400">
                   <XCircleIcon className="h-5 w-5" />
                 </button>
+section 18:10:09.215 7: // --- FIN CORRECCIÓN 1 ---
               </div>
             </div>
           ))
@@ -120,12 +122,13 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             Registrar (Efectivo)
           </button>
           <button
-            onClick={onShowQR} 
+            onClick={onShowQR}s
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
             <QrCodeIcon className="h-6 w-6 mr-2" />
             Pagar con MP (QR)
+  source 18:10:09.215 7: // --- FIN CORRECCIÓN 1 ---
           </button>
         </div>
       </div>
@@ -140,15 +143,13 @@ const PosPage = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
-  
-  // --- INICIO CORRECCIÓN 2: Estado para la venta pendiente ---
   const [pendingSale, setPendingSale] = useState(null);
-  // --- FIN CORRECCIÓN 2 ---
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await productService.getProducts(); // Asumiendo que esta es la llamada correcta
+      // La sintaxis de llamada (productService.getProducts) es correcta con la importación *
+      const data = await productService.getProducts(); 
       setProducts(data.filter(p => p.stock > 0)); 
     } catch (error) {
       toast.error('Error al cargar productos');
@@ -195,6 +196,7 @@ const PosPage = () => {
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
+      // La sintaxis de llamada (saleService.createSale) es correcta con la importación *
       await saleService.createSale({
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
         total: total,
@@ -209,13 +211,11 @@ const PosPage = () => {
     }
   };
 
-  // --- INICIO CORRECCIÓN 3: Nueva función async para PAGO QR ---
   const handleInitiateQRPayment = async () => {
     if (cart.length === 0) return;
     const toastId = toast.loading('Iniciando pago...');
 
     try {
-      // 1. Crear la venta en la DB con estado 'AwaitingPayment'
       const saleData = {
         items: cart.map(item => ({ 
           product: item.productId, 
@@ -225,15 +225,13 @@ const PosPage = () => {
         })),
         total: total,
         paymentMethod: 'MercadoPago',
-        status: 'AwaitingPayment' // <-- IMPORTANTE
+        status: 'AwaitingPayment'
       };
       
+      // La sintaxis de llamada (saleService.createSale) es correcta con la importación *
       const newSale = await saleService.createSale(saleData);
 
-      // 2. Guardar la venta pendiente en el estado
       setPendingSale(newSale);
-      
-      // 3. Abrir el modal
       setShowQRModal(true);
       toast.dismiss(toastId);
 
@@ -244,40 +242,31 @@ const PosPage = () => {
     }
   };
   
-  // --- INICIO CORRECCIÓN 4: Handlers para el modal ---
-  
-  // onPaymentSuccess es llamado por el socket dentro del modal
   const handlePaymentSuccess = (paidSale) => {
     toast.success('Venta registrada (Mercado Pago)');
     setCart([]);
-    fetchProducts(); // Re-fetch productos
+    fetchProducts();
     setShowQRModal(false); 
     setPendingSale(null);
   };
 
-  // onClose es llamado si el usuario cierra el modal manualmente
   const handleQRModalClose = () => {
     setShowQRModal(false);
-    // Opcional: Podríamos cancelar la venta 'AwaitingPayment' en el backend
-    // Por ahora, solo la limpiamos del estado.
     setPendingSale(null);
   };
-  // --- FIN CORRECCIÓN 4 ---
 
   return (
     <div className="p-4 h-full">
       
-      {/* --- INICIO CORRECCIÓN 5: Pasar las props correctas al modal --- */}
       {showQRModal && pendingSale && (
         <PosQRModal 
-          saleId={pendingSale._id}           // <-- Prop 1: saleId
-          items={pendingSale.items}          // <-- Prop 2: items (desde la venta)
-          totalAmount={pendingSale.total}    // <-- Prop 3: totalAmount (desde la venta)
+          saleId={pendingSale._id}
+          items={pendingSale.items}
+          totalAmount={pendingSale.total}
           onClose={handleQRModalClose}
-          onPaymentSuccess={handlePaymentSuccess} // <-- Pasar el handler de éxito
+          onPaymentSuccess={handlePaymentSuccess}
         />
       )}
-      {/* --- FIN CORRECCIÓN 5 --- */}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
         <div className="md:col-span-2 h-full">
@@ -289,9 +278,7 @@ const PosPage = () => {
             setCart={setCart} 
             total={total} 
             onRegisterSale={handleRegisterSale}
-            // --- INICIO CORRECCIÓN 6: Llamar a la nueva función async ---
             onShowQR={handleInitiateQRPayment}
-            // --- FIN CORRECCIÓN 6 ---
           />
         </div>
       </div>
