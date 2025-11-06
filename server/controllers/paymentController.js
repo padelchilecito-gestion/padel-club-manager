@@ -1,4 +1,4 @@
-// server/controllers/paymentController.js (CORREGIDO Y UNIFICADO)
+// server/controllers/paymentController.js (VERSIÓN UNIFICADA FINAL)
 const asyncHandler = require('express-async-handler');
 const { mercadopago } = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
@@ -15,14 +15,14 @@ const createQrPayment = asyncHandler(async (req, res) => {
   const { saleId, bookingId, items, totalAmount } = req.body;
   const io = req.app.get('socketio');
 
-  // 1. Validar que los datos mínimos existan
+  // 1. Validar
   if ((!saleId && !bookingId) || !items || !totalAmount) {
     console.error('Error: Faltan datos para generar QR', { saleId, bookingId, items, totalAmount });
     res.status(400);
     throw new Error('Faltan datos (ID de Venta/Reserva, Items o Monto) para generar el QR.');
   }
 
-  // 2. Determinar el tipo de pago y el ID
+  // 2. Determinar tipo
   let paymentType = '';
   let paymentId = '';
 
@@ -34,16 +34,15 @@ const createQrPayment = asyncHandler(async (req, res) => {
     paymentId = bookingId;
   }
 
-  // 3. Configurar la URL de notificación (Webhook)
-  // Usamos el 'external_reference' en lugar de query params para más fiabilidad.
+  // 3. Configurar Webhook
   const notification_url = `${process.env.BACKEND_URL || process.env.SERVER_URL}/api/payments/webhook`;
 
   const preference = {
     items: items.map(item => ({
-      id: item.id || item._id, // Usar item.id o item._id
-      title: item.title || item.name, // Usar item.title o item.name
+      id: item.id || item._id,
+      title: item.title || item.name,
       quantity: Number(item.quantity),
-      unit_price: Number(item.unit_price || item.price), // Usar item.unit_price o item.price
+      unit_price: Number(item.unit_price || item.price),
       currency_id: 'ARS',
     })),
     back_urls: {
@@ -59,7 +58,6 @@ const createQrPayment = asyncHandler(async (req, res) => {
   try {
     const response = await mercadopago.preferences.create(preference);
     
-    // Devolvemos la preferencia completa
     res.json({ 
       id: response.body.id,
       init_point: response.body.init_point,
@@ -86,7 +84,6 @@ const handleWebhook = asyncHandler(async (req, res) => {
     const data = await mercadopago.payment.findById(payment.data.id);
     const paymentDetails = data.body;
 
-    // Extraer nuestro tipo e ID desde la external_reference
     const externalReference = paymentDetails.external_reference;
     if (!externalReference || !externalReference.includes(':')) {
        console.warn('Webhook recibido sin external_reference válida.');
@@ -95,7 +92,6 @@ const handleWebhook = asyncHandler(async (req, res) => {
 
     const [type, id] = externalReference.split(':');
 
-    // Verificar que el pago esté aprobado
     if (paymentDetails.status === 'approved') {
       const io = req.app.get('socketio');
 
@@ -119,7 +115,6 @@ const handleWebhook = asyncHandler(async (req, res) => {
             sale.isPaid = true;
             await sale.save();
 
-            // Reducir stock solo cuando el pago de MP está aprobado
             for (const item of sale.items) {
               await Product.findByIdAndUpdate(item.product, {
                 $inc: { stock: -item.quantity }
@@ -137,7 +132,7 @@ const handleWebhook = asyncHandler(async (req, res) => {
     }
   }
 
-  res.status(200).send('OK'); // Responder a MercadoPago
+  res.status(200).send('OK');
 });
 
 /**

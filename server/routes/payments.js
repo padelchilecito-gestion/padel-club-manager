@@ -1,11 +1,11 @@
-// server/routes/payments.js (CORREGIDO Y UNIFICADO)
+// server/routes/payments.js (VERSIÓN UNIFICADA FINAL)
 const express = require('express');
 const router = express.Router();
 const {
   createQrPayment,
   handleWebhook,
   getPaymentStatus
-} = require('../controllers/paymentController');
+} = require('../controllers/paymentController'); // <-- Importa las funciones correctas
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
 // Ruta UNIFICADA para crear QR (para POS y Reservas)
