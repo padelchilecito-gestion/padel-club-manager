@@ -1,4 +1,4 @@
-// server/controllers/authController.js (CORREGIDO)
+// server/controllers/authController.js (CORREGIDO Y COMPLETADO)
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
@@ -9,16 +9,13 @@ const generateToken = (res, id) => {
     expiresIn: '30d',
   });
 
-  // --- INICIO DE LA CORRECCIÓN ---
-  // Establecer la cookie HTTP-Only en la respuesta
-  // Esta configuración es REQUERIDA para producción cross-domain (Vercel/Render)
+  // Configuración de cookie REQUERIDA para producción cross-domain (Vercel/Render)
   res.cookie('token', token, {
     httpOnly: true, // El cliente (JS) no puede leerla
     secure: true, // Requerido para 'SameSite=None'. Solo se envía sobre HTTPS.
-    sameSite: 'None', // Requerido para peticiones cross-site (frontend en Vercel, backend en Render)
+    sameSite: 'None', // Requerido para peticiones cross-site
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
   });
-  // --- FIN DE LA CORRECCIÓN ---
 };
 
 // @desc    Auth user & get token (Login)
@@ -32,14 +29,11 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new Error('Por favor, ingrese usuario y contraseña');
   }
 
-  // Buscar usuario por username
   const user = await User.findOne({ username });
 
-  // Validar usuario y contraseña
   if (user && (await user.matchPassword(password))) {
     generateToken(res, user._id); // Genera y setea la cookie
 
-    // Devuelve los datos del usuario (sin el password)
     res.json({
       _id: user._id,
       username: user.username,
@@ -72,7 +66,7 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await User.create({
     username,
     password,
-    role: role || 'Operator', // Default a 'Operator' si no se provee
+    role: role || 'Operator',
   });
 
   if (user) {
@@ -93,11 +87,11 @@ const registerUser = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Private
 const logoutUser = asyncHandler(async (req, res) => {
-  // Para hacer logout, seteamos una cookie vacía que expira inmediatamente
+  // Limpiamos la cookie con la misma configuración
   res.cookie('token', '', {
     httpOnly: true,
-    secure: true, // Debe coincidir con la config de login
-    sameSite: 'None', // Debe coincidir con la config de login
+    secure: true, // Debe coincidir
+    sameSite: 'None', // Debe coincidir
     expires: new Date(0), // Expira ahora
   });
   res.status(200).json({ message: 'Sesión cerrada exitosamente' });
@@ -115,17 +109,51 @@ const getUserProfile = asyncHandler(async (req, res) => {
       role: req.user.role,
     });
   } else {
+    res.status(440);
+    throw new Error('Usuario no encontrado');
+  }
+});
+
+// --- INICIO DE LA CORRECCIÓN (FUNCIÓN FALTANTE) ---
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateUserProfile = asyncHandler(async (req, res) => {
+  // req.user viene del middleware 'protect'
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    // Actualizar campos
+    user.username = req.body.username || user.username;
+
+    // Solo actualizar la contraseña SI se provee una nueva
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
+
+    const updatedUser = await user.save();
+
+    // Devolver el perfil actualizado (sin contraseña)
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      role: updatedUser.role,
+    });
+  } else {
     res.status(404);
     throw new Error('Usuario no encontrado');
   }
 });
+
+// --- FIN DE LA CORRECCIÓN ---
+
 
 // @desc    Check auth status
 // @route   GET /api/auth/check
 // @access  Private
 const checkAuthStatus = asyncHandler(async (req, res) => {
   // Este endpoint solo es alcanzable si el middleware 'protect' tuvo éxito
-  // req.user ya está adjunto
   res.status(200).json({
     _id: req.user._id,
     username: req.user.username,
@@ -133,10 +161,12 @@ const checkAuthStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// Exportar TODAS las funciones
 module.exports = {
   loginUser,
   registerUser,
   logoutUser,
   getUserProfile,
+  updateUserProfile, // <-- Asegurarse de que esté exportada
   checkAuthStatus,
 };
