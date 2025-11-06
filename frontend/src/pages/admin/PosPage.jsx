@@ -1,16 +1,15 @@
-// frontend/src/pages/admin/PosPage.jsx - CORREGIDO
+// frontend/src/pages/admin/PosPage.jsx (VERSIÓN LIMPIA Y CORREGIDA)
 import React, { useState, useEffect } from 'react';
-// --- INICIO CORRECCIÓN 1: Importar servicios con 'named' (* as) ---
-// Esto corrige el error de build de Vercel
-import * as productService from '../../services/productService';
-import * as saleService from '../../services/saleService';
+// --- INICIO CORRECCIÓN 1: Importar con llaves (named imports) ---
+import { getProducts } from '../../services/productService';
+import { createSale } from '../../services/saleService';
 // --- FIN CORRECCIÓN 1 ---
 import { toast } from 'react-hot-toast';
 import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
 import PosQRModal from '../../components/admin/PosQRModal';
 import { InlineLoading } from '../../components/ui/Feedback';
 
-// Componente interno para la grilla de productos (Sin cambios)
+// Componente interno para la grilla de productos
 const ProductGrid = ({ products, onAddToCart, loading }) => (
   <div className="bg-gray-800 p-4 rounded-lg h-[80vh] overflow-y-auto">
     <h2 className="text-2xl font-bold text-white mb-4">Productos</h2>
@@ -55,7 +54,7 @@ const ProductGrid = ({ products, onAddToCart, loading }) => (
   </div>
 );
 
-// Componente interno para el carrito (Sin cambios)
+// Componente interno para el carrito
 const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
     const updateQuantity = (productId, newQuantity) => {
     if (newQuantity <= 0) {
@@ -93,19 +92,17 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
                 <p className="text-white font-semibold">{item.name}</p>
                 <p className="text-gray-400 text-sm">${item.price} x {item.quantity} = ${item.price * item.quantity}</p>
               </div>
-            S <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
                 <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="bg-gray-700 p-1 rounded-full text-white">
                   <MinusIcon className="h-4 w-4" />
                 </button>
                 <span className="text-white font-bold w-6 text-center">{item.quantity}</span>
-section 18:10:09.215 6: import saleService from '../../services/saleService';
                 <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="bg-gray-700 p-1 rounded-full text-white">
                   <PlusIcon className="h-4 w-4" />
                 </button>
-  D               <button onClick={() => updateQuantity(item.productId, 0)} className="text-red-500 hover:text-red-400">
+                <button onClick={() => updateQuantity(item.productId, 0)} className="text-red-500 hover:text-red-400">
                   <XCircleIcon className="h-5 w-5" />
                 </button>
-section 18:10:09.215 7: // --- FIN CORRECCIÓN 1 ---
               </div>
             </div>
           ))
@@ -121,15 +118,16 @@ section 18:10:09.215 7: // --- FIN CORRECCIÓN 1 ---
           >
             Registrar (Efectivo)
           </button>
+          {/* --- INICIO CORRECCIÓN 2: Código del botón QR limpio --- */}
           <button
-            onClick={onShowQR}s
+            onClick={onShowQR} 
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
             <QrCodeIcon className="h-6 w-6 mr-2" />
             Pagar con MP (QR)
-  source 18:10:09.215 7: // --- FIN CORRECCIÓN 1 ---
           </button>
+          {/* --- FIN CORRECCIÓN 2 --- */}
         </div>
       </div>
     </div>
@@ -148,10 +146,11 @@ const PosPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      // La sintaxis de llamada (productService.getProducts) es correcta con la importación *
-      const data = await productService.getProducts(); 
+      // --- INICIO CORRECCIÓN 3: Usar la función importada 'getProducts' ---
+      const data = await getProducts(); 
       setProducts(data.filter(p => p.stock > 0)); 
     } catch (error) {
+      // Este error ya no debería ocurrir
       toast.error('Error al cargar productos');
       console.error('Error en fetchProducts (POS Page):', error);
     } finally {
@@ -187,7 +186,7 @@ const PosPage = () => {
         price: product.price, 
         quantity: 1,
         stock: product.stock 
-      }];
+    _id   }];
     });
   };
 
@@ -196,14 +195,15 @@ const PosPage = () => {
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
-      // La sintaxis de llamada (saleService.createSale) es correcta con la importación *
-      await saleService.createSale({
+      // --- INICIO CORRECCIÓN 4: Usar la función importada 'createSale' ---
+      await createSale({
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
         total: total,
         paymentMethod: 'Efectivo',
         status: 'Completed'
       });
       toast.success('Venta registrada (Efectivo)');
+section 18:10:09.215 3: // --- INICIO CORRECCIÓN 1: Importar servicios como 'default' ---
       setCart([]);
       fetchProducts(); 
     } catch (error) {
@@ -228,8 +228,8 @@ const PosPage = () => {
         status: 'AwaitingPayment'
       };
       
-      // La sintaxis de llamada (saleService.createSale) es correcta con la importación *
-      const newSale = await saleService.createSale(saleData);
+      // --- INICIO CORRECCIÓN 5: Usar la función importada 'createSale' ---
+      const newSale = await createSale(saleData);
 
       setPendingSale(newSale);
       setShowQRModal(true);
@@ -258,6 +258,7 @@ const PosPage = () => {
   return (
     <div className="p-4 h-full">
       
+      {/* Esta lógica de renderizado (con pendingSale) es correcta */}
       {showQRModal && pendingSale && (
         <PosQRModal 
           saleId={pendingSale._id}
@@ -269,6 +270,7 @@ const PosPage = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+source 18:10:09.215 4: // (Asumiendo que tus otros archivos los importan así)
         <div className="md:col-span-2 h-full">
           <ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
         </div>
