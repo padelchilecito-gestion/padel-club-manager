@@ -1,16 +1,17 @@
-// server/controllers/paymentController.js (CORREGIDO Y COMPLETADO)
+// server/controllers/paymentController.js (CORREGIDO Y UNIFICADO)
 const asyncHandler = require('express-async-handler');
 const { mercadopago } = require('../config/mercadopago-config');
 const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
-const Product = require('../models/Product'); // Necesario para el webhook de venta
+const Product = require('../models/Product');
 const { logActivity } = require('../utils/logActivity');
 
-// @desc    Crear preferencia de pago para QR
-// @route   POST /api/payments/create-qr
-// @access  Private/AdminOrOperator
+/**
+ * @desc    Crear preferencia de pago para QR (Unificado para Ventas y Reservas)
+ * @route   POST /api/payments/create-qr
+ * @access  Private/AdminOrOperator
+ */
 const createQrPayment = asyncHandler(async (req, res) => {
-  // --- INICIO DE LA CORRECCIÓN 1 ---
   const { saleId, bookingId, items, totalAmount } = req.body;
   const io = req.app.get('socketio');
 
@@ -33,37 +34,35 @@ const createQrPayment = asyncHandler(async (req, res) => {
     paymentId = bookingId;
   }
 
-  // 3. Configurar la URL de notificación (Webhook) para incluir el tipo y el ID
-  const notification_url = `${process.env.BACKEND_URL}/api/payments/webhook?type=${paymentType}&id=${paymentId}`;
-
-  // --- FIN DE LA CORRECCIÓN 1 ---
+  // 3. Configurar la URL de notificación (Webhook)
+  // Usamos el 'external_reference' en lugar de query params para más fiabilidad.
+  const notification_url = `${process.env.BACKEND_URL || process.env.SERVER_URL}/api/payments/webhook`;
 
   const preference = {
     items: items.map(item => ({
-      id: item.id,
-      title: item.title,
+      id: item.id || item._id, // Usar item.id o item._id
+      title: item.title || item.name, // Usar item.title o item.name
       quantity: Number(item.quantity),
-      unit_price: Number(item.unit_price),
+      unit_price: Number(item.unit_price || item.price), // Usar item.unit_price o item.price
       currency_id: 'ARS',
     })),
     back_urls: {
-      success: `${process.env.FRONTEND_URL}/admin/pos`, // Redirige a POS (o donde prefieras)
-      failure: `${process.env.FRONTEND_URL}/admin/pos`,
-      pending: `${process.env.FRONTEND_URL}/admin/pos`,
+      success: `${process.env.CLIENT_URL}/admin/pos?status=success`,
+      failure: `${process.env.CLIENT_URL}/admin/pos?status=failure`,
+      pending: `${process.env.CLIENT_URL}/admin/pos?status=pending`,
     },
     auto_return: 'approved',
-    notification_url: notification_url, // URL de webhook actualizada
-    external_reference: paymentId, // Usamos el ID (saleId o bookingId)
-    total_amount: Number(totalAmount), // Monto total
+    notification_url: notification_url,
+    external_reference: `${paymentType}:${paymentId}`, // Referencia CLAVE: "sale:ID" o "booking:ID"
   };
 
   try {
     const response = await mercadopago.preferences.create(preference);
     
-    // Devolvemos la preferencia completa, el frontend usará 'init_point' o 'qr_code'
+    // Devolvemos la preferencia completa
     res.json({ 
       id: response.body.id,
-      init_point: response.body.init_point, // URL para QR
+      init_point: response.body.init_point,
       qr_code_base64: response.body.point_of_interaction?.transaction_data?.qr_code_base64,
       qr_code: response.body.point_of_interaction?.transaction_data?.qr_code
     });
@@ -75,33 +74,32 @@ const createQrPayment = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Manejar notificaciones de webhook de MercadoPago
-// @route   POST /api/payments/webhook
-// @access  Public
+/**
+ * @desc    Manejar notificaciones de webhook de MercadoPago (Unificado)
+ * @route   POST /api/payments/webhook
+ * @access  Public
+ */
 const handleWebhook = asyncHandler(async (req, res) => {
   const payment = req.body;
-
-  // --- INICIO DE LA CORRECCIÓN 2 ---
-  // Obtener nuestro tipo e ID desde los query params
-  const { type, id } = req.query;
-
-  if (!type || !id) {
-    console.warn('Webhook recibido sin query params "type" o "id".');
-    return res.status(400).send('Faltan query params');
-  }
-  // --- FIN DE LA CORRECCIÓN 2 ---
 
   if (payment.type === 'payment') {
     const data = await mercadopago.payment.findById(payment.data.id);
     const paymentDetails = data.body;
 
-    // Verificar que el pago esté aprobado y el external_reference coincida
-    if (paymentDetails.status === 'approved' && paymentDetails.external_reference === id) {
+    // Extraer nuestro tipo e ID desde la external_reference
+    const externalReference = paymentDetails.external_reference;
+    if (!externalReference || !externalReference.includes(':')) {
+       console.warn('Webhook recibido sin external_reference válida.');
+       return res.status(400).send('Referencia externa inválida');
+    }
+
+    const [type, id] = externalReference.split(':');
+
+    // Verificar que el pago esté aprobado
+    if (paymentDetails.status === 'approved') {
       const io = req.app.get('socketio');
 
       try {
-        // --- INICIO DE LA CORRECCIÓN 3 ---
-        // Actualizar el modelo correcto (Booking o Sale)
         if (type === 'booking') {
           const booking = await Booking.findById(id);
           if (booking && !booking.isPaid) {
@@ -111,7 +109,7 @@ const handleWebhook = asyncHandler(async (req, res) => {
             await booking.save();
 
             console.log(`Reserva ${id} pagada por Webhook.`);
-            io.emit('bookingUpdated', booking); // Notificar al frontend
+            io.emit('bookingUpdated', booking);
             await logActivity('Booking', id, 'payment_success_webhook', null, { method: 'MercadoPago' });
           }
         }
@@ -121,8 +119,7 @@ const handleWebhook = asyncHandler(async (req, res) => {
             sale.isPaid = true;
             await sale.save();
 
-            // Lógica de reducción de stock (que estaba en createSale)
-            // se mueve aquí para ventas con MP
+            // Reducir stock solo cuando el pago de MP está aprobado
             for (const item of sale.items) {
               await Product.findByIdAndUpdate(item.product, {
                 $inc: { stock: -item.quantity }
@@ -130,23 +127,43 @@ const handleWebhook = asyncHandler(async (req, res) => {
             }
 
             console.log(`Venta ${id} pagada por Webhook.`);
-            io.emit('saleUpdated', sale); // Notificar al frontend
+            io.emit('saleUpdated', sale);
             await logActivity('Sale', id, 'payment_success_webhook', null, { method: 'MercadoPago' });
           }
         }
-        // --- FIN DE LA CORRECCIÓN 3 ---
-
       } catch (error) {
         console.error(`Error al procesar ${type} ${id} desde Webhook:`, error);
-        // Devolvemos 200 a MP aunque fallemos internamente, para evitar reintentos.
       }
     }
   }
 
-  res.status(200).send('OK'); // Responder a MercadoPago que recibimos el webhook
+  res.status(200).send('OK'); // Responder a MercadoPago
 });
+
+/**
+ * @desc    Obtener estado de un pago de MercadoPago
+ * @route   GET /api/payments/status/:paymentId
+ * @access  Private
+ */
+const getPaymentStatus = asyncHandler(async (req, res) => {
+   try {
+    const response = await mercadopago.payment.findById(req.params.paymentId);
+    res.json({
+      id: response.body.id,
+      status: response.body.status,
+      status_detail: response.body.status_detail,
+      external_reference: response.body.external_reference
+    });
+  } catch (error) {
+    console.error('Error al obtener estado de pago:', error);
+    res.status(500);
+    throw new Error('Error al consultar estado en MercadoPago.');
+  }
+});
+
 
 module.exports = {
   createQrPayment,
   handleWebhook,
+  getPaymentStatus,
 };
