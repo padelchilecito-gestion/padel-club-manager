@@ -1,6 +1,6 @@
-// frontend/src/pages/admin/PosPage.jsx (VERSIÓN LIMPIA Y CORREGIDA)
+// frontend/src/pages/admin/PosPage.jsx (VERSIÓN FINAL COMPLETA)
 import React, { useState, useEffect } from 'react';
-// Importamos las funciones específicas que necesitamos
+// 1. Importaciones corregidas (con llaves)
 import { getProducts } from '../../services/productService';
 import { createSale } from '../../services/saleService';
 import { toast } from 'react-hot-toast';
@@ -118,7 +118,7 @@ className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opac
             Registrar (Efectivo)
           </button>
           <button
-            onClick={onShowQR} 
+            onClick={onShowQR}Next 
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
@@ -131,9 +131,9 @@ className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opac
   );
 };
 
-
 // Componente principal de la página
 const PosPage = () => {
+source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +143,7 @@ const PosPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await getProducts(); // Llamada correcta
+      const data = await getProducts(); // Llamada con importación nombrada
       setProducts(data.filter(p => p.stock > 0)); 
     } catch (error) {
       toast.error('Error al cargar productos');
@@ -172,6 +172,7 @@ const PosPage = () => {
         return prevCart.map((item) =>
           item.productId === product._id
             ? { ...item, quantity: item.quantity + 1 }
+to 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
             : item
         );
       }
@@ -181,9 +182,7 @@ const PosPage = () => {
         price: product.price, 
         quantity: 1,
         stock: product.stock 
-        // --- INICIO CORRECCIÓN 3: Eliminado el "_id" corrupto ---
-      }];
-        // --- FIN CORRECCIÓN 3 ---
+      }]; // 2. Error de sintaxis de 'id' eliminado
     });
   };
 
@@ -192,8 +191,10 @@ const PosPage = () => {
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
     try {
-      await createSale({ // Llamada correcta
+      await createSale({ // Llamada con importación nombrada
+section 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
+s 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
         total: total,
         paymentMethod: 'Efectivo',
         status: 'Completed'
@@ -222,8 +223,64 @@ const PosPage = () => {
         paymentMethod: 'MercadoPago',
         status: 'AwaitingPayment'
       };
-
-            
-      const newSale = await createSale(saleData); // Llamada correcta
+      
+      const newSale = await createSale(saleData); // Llamada con importación nombrada
 
       setPendingSale(newSale);
+      setShowQRModal(true);
+      toast.dismiss(toastId);
+
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error('Error al iniciar la venta. Intente de nuevo.');
+      console.error("Error creating pending sale:", error);
+    }
+  };
+  
+  const handlePaymentSuccess = (paidSale) => {
+    toast.success('Venta registrada (Mercado Pago)');
+    setCart([]);
+    fetchProducts();
+    setShowQRModal(false); 
+    setPendingSale(null);
+  };
+
+  const handleQRModalClose = () => {
+    setShowQRModal(false);
+    setPendingSale(null);
+  };
+
+  // 3. Este es el código que faltaba
+  return (
+    <div className="p-4 h-full">
+      
+      {showQRModal && pendingSale && (
+source 18:24:30.615 /vercel/path1/src/pages/admin/PosPage.jsx:230:0: ERROR: Unexpected end of file
+        <PosQRModal 
+          saleId={pendingSale._id}
+          items={pendingSale.items}
+          totalAmount={pendingSale.total}
+          onClose={handleQRModalClose}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+        <div className="md:col-span-2 h-full">
+          <ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
+        </div>
+        <div className="h-full">
+          <Cart 
+            cart={cart}s
+            setCart={setCart} 
+            total={total} 
+            onRegisterSale={handleRegisterSale}
+            onShowQR={handleInitiateQRPayment}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PosPage;
