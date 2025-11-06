@@ -1,3 +1,4 @@
+// server/models/Product.js (CORREGIDO)
 const mongoose = require('mongoose');
 
 const ProductSchema = new mongoose.Schema({
@@ -5,16 +6,17 @@ const ProductSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    unique: true,
   },
-  category: {
+  description: {
     type: String,
-    required: true,
-    enum: ['Bebidas', 'Snacks', 'Accesorios', 'Ropa', 'Otros'],
-    default: 'Otros',
+    trim: true,
   },
   price: {
     type: Number,
+    required: true,
+  },
+  category: {
+    type: String,
     required: true,
   },
   stock: {
@@ -24,24 +26,18 @@ const ProductSchema = new mongoose.Schema({
   },
   imageUrl: {
     type: String,
-    required: false, // Will be populated from Cloudinary
   },
-  trackStockAlert: {
+  // --- INICIO DE LA CORRECCIÓN ---
+  cloudinaryId: {
+    type: String, // Campo para almacenar el ID de Cloudinary
+  },
+  // --- FIN DE LA CORRECCIÓN ---
+  isActive: {
     type: Boolean,
     default: true,
   },
-  lowStockThreshold: {
-    type: Number,
-    default: 5,
-  },
-  showInShop: {
-    type: Boolean,
-    default: true,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+}, { timestamps: true });
+
+ProductSchema.index({ name: 'text', description: 'text' });
 
 module.exports = mongoose.model('Product', ProductSchema);
