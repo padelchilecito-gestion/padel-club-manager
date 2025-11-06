@@ -1,8 +1,9 @@
-// frontend/src/pages/admin/PosPage.jsx (VERSIÓN FINAL LIMPIA)
+// frontend/src/pages/admin/PosPage.jsx (VERSIÓN FINAL CON IMPORTACIONES CORREGIDAS)
 import React, { useState, useEffect } from 'react';
-// 1. Importaciones corregidas (con llaves)
-import { getProducts } from '../../services/productService';
-import { createSale } from '../../services/saleService';
+// --- INICIO CORRECCIÓN 1: Importar los OBJETOS del servicio ---
+import { productService } from '../../services/productService';
+import { saleService } from '../../services/saleService';
+// --- FIN CORRECCIÓN 1 ---
 import { toast } from 'react-hot-toast';
 import { QrCodeIcon, PlusIcon, MinusIcon, XCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
 import PosQRModal from '../../components/admin/PosQRModal';
@@ -114,16 +115,16 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             onClick={onRegisterSale}
             disabled={cart.length === 0}
             className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
-          >
+s        >
             Registrar (Efectivo)
           </button>
           <button
-            onClick={onShowQR}
-Â          disabled={cart.length === 0}
-            className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
+          	onClick={onShowQR}
+          	disabled={cart.length === 0}
+          	className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
           >
             <QrCodeIcon className="h-6 w-6 mr-2" />
-            Pagar con MP (QR)
+          	Pagar con MP (QR)
           </button>
         </div>
       </div>
@@ -142,11 +143,13 @@ const PosPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await getProducts(); // Llamada correcta (importación nombrada)
+      // --- INICIO CORRECCIÓN 2: Llamar a la función como un método del objeto importado ---
+      const data = await productService.getProducts(); 
       setProducts(data.filter(p => p.stock > 0)); 
-    } catch (error) {
+  	} catch (error) {
       toast.error('Error al cargar productos');
       console.error('Error en fetchProducts (POS Page):', error);
+section 18:52:34.530 /vercel/path1/src/pages/admin/PosPage.jsx:162:11: ERROR: Expected ";" but found "const"
     } finally {
       setLoading(false);
     }
@@ -159,12 +162,14 @@ const PosPage = () => {
   const handleAddToCart = (product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.productId === product._id);
-Â      const stockAvailable = product.stock;
+      // --- INICIO CORRECCIÓN 3: Eliminado el carácter corrupto 'Â' ---
+      const stockAvailable = product.stock; 
       const quantityInCart = existingItem ? existingItem.quantity : 0;
+      // --- FIN CORRECCIÓN 3 ---
 
       if (quantityInCart >= stockAvailable) {
         toast.error(`Stock máximo alcanzado para ${product.name}`);
-        return prevCart;
+    	  return prevCart;
       }
 
       if (existingItem) {
@@ -174,13 +179,13 @@ const PosPage = () => {
 	  		  : item
         );
       }
-      return [...prevCart, { 
-        productId: product._id, 
-        name: product.name, 
-        price: product.price, 
-        quantity: 1,
-        stock: product.stock 
-      }]; // 2. Código corrupto eliminado de esta área
+    	return [...prevCart, { 
+      	productId: product._id, 
+      	name: product.name, 
+      	price: product.price, 
+      	quantity: 1,
+      	stock: product.stock 
+    	}];
     });
   };
 
@@ -188,8 +193,9 @@ const PosPage = () => {
 
   const handleRegisterSale = async () => {
     if (cart.length === 0) return;
-    try {
-      await createSale({ // Llamada correcta (importación nombrada)
+  	try {
+      // --- INICIO CORRECCIÓN 4: Llamar a la función como un método del objeto importado ---
+      await saleService.createSale({ 
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
         total: total,
         paymentMethod: 'Efectivo',
@@ -198,9 +204,9 @@ const PosPage = () => {
       toast.success('Venta registrada (Efectivo)');
       setCart([]);
       fetchProducts(); 
-    } catch (error) {
+  	} catch (error) {
       toast.error('Error al registrar la venta');
-    }
+  	}
   };
 
   const handleInitiateQRPayment = async () => {
@@ -220,7 +226,8 @@ const PosPage = () => {
         status: 'AwaitingPayment'
       };
       
-      const newSale = await createSale(saleData); // Llamada correcta (importación nombrada)
+      // --- INICIO CORRECCIÓN 5: Llamar a la función como un método del objeto importado ---
+      const newSale = await saleService.createSale(saleData); 
 
       setPendingSale(newSale);
       setShowQRModal(true);
@@ -246,35 +253,35 @@ const PosPage = () => {
     setPendingSale(null);
   };
 
-  // 3. Código de renderizado (asegurándonos que esté completo)
+  // 3. Código de renderizado (completo)
   return (
-    <div className="p-4 h-full">
-      
-      {showQRModal && pendingSale && (
-        <PosQRModal 
+  	<div className="p-4 h-full">
+    	
+    	{showQRModal && pendingSale && (
+      	<PosQRModal 
           saleId={pendingSale._id}
           items={pendingSale.items}
-          totalAmount={pendingSale.total}
-          onClose={handleQRModalClose}
+        	  totalAmount={pendingSale.total}
+        	  onClose={handleQRModalClose}
           onPaymentSuccess={handlePaymentSuccess}
-        />
-      )}
+      	/>
+    	)}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-        <div className="md:col-span-2 h-full">
-          <ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
+    	<div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+      	<div className="md:col-span-2 h-full">
+        	<ProductGrid products={products} onAddToCart={handleAddToCart} loading={loading} />
+      	</div>
+      	<div className="h-full">
+        	<Cart 
+          	cart={cart}
+          	setCart={setCart} 
+          	total={total} 
+          	onRegisterSale={handleRegisterSale}
+          	onShowQR={handleInitiateQRPayment}
+        	/>
         </div>
-        <div className="h-full">
-          <Cart 
-            cart={cart}
-            setCart={setCart} 
-            total={total} 
-            onRegisterSale={handleRegisterSale}
-            onShowQR={handleInitiateQRPayment}
-          />
-        </div>
-      </div>
-    </div>
+  	  </div>
+  	</div>
   );
 };
 
