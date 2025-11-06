@@ -67,6 +67,14 @@ const getAllProducts = async (req, res) => {
   }
 };
 
+// @desc    Get all products for the shop
+// @route   GET /api/products/shop
+// @access  Public
+const getProductsForShop = (req, res, next) => {
+  req.query.visible = 'true';
+  getAllProducts(req, res, next);
+};
+
 // @desc    Get a single product by ID
 // @route   GET /api/products/:id
 // @access  Public
@@ -83,6 +91,13 @@ const getProductById = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
+};
+
+// @desc    Get a single product for the shop by ID
+// @route   GET /api/products/shop/:id
+// @access  Public
+const getProductForShop = async (req, res, next) => {
+    getProductById(req,res,next);
 };
 
 // @desc    Update a product
@@ -154,7 +169,9 @@ const deleteProduct = async (req, res) => {
 module.exports = {
   createProduct,
   getAllProducts,
+  getProductsForShop,
   getProductById,
+  getProductForShop,
   updateProduct,
   deleteProduct,
 };

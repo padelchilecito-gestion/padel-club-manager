@@ -1,29 +1,26 @@
-// server/routes/cashbox.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  // Se usan los nombres exactos de tu controlador
-  startSession,
-  endSession,
-  getSession,
+  startCashboxSession,
+  closeCashboxSession,
+  getActiveCashboxSession,
   addMovement,
-  getSummary,
+  getActiveSessionReport,
 } = require('../controllers/cashboxController');
 const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 const { 
   validateMovement, 
-  handleValidationErrors // Se importa el manejador de validación
+  handleValidationErrors
 } = require('../validators/cashboxValidator');
 
 
 router.use(protect);
-router.use(adminOrOperator); // Se usa el middleware correcto
+router.use(adminOrOperator);
 
-// Se usan los nombres de función correctos
-router.post('/start', startSession);
-router.post('/end', endSession);
-router.get('/session', getSession);
-router.post('/movement', validateMovement, handleValidationErrors, addMovement); // Se añade el manejador
-router.get('/summary', getSummary);
+router.post('/start', startCashboxSession);
+router.post('/end', closeCashboxSession);
+router.get('/session', getActiveCashboxSession);
+router.post('/movement', validateMovement, handleValidationErrors, addMovement);
+router.get('/summary', getActiveSessionReport);
 
 module.exports = router;
