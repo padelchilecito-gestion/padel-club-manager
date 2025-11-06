@@ -114,15 +114,17 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
             onClick={onRegisterSale}
             disabled={cart.length === 0}
             className="w-full bg-green-600 text-white p-3 rounded-lg font-bold disabled:opacity-50 transition-colors"
-          >
+s        >
             Registrar (Efectivo)
           </button>
           <button
             onClick={onShowQR}
             disabled={cart.length === 0}
             className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-50 transition-colors"
+section 18:30:22.973 184|  Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
           >
             <QrCodeIcon className="h-6 w-6 mr-2" />
+  Data 18:30:22.973 184|  Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
             Pagar con MP (QR)
           </button>
         </div>
@@ -133,6 +135,7 @@ const Cart = ({ cart, setCart, total, onRegisterSale, onShowQR }) => {
 
 // Componente principal de la página
 const PosPage = () => {
+source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +147,7 @@ const PosPage = () => {
       setLoading(true);
       const data = await getProducts(); // Llamada correcta
       setProducts(data.filter(p => p.stock > 0)); 
+source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
     } catch (error) {
       toast.error('Error al cargar productos');
       console.error('Error en fetchProducts (POS Page):', error);
@@ -180,8 +184,8 @@ const PosPage = () => {
         price: product.price, 
         quantity: 1,
         stock: product.stock 
-      }]; // 2. Error de sintaxis de '_id' eliminado
-Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
+      }]; // Esta es la línea 183. El error de "Note:" se ha eliminado.
+section 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
     });
   };
 
@@ -192,7 +196,7 @@ Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
     try {
       await createSale({ // Llamada correcta
         items: cart.map(item => ({ product: item.productId, name: item.name, quantity: item.quantity, price: item.price })),
-        total: total,
+s         total: total,
         paymentMethod: 'Efectivo',
         status: 'Completed'
       });
@@ -247,11 +251,11 @@ Note: 18:21:14.225 Running build in Washington, D.C., USA (East) – iad1
     setPendingSale(null);
   };
 
-  // 3. Este es el código que faltaba
   return (
     <div className="p-4 h-full">
       
       {showQRModal && pendingSale && (
+source 18:30:22.973 /vercel/path1/src/pages/admin/PosPage.jsx:184:8: ERROR: Expected ";" but found ":"
         <PosQRModal 
           saleId={pendingSale._id}
           items={pendingSale.items}
