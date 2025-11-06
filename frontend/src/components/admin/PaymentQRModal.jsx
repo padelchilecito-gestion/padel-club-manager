@@ -1,16 +1,15 @@
 // frontend/src/components/admin/PaymentQRModal.jsx (CORREGIDO)
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, CheckCircleIcon, QrCodeIcon } from '@heroicons/react/24/solid';
-import paymentService from '../../services/paymentService'; // <-- CORRECCIÓN: Se quitaron las llaves {}
+import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import paymentService from '../../services/paymentService'; 
 import socket from '../../services/socketService';
 import { InlineLoading, ErrorMessage } from '../ui/Feedback';
 
 function PaymentQRModal({ bookingId, amount, onClose, onPaymentSuccess }) {
-  const [qrCodeUrl, setQrCodeUrl] = useState(null);
+  const [qrCodeBase64, setQrCodeBase64] = useState(null); // Usaremos base64
   const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending', 'success', 'failure'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [preferenceId, setPreferenceId] = useState(null);
 
   useEffect(() => {
     const generateQR = async () => {
@@ -25,12 +24,30 @@ function PaymentQRModal({ bookingId, amount, onClose, onPaymentSuccess }) {
       setPaymentStatus('pending');
 
       try {
-        const data = await paymentService.createMercadoPagoPreference({ 
-          bookingId, 
-          amount 
+        // 1. Construir el array 'items' que el backend unificado espera
+        const paymentItems = [
+          {
+            id: bookingId,
+            title: 'Reserva de Cancha',
+            quantity: 1,
+            unit_price: amount,
+          }
+        ];
+        
+        // 2. Llamar a la función UNIFICADA
+        const data = await paymentService.createQrPayment({ 
+          bookingId: bookingId, 
+          items: paymentItems,
+          totalAmount: amount
         });
-        setQrCodeUrl(data.init_point); // Esta es la URL que MP da para el QR
-        setPreferenceId(data.preferenceId);
+        
+        // 3. Usar el QR en base64
+        if (data.qr_code_base64) {
+          setQrCodeBase64(`data:image/jpeg;base64,${data.qr_code_base64}`);
+        } else {
+          setQrCodeBase64(`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(data.init_point)}`);
+        }
+
       } catch (err) {
         console.error("Error generating MP preference:", err);
         setError(err.message || 'Error al generar el código QR.');
@@ -43,27 +60,22 @@ function PaymentQRModal({ bookingId, amount, onClose, onPaymentSuccess }) {
   }, [bookingId, amount]);
 
   useEffect(() => {
-    if (!preferenceId) return;
-
-    // Escuchar eventos de socket para esta preferencia específica
-    const paymentTopic = `payment:status:${preferenceId}`;
-    
-    socket.on(paymentTopic, (data) => {
-      console.log(`Socket event received: ${paymentTopic}`, data);
-      if (data.status === 'approved') {
+    // 4. Escuchar el evento de socket correcto
+    const onBookingUpdate = (updatedBooking) => {
+      if (updatedBooking._id === bookingId && updatedBooking.isPaid) {
+        console.log(`Socket event received: Reserva ${bookingId} pagada.`);
         setPaymentStatus('success');
-        onPaymentSuccess(data); // Notificar al componente padre
-      } else if (data.status === 'rejected' || data.status === 'cancelled' || data.status === 'failure') {
-        setPaymentStatus('failure');
-        setError('El pago fue rechazado o cancelado.');
+        onPaymentSuccess(updatedBooking); // Notificar al componente padre
       }
-    });
+    };
+
+    socket.on('bookingUpdated', onBookingUpdate);
 
     // Limpieza al desmontar
     return () => {
-      socket.off(paymentTopic);
+      socket.off('bookingUpdated', onBookingUpdate);
     };
-  }, [preferenceId, onPaymentSuccess]);
+  }, [bookingId, onPaymentSuccess]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -89,9 +101,9 @@ function PaymentQRModal({ bookingId, amount, onClose, onPaymentSuccess }) {
           </div>
         )}
 
-        {!loading && !error && paymentStatus === 'pending' && qrCodeUrl && (
+        {!loading && !error && paymentStatus === 'pending' && qrCodeBase64 && (
           <div className="flex flex-col items-center">
-            <img src={qrCodeUrl} alt="Código QR de Mercado Pago" className="w-64 h-64 border rounded" />
+            <img src={qrCodeBase64} alt="Código QR de Mercado Pago" className="w-64 h-64 border rounded" />
             <p className="mt-4 text-lg font-bold text-gray-700">Total: ${amount.toFixed(2)}</p>
             <p className="mt-2 text-sm text-gray-500">Esperando confirmación de pago...</p>
           </div>
