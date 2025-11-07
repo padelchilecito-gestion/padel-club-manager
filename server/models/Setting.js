@@ -13,12 +13,14 @@ const SettingSchema = new mongoose.Schema({
       'CLOUDINARY_API_SECRET',
       'WHATSAPP_SENDER_NUMBER',
       'WHATSAPP_API_TOKEN',
-      // Nuevas claves
+      // Claves de horarios anteriores (se reemplazan)
       'TIMEZONE',
       'WEEKDAY_OPENING_HOUR',
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
+      // --- NUEVA CLAVE ---
+      'BUSINESS_HOURS', // Almacena un JSON con los 336 slots de 30 min.
     ],
   },
   value: {
