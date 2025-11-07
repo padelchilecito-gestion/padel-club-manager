@@ -1,36 +1,23 @@
-// server/utils/timeSlotGenerator.js
-const { addMinutes, format, parse, addDays } = require('date-fns'); // <-- CORRECCIÓN AQUÍ
+const { addMinutes, format } = require('date-fns');
 
 /**
- * Genera una lista de strings de tiempo (HH:MM) para los slots de un día.
- * Puede manejar horarios que cruzan la medianoche (ej. de 22:00 a 02:00).
- *
- * @param {string} openTimeString - Hora de apertura en formato "HH:MM".
- * @param {string} closeTimeString - Hora de cierre en formato "HH:MM".
- * @param {number} slotDurationMinutes - Duración de cada slot en minutos.
- * @returns {string[]} Un array de strings "HH:MM" representando el inicio de cada slot.
+ * Genera una lista de horarios (time slots) entre una hora de inicio y una de fin.
+ * @param {string} startTime - Hora de inicio (ej. "09:00").
+ * @param {string} endTime - Hora de fin (ej. "23:00").
+ * @param {number} slotDuration - Duración del turno en minutos.
+ * @returns {Array<string>} Una lista de horarios en formato "HH:mm".
  */
-const generateTimeSlots = (openTimeString, closeTimeString, slotDurationMinutes) => {
+function generateTimeSlots(startTime, endTime, slotDuration) {
     const slots = [];
-    
-    // Parsear las horas usando una fecha base para que date-fns pueda comparar
-    // Usamos una fecha ficticia (ej. 2023-01-01) y ajustamos el día si el cierre es "al día siguiente"
-    let startTime = parse(openTimeString, 'HH:mm', new Date(2023, 0, 1)); // 2023-01-01 HH:MM
-    let endTime = parse(closeTimeString, 'HH:mm', new Date(2023, 0, 1)); // 2023-01-01 HH:MM
+    let currentTime = new Date(`1970-01-01T${startTime}:00`);
+    const end = new Date(`1970-01-01T${endTime}:00`);
 
-    // Si la hora de cierre es menor que la de apertura, significa que el horario cruza la medianoche.
-    // Ajustamos el endTime para que sea al día siguiente.
-    if (endTime <= startTime) {
-        endTime = addDays(endTime, 1);
-    }
-
-    let currentTime = startTime;
-    while (currentTime < endTime) {
+    while (currentTime < end) {
         slots.push(format(currentTime, 'HH:mm'));
-        currentTime = addMinutes(currentTime, slotDurationMinutes);
+        currentTime = addMinutes(currentTime, slotDuration);
     }
 
     return slots;
-};
+}
 
 module.exports = { generateTimeSlots };

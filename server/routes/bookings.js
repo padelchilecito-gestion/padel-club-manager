@@ -1,30 +1,22 @@
-// server/routes/bookings.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
-const {
-  createBooking,
-  createBookingCash,
-  createBookingMercadoPago,
-  getBookings,
-  getBookingById,
-  updateBooking,
-  deleteBooking,
-} = require('../controllers/bookingController');
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+const asyncHandler = require('express-async-handler');
+const { createBooking } = require('../controllers/bookingController');
+const { createMercadoPagoPreference } = require('../controllers/paymentController');
 
-router.post('/cash', createBookingCash);
-router.post('/mercadopago', createBookingMercadoPago);
+// @route   POST /api/bookings/cash
+// @desc    Crea una nueva reserva con pago en efectivo.
+router.post('/cash', asyncHandler(async (req, res) => {
+    const { booking } = await createBooking({ ...req.body, paymentMethod: 'Efectivo' });
+    res.status(201).json(booking);
+}));
 
-router.route('/')
-  .get(protect, adminOrOperator, getBookings)
-  .post(protect, createBooking);
-
-router.route('/mybookings')
-  .get(protect, getBookings);
-
-router.route('/:id')
-  .get(protect, getBookingById)
-  .put(protect, adminOrOperator, updateBooking)
-  .delete(protect, adminOrOperator, deleteBooking);
+// @route   POST /api/bookings/mercadopago
+// @desc    Crea una reserva y una preferencia de Mercado Pago.
+router.post('/mercadopago', asyncHandler(async (req, res) => {
+    const { booking, court, slotDuration } = await createBooking({ ...req.body, paymentMethod: 'MercadoPago' });
+    const preference = await createMercadoPagoPreference(booking, court, slotDuration);
+    res.status(201).json({ booking, init_point: preference.init_point });
+}));
 
 module.exports = router;
