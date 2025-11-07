@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { settingService } from '../../services/settingService';
+import ScheduleEditor from '../../components/admin/ScheduleEditor'; // --- IMPORTAMOS EL NUEVO COMPONENTE ---
+
+// --- FUNCIÓN DE UTILIDAD ---
+// Crea un horario por defecto (todo cerrado)
+const createDefaultSchedule = () => {
+  const defaultSchedule = {};
+  for (let i = 0; i < 7; i++) {
+    // 48 bloques de 30 min (24 horas * 2)
+    defaultSchedule[i] = Array(48).fill(false);
+  }
+  return defaultSchedule;
+};
+// -------------------------
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -7,6 +20,11 @@ const SettingsPage = () => {
     WHATSAPP_SENDER_NUMBER: '',
     WHATSAPP_API_TOKEN: '',
   });
+  
+  // --- NUEVO ESTADO PARA EL HORARIO ---
+  const [businessHours, setBusinessHours] = useState(null);
+  // ------------------------------------
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -17,7 +35,17 @@ const SettingsPage = () => {
       try {
         setLoading(true);
         const data = await settingService.getSettings();
-        setSettings(prev => ({ ...prev, ...data }));
+        
+        // Separamos el horario del resto de las configuraciones
+        const { BUSINESS_HOURS, ...otherSettings } = data;
+        setSettings(prev => ({ ...prev, ...otherSettings }));
+
+        if (BUSINESS_HOURS) {
+          setBusinessHours(JSON.parse(BUSINESS_HOURS));
+        } else {
+          setBusinessHours(createDefaultSchedule());
+        }
+
       } catch (err) {
         setError('No se pudieron cargar las configuraciones.');
       } finally {
@@ -35,13 +63,27 @@ const SettingsPage = () => {
     }));
   };
 
+  // --- FUNCIÓN PARA ACTUALIZAR EL HORARIO ---
+  const handleScheduleChange = useCallback((newSchedule) => {
+    setBusinessHours(newSchedule);
+  }, []);
+  // ----------------------------------------
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     setSuccess('');
+    
+    // --- PREPARAMOS TODOS LOS DATOS PARA GUARDAR ---
+    const settingsToSave = {
+      ...settings,
+      BUSINESS_HOURS: JSON.stringify(businessHours),
+    };
+    // ---------------------------------------------
+
     try {
-      await settingService.updateSettings(settings);
+      await settingService.updateSettings(settingsToSave);
       setSuccess('¡Configuración guardada con éxito!');
     } catch (err) {
       setError('Error al guardar la configuración.');
@@ -50,13 +92,28 @@ const SettingsPage = () => {
     }
   };
 
-  if (loading) return <div className="text-center p-8">Cargando configuración...</div>;
+  if (loading || !businessHours) return <div className="text-center p-8">Cargando configuración...</div>;
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Configuración del Sistema</h1>
 
-      <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg max-w-2xl mx-auto">
+      <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg max-w-5xl mx-auto">
+        
+        {/* --- NUEVO EDITOR DE HORARIOS --- */}
+        <fieldset className="border border-gray-700 p-4 rounded-lg mb-6">
+          <legend className="px-2 text-lg font-semibold text-primary">Horarios de Apertura</legend>
+          <p className="text-sm text-text-secondary mb-4">
+            Selecciona los bloques de 30 minutos en los que el club está abierto. 
+            (Click y arrastra para seleccionar/deseleccionar).
+          </p>
+          <ScheduleEditor 
+            schedule={businessHours} 
+            onChange={handleScheduleChange} 
+          />
+        </fieldset>
+        {/* ------------------------------- */}
+
         <div className="space-y-6">
           <fieldset className="border border-gray-700 p-4 rounded-lg">
             <legend className="px-2 text-lg font-semibold text-primary">Mercado Pago</legend>
