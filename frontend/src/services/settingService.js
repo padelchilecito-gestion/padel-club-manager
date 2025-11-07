@@ -20,7 +20,21 @@ const updateSettings = async (settingsData) => {
   }
 };
 
+// --- NUEVA FUNCIÓN PÚBLICA ---
+const getPublicBusinessHours = async () => {
+  try {
+    // Esta ruta la creamos en server/routes/settings.js y es pública
+    const response = await apiClient.get('/settings/business-hours');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching business hours:', error);
+    throw error.response?.data || error;
+  }
+};
+// ----------------------------
+
 export const settingService = {
   getSettings,
   updateSettings,
+  getPublicBusinessHours, // <-- Añadimos la nueva función a la exportación
 };
