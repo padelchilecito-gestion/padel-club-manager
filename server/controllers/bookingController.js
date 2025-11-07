@@ -111,7 +111,7 @@ const createBookingCash = asyncHandler(async (req, res) => {
   });
 
   if (booking) {
-    await logActivity('Booking', booking._id, 'create_cash', req.user ? req.user._id : null, { clientName, startTime });
+    await logActivity(req.user, 'booking_create_cash', `Reserva en efectivo creada para ${booking.clientName} (ID: ${booking._id})`);
     res.status(201).json(booking);
   } else {
     res.status(400);
@@ -212,7 +212,7 @@ const createBookingMercadoPago = asyncHandler(async (req, res) => {
 
   try {
     const responseMp = await mercadopago.preferences.create(preference);
-    await logActivity('Booking', newBooking._id, 'init_mercadopago', req.user ? req.user._id : null, { preferenceId: responseMp.body.id });
+    await logActivity(req.user, 'booking_init_mp', `Inicio de pago con MP para ${newBooking.clientName} (ID: ${newBooking._id})`);
     res.json({ init_point: responseMp.body.init_point }); // Devolvemos la URL de redirección
   } catch (mpError) {
     console.error('Error al crear preferencia de Mercado Pago:', mpError);
@@ -260,7 +260,7 @@ const updateBooking = asyncHandler(async (req, res) => {
     booking.notes = notes || booking.notes;
 
     const updatedBooking = await booking.save();
-    await logActivity('Booking', updatedBooking._id, 'update', req.user._id, { status: updatedBooking.status });
+    await logActivity(req.user, 'booking_update_status', `Estado de reserva ID ${updatedBooking._id} cambiado a ${updatedBooking.status}`);
     res.json(updatedBooking);
   } else {
     res.status(404);
@@ -273,7 +273,7 @@ const deleteBooking = asyncHandler(async (req, res) => {
 
   if (booking) {
     await booking.deleteOne();
-    await logActivity('Booking', req.params.id, 'delete', req.user._id, { id: req.params.id });
+    await logActivity(req.user, 'booking_delete', `Reserva ID ${req.params.id} eliminada.`);
     res.json({ message: 'Reserva eliminada' });
   } else {
     res.status(404);

@@ -1,41 +1,54 @@
 // frontend/src/services/paymentService.js (CORREGIDO)
 import api from './api';
 
+const PAYMENT_API_URL = '/api/payments';
+
 /**
- * Crea una preferencia de pago UNIFICADA para QR.
- * Puede recibir un 'saleId' o un 'bookingId'.
- * @param {object} paymentData - { items, totalAmount, saleId, bookingId }
+ * Crea una preferencia de pago para una RESERVA.
  */
-const createQrPayment = async (paymentData) => {
+const createMercadoPagoPreference = async (bookingData) => {
   try {
-    // Llama a la ruta unificada del backend
-    const { data } = await api.post('/payments/create-qr', paymentData);
-    return data;
+    const { data } = await api.post(`${PAYMENT_API_URL}/create-preference`, bookingData);
+    return data; // Devuelve { init_point, preferenceId }
   } catch (error) {
-    console.error('Error al crear la preferencia de pago QR:', error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al crear QR');
+    throw error.response?.data?.message || error.message;
   }
 };
 
 /**
- * Obtiene el estado de un pago desde MercadoPago.
- * @param {string} paymentId - El ID del pago de MP
+ * Obtiene el estado de un pago.
  */
 const getPaymentStatus = async (paymentId) => {
   try {
-    const { data } = await api.get(`/payments/status/${paymentId}`);
-    return data;
+    const { data } = await api.get(`${PAYMENT_API_URL}/status/${paymentId}`);
+    return data; // Devuelve el estado del pago
   } catch (error) {
-    console.error('Error al obtener el estado del pago:', error.response?.data);
-    throw new Error(error.response?.data?.message || 'Error al verificar pago');
+    throw error.response?.data?.message || error.message;
   }
 };
 
 // --- INICIO DE LA CORRECCIÓN ---
-// Exportamos un objeto como 'default' para que la importación
-// 'import paymentService from ...' funcione en los componentes.
-export default {
-  createQrPayment,
-  getPaymentStatus,
+/**
+ * Crea una preferencia de pago para el POS (Punto de Venta).
+ * @param {object} posData - { items, totalAmount, saleId }
+ * @returns {Promise<object>} { init_point, preferenceId }
+ */
+const generatePosQR = async (posData) => {
+  try {
+    // Llama a la nueva ruta del backend
+    const { data } = await api.post(`${PAYMENT_API_URL}/create-pos-preference`, posData);
+    return data;
+  } catch (error) {
+    console.error('Error en generatePosQR service:', error);
+    throw new Error(error.response?.data?.message || 'Error al generar QR para POS');
+  }
 };
 // --- FIN DE LA CORRECCIÓN ---
+
+const paymentService = {
+  createMercadoPagoPreference,
+  getPaymentStatus,
+  generatePosQR, // <-- Exportar la nueva función
+};
+
+export default paymentService;
