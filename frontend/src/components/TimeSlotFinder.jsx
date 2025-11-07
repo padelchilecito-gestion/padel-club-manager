@@ -1,22 +1,46 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
-import { format, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
+// --- SERVICIO IMPORTADO ---
+import { settingService } from '../services/settingService';
+// --- FUNCIONES DE DATE-FNS IMPORTADAS ---
+import { format, addMinutes, setHours, setMinutes, startOfDay, getDay } from 'date-fns';
 
-// Helper to generate time slots for a day
-const generateTimeSlots = (date, bookedSlots) => {
+// --- LÓGICA DE GENERACIÓN DE TURNOS REESCRITA ---
+/**
+ * Genera los turnos de 30 min basándose en 3 criterios:
+ * 1. El turno es en el futuro.
+ * 2. El turno NO está ya reservado (bookedSlots).
+ * 3. El club ESTÁ abierto en ese horario (businessHours).
+ */
+const generateTimeSlots = (date, bookedSlots, businessHours) => {
     const slots = [];
+    if (!businessHours) return slots; // No generar nada si no se cargaron los horarios
+
     const now = new Date();
     const dayStart = startOfDay(date);
+    const dayIndex = getDay(date); // 0 = Domingo, 1 = Lunes, ...
 
-    for (let i = 8 * 60; i < 23 * 60; i += 30) { // De 8:00 a 22:30, en intervalos de 30 min
-        const slotStart = setMinutes(setHours(dayStart, 0), i);
-        if (slotStart < now) continue; // Skip past slots
+    const scheduleForDay = businessHours[dayIndex];
+    if (!scheduleForDay) return slots; // No hay horario para este día
 
+    // Iteramos por los 48 bloques de 30 minutos del día (24 horas * 2)
+    for (let i = 0; i < 48; i++) {
+        const slotStart = addMinutes(dayStart, i * 30);
+        
+        // Criterio 1: El turno es en el futuro
+        if (slotStart < now) continue;
+
+        // Criterio 2: El club ESTÁ abierto (basado en la grilla)
+        // scheduleForDay[i] debe ser 'true'
+        if (!scheduleForDay[i]) continue;
+
+        // Criterio 3: El turno NO está ya reservado
         const slotEnd = addMinutes(slotStart, 30);
         const isBooked = bookedSlots.some(booked => {
             const bookedStart = new Date(booked.startTime);
             const bookedEnd = new Date(booked.endTime);
+            // Revisa si el slot (ej: 10:00-10:30) se superpone con una reserva (ej: 09:30-10:30)
             return (slotStart < bookedEnd && slotEnd > bookedStart);
         });
 
@@ -26,26 +50,30 @@ const generateTimeSlots = (date, bookedSlots) => {
     }
     return slots;
 };
-
+// ------------------------------------------------
 
 const TimeSlotFinder = () => {
     const [courts, setCourts] = useState([]);
     const [selectedCourt, setSelectedCourt] = useState('');
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    
+    // --- NUEVO ESTADO PARA HORARIOS ---
+    const [businessHours, setBusinessHours] = useState(null);
+    // ----------------------------------
+
     const [bookedSlots, setBookedSlots] = useState([]);
     const [availableSlots, setAvailableSlots] = useState([]);
     const [selectedSlots, setSelectedSlots] = useState([]);
 
-    // --- NUEVOS ESTADOS ---
     const [showUserForm, setShowUserForm] = useState(false);
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
-    // ----------------------
-
-    const [loading, setLoading] = useState(false);
+    
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [bookingError, setBookingError] = useState('');
 
+    // Efecto 1: Cargar canchas (sin cambios)
     useEffect(() => {
         const fetchCourts = async () => {
             try {
@@ -65,6 +93,23 @@ const TimeSlotFinder = () => {
         fetchCourts();
     }, []);
 
+    // --- NUEVO EFECTO ---
+    // Efecto 2: Cargar horarios de apertura
+    useEffect(() => {
+        const fetchBusinessHours = async () => {
+            try {
+                const hoursData = await settingService.getPublicBusinessHours();
+                setBusinessHours(hoursData);
+            } catch (err) {
+                // No bloqueamos al usuario, pero mostramos un error si falla
+                setError(prev => prev + ' No se pudieron cargar los horarios del club.');
+            }
+        };
+        fetchBusinessHours();
+    }, []);
+    // --------------------
+
+    // Efecto 3: Cargar turnos ocupados (sin cambios)
     useEffect(() => {
         if (!selectedCourt || !selectedDate) return;
         const fetchAvailability = async () => {
@@ -82,15 +127,22 @@ const TimeSlotFinder = () => {
         fetchAvailability();
     }, [selectedCourt, selectedDate]);
 
+    // --- EFECTO MODIFICADO ---
+    // Efecto 4: Generar turnos disponibles
+    // Ahora depende de businessHours
     useEffect(() => {
-        const dateForSlots = new Date(selectedDate + 'T00:00:00');
-        const slots = generateTimeSlots(dateForSlots, bookedSlots);
+        const dateForSlots = new Date(selectedDate + 'T00:00:00'); // Asume zona horaria local
+        
+        // Pasamos los horarios de apertura a la función
+        const slots = generateTimeSlots(dateForSlots, bookedSlots, businessHours);
+        
         setAvailableSlots(slots);
         setSelectedSlots([]);
-    }, [bookedSlots, selectedDate]);
+    }, [bookedSlots, selectedDate, businessHours]);
+    // -------------------------
 
     const handleSlotClick = (slot) => {
-        setShowUserForm(false); // Ocultar formulario si se cambia la selección
+        setShowUserForm(false); 
         setSelectedSlots(prev =>
             prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot].sort((a, b) => a - b)
         );
@@ -113,7 +165,7 @@ const TimeSlotFinder = () => {
             return;
         }
         setBookingError('');
-        setShowUserForm(true); // Mostrar el formulario de datos del usuario
+        setShowUserForm(true);
     };
 
     const handleFinalizeBooking = async (paymentMethod) => {
@@ -152,7 +204,6 @@ const TimeSlotFinder = () => {
                 const newBooking = await bookingService.createBooking(bookingData);
                 alert(`¡Reserva confirmada! Tu turno para el ${format(new Date(newBooking.startTime), 'dd/MM/yyyy HH:mm')} ha sido creado.`);
 
-                // Limpiar y recargar
                 setShowUserForm(false);
                 setUserName('');
                 setUserPhone('');
@@ -201,8 +252,11 @@ const TimeSlotFinder = () => {
 
             <div className="mb-6">
                 <h3 className="text-xl font-semibold text-text-primary mb-3">Turnos Disponibles</h3>
-                {loading && <p className="text-text-secondary">Cargando turnos...</p>}
-                {!loading && availableSlots.length > 0 ? (
+                {(loading || !businessHours) && <p className="text-text-secondary">Cargando turnos...</p>}
+                
+                {/* --- LÓGICA DE RENDERIZADO MODIFICADA --- */}
+                {/* Solo mostramos slots si businessHours cargó */}
+                {businessHours && !loading && availableSlots.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                         {availableSlots.map(slot => (
                             <button
@@ -219,27 +273,23 @@ const TimeSlotFinder = () => {
                         ))}
                     </div>
                 ) : (
-                    !loading && <p className="text-text-secondary">No hay turnos disponibles para esta fecha.</p>
+                    businessHours && !loading && <p className="text-text-secondary">No hay turnos disponibles para esta fecha.</p>
                 )}
+                {/* -------------------------------------- */}
             </div>
 
-            {/* --- SECCIÓN DE RESUMEN Y FORMULARIO MODIFICADA --- */}
             {selectedSlots.length > 0 && (
                 <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
                     <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
-
-                    {/* Muestra el rango de horas */}
                     <p className="text-text-primary mt-2">
                         Horario: <span className="font-semibold">{format(startTime, 'HH:mm')} a {format(endTime, 'HH:mm')}</span>
                     </p>
-
                     <p className="text-2xl font-bold text-secondary mt-2">
                         Total: ${totalPrice.toFixed(2)}
                     </p>
 
                     {bookingError && <p className="text-danger text-sm mt-2">{bookingError}</p>}
 
-                    {/* Si el formulario no está visible, muestra el botón para continuar */}
                     {!showUserForm && (
                          <button
                             onClick={handleProceedToBooking}
@@ -249,7 +299,6 @@ const TimeSlotFinder = () => {
                         </button>
                     )}
 
-                    {/* Formulario de datos del usuario (condicional) */}
                     {showUserForm && (
                         <div className="mt-4 pt-4 border-t border-gray-600">
                             <h4 className="text-md font-semibold text-text-primary mb-3">Completa tus datos</h4>
