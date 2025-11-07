@@ -1,3 +1,4 @@
+// server/routes/sales.js (CORREGIDO Y VERIFICADO)
 const express = require('express');
 const router = express.Router();
 const {
@@ -5,24 +6,20 @@ const {
   getSales,
   getSaleById,
   updateSale,
-  deleteSale
+  deleteSale,
 } = require('../controllers/saleController');
-const { protect, admin, adminOrOperator } = require('../middlewares/authMiddleware');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
 
-// Proteger todas las rutas de ventas
 router.use(protect);
+router.use(adminOrOperator);
 
-// Rutas para Admin y Operadores
 router.route('/')
-  .post(adminOrOperator, createSale)
-  .get(adminOrOperator, getSales);
+  .get(getSales)
+  .post(createSale);
 
 router.route('/:id')
-  .get(adminOrOperator, getSaleById);
-
-// Rutas exclusivas para Admin
-router.route('/:id')
-  .put(admin, updateSale)
-  .delete(admin, deleteSale);
+  .get(getSaleById)
+  .put(updateSale)
+  .delete(deleteSale);
 
 module.exports = router;

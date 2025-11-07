@@ -1,20 +1,25 @@
-// server/routes/payments.js (VERSIÓN UNIFICADA FINAL)
+// server/routes/payments.js (CORREGIDO)
 const express = require('express');
 const router = express.Router();
 const {
-  createQrPayment,
-  handleWebhook,
-  getPaymentStatus
-} = require('../controllers/paymentController'); // <-- Importa las funciones correctas
-const { protect, adminOrOperator } = require('../middlewares/authMiddleware');
+  createMercadoPagoPreference,
+  handleMercadoPagoWebhook,
+  getPaymentStatus,
+  createPosPreference, // <-- 1. Importar la nueva función
+} = require('../controllers/paymentController');
+const { protect, adminOrOperator } = require('../middlewares/authMiddleware'); // <-- 2. Importar middlewares
 
-// Ruta UNIFICADA para crear QR (para POS y Reservas)
-router.post('/create-qr', protect, adminOrOperator, createQrPayment);
+// Webhook de Mercado Pago (es público)
+router.post('/webhook', handleMercadoPagoWebhook);
 
-// Ruta pública para recibir notificaciones de Mercado Pago
-router.post('/webhook', handleWebhook);
+// Ruta para reservas (protegida por login)
+router.post('/create-preference', protect, createMercadoPagoPreference);
 
-// Ruta para verificar el estado de un pago
-router.get('/status/:paymentId', protect, getPaymentStatus);
+// --- INICIO DE LA CORRECCIÓN ---
+// 3. Añadir la nueva ruta para el POS (protegida por Admin/Operador)
+router.post('/create-pos-preference', protect, adminOrOperator, createPosPreference);
+// --- FIN DE LA CORRECCIÓN ---
+
+router.get('/status/:id', protect, getPaymentStatus);
 
 module.exports = router;
