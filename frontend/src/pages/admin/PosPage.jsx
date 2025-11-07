@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
-import { bookingService } from '../../services/bookingService'; // For Mercado Pago preference
+import { bookingService } from '../../services/bookingService';
 import { PlusCircleIcon, MinusCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
+// --- AÑADIDO ---
+import QRCode from 'react-qr-code';
+// ---------------
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -11,7 +14,7 @@ const PosPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [paymentQR, setPaymentQR] = useState('');
+  const [paymentQR, setPaymentQR] = useState(''); // Esto guardará el link para el QR
   const { user } = useAuth();
 
   const fetchProducts = async () => {
@@ -93,23 +96,36 @@ const PosPage = () => {
         setCart([]);
         fetchProducts(); // Refetch products to update stock
       } else if (paymentMethod === 'Mercado Pago') {
+        
+        // --- CORRECCIÓN ---
+        // El objeto payer era el que faltaba y causaba el crash
         const paymentData = {
           items: [{
             title: 'Compra en Padel Club',
             unit_price: total,
             quantity: 1,
           }],
+          payer: {
+            name: "Cliente", // Puedes usar un dato genérico
+            email: "test_user@test.com" // MP requiere un email
+          },
           metadata: { 
             sale_items: saleData.items,
             user_id: user._id,
             username: user.username,
           }
         };
+        // ------------------
+
         const preference = await bookingService.createPaymentPreference(paymentData);
-        alert(`Pago con Mercado Pago: Redirigir a ${preference.init_point} o mostrar QR.`);
+        
+        // --- MODIFICADO ---
+        // Guardamos el link para mostrar el QR
         setPaymentQR(preference.init_point);
-        setCart([]); // Clear cart assuming payment will be completed
-        fetchProducts();
+        // ------------------
+
+        setCart([]); // Limpiamos el carrito
+        fetchProducts(); // Recargamos el stock
       }
     } catch (err) {
       setError(err.message || 'No se pudo completar la venta.');
@@ -118,24 +134,29 @@ const PosPage = () => {
     }
   };
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
-      <div className="lg:col-span-2 bg-dark-secondary p-4 rounded-lg overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">Productos</h2>
-        <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
-        {loading && <p>Cargando...</p>}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map(product => (
-            <div key={product._id} onClick={() => addToCart(product)} className="bg-dark-primary p-3 rounded-lg text-center cursor-pointer hover:bg-primary-dark transition-colors">
-              <img src={product.imageUrl || 'https://via.placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
-              <p className="font-semibold truncate">{product.name}</p>
-              <p className="text-sm text-secondary">${product.price.toFixed(2)}</p>
-            </div>
-          ))}
+  // --- AÑADIDO ---
+  // Lógica para mostrar el QR o el carrito
+  const renderCartOrQR = () => {
+    if (paymentQR) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full">
+          <h2 className="text-xl font-bold mb-4 text-primary">Escanea para Pagar</h2>
+          <div className="bg-white p-4 rounded-lg">
+            <QRCode value={paymentQR} size={256} />
+          </div>
+          <p className="text-2xl font-bold text-secondary mt-4">${total.toFixed(2)}</p>
+          <button 
+            onClick={() => setPaymentQR('')} 
+            className="w-full mt-4 bg-gray-600 hover:bg-gray-500 text-white font-bold p-3 rounded-md"
+          >
+            Nueva Venta
+          </button>
         </div>
-      </div>
+      );
+    }
 
-      <div className="bg-dark-secondary p-4 rounded-lg flex flex-col">
+    return (
+      <>
         <h2 className="text-2xl font-bold mb-4">Carrito</h2>
         <div className="flex-grow overflow-y-auto">
           {cart.length === 0 ? (
@@ -165,9 +186,35 @@ const PosPage = () => {
           {error && <p className="text-danger text-center text-sm mb-2">{error}</p>}
           <div className="grid grid-cols-2 gap-4">
             <button onClick={() => handleFinalizeSale('Efectivo')} className="bg-secondary text-white font-bold p-3 rounded-md hover:bg-opacity-80 disabled:opacity-50" disabled={loading || cart.length === 0}>Efectivo</button>
-            <button onClick={() => handleFinalizeSale('Mercado Pago')} className="bg-blue-500 text-white font-bold p-3 rounded-md hover:bg-blue-600 disabled:opacity-50" disabled={loading || cart.length === 0}>Mercado Pago</button>
+            <button onClick={() => handleFinalizeSale('Mercado Pago')} className="bg-blue-500 text-white font-bold p-3 rounded-md hover:bg-blue-600 disabled:opacity-50" disabled={loading || cart.length === 0}>Mercado Pago (QR)</button>
           </div>
         </div>
+      </>
+    );
+  };
+  // ------------------
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
+      <div className="lg:col-span-2 bg-dark-secondary p-4 rounded-lg overflow-y-auto">
+        <h2 className="text-2xl font-bold mb-4">Productos</h2>
+        <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.trg.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
+        {loading && <p>Cargando...</p>}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredProducts.map(product => (
+            <div key={product._id} onClick={() => addToCart(product)} className="bg-dark-primary p-3 rounded-lg text-center cursor-pointer hover:bg-primary-dark transition-colors">
+              <img src={product.imageUrl || 'https://via.placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
+              <p className="font-semibold truncate">{product.name}</p>
+              <p className="text-sm text-secondary">${product.price.toFixed(2)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-dark-secondary p-4 rounded-lg flex flex-col">
+        {/* --- MODIFICADO --- */}
+        {renderCartOrQR()}
+        {/* ------------------ */}
       </div>
     </div>
   );
