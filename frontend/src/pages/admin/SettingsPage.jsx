@@ -98,7 +98,12 @@ const SettingsPage = () => {
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Configuración del Sistema</h1>
 
-      <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg max-w-5xl mx-auto">
+      {/* --- CORRECCIÓN DE ESTILO ---
+        Se eliminaron las clases 'max-w-5xl' y 'mx-auto' del formulario.
+        Esto permite que el formulario ocupe todo el ancho del contenedor principal,
+        solucionando el problema del "marco corto" que viste en la captura.
+      */}
+      <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg">
         
         {/* --- NUEVO EDITOR DE HORARIOS --- */}
         <fieldset className="border border-gray-700 p-4 rounded-lg mb-6">
