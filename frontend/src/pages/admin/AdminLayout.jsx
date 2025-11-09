@@ -23,7 +23,13 @@ const AdminLayout = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-dark-primary p-6">
+        {/* --- CORRECCIÓN DE ESTILO ---
+          Se eliminó 'overflow-x-hidden' de la clase de <main>.
+          Esto permitía que el layout principal bloqueara el scroll horizontal 
+          del componente ScheduleEditor en la página de Configuración.
+          Ahora, <main> solo gestiona el scroll vertical.
+        */}
+        <main className="flex-1 overflow-y-auto bg-dark-primary p-6">
           <Routes>
             {/* Redirect /admin to /admin/dashboard */}
             <Route index element={<Navigate to="dashboard" replace />} />
