@@ -5,10 +5,10 @@ const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')
 
 // Componente de celda individual (30 min)
 const TimeSlot = ({ isSet, onToggle }) => (
-  <div
+  <td
     onMouseDown={onToggle}
     onMouseEnter={onToggle}
-    className={`w-full h-8 border-b border-r border-gray-700 cursor-pointer ${
+    className={`h-8 border-b border-r border-gray-700 cursor-pointer ${
       isSet ? 'bg-secondary' : 'bg-dark-primary hover:bg-gray-600'
     }`}
   />
@@ -60,26 +60,34 @@ const ScheduleEditor = ({ schedule, onChange }) => {
   };
 
   return (
-    <div className="w-full overflow-x-auto" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-      <table className="min-w-full border-collapse border border-gray-700 table-fixed">
+    <div className="w-full overflow-x-auto rounded-lg border border-gray-700" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+      {/* --- CORRECCIÓN DE ESTILO ---
+        Se eliminó 'min-w-full' y se cambió 'border-collapse' por 'border-spacing-0'
+        para asegurar que el overflow-x-auto funcione correctamente.
+      */}
+      <table className="border-spacing-0 border-gray-700 table-fixed">
         <thead className="bg-dark-primary">
           <tr>
-            <th className="w-24 border-r border-gray-700 p-2 text-xs">Día</th>
+            <th className="w-24 border-r border-b border-gray-700 p-2 text-xs sticky left-0 z-10 bg-dark-primary">Día</th>
             {hours.map(hour => (
-              <th key={hour} colSpan={2} className="w-16 border-r border-gray-700 p-2 text-xs font-normal text-text-secondary">
+              <th key={hour} colSpan={2} className="w-16 border-r border-b border-gray-700 p-2 text-xs font-normal text-text-secondary">
                 {hour}:00
               </th>
             ))}
-            <th className="w-32 border-l border-gray-700 p-2 text-xs">Acciones</th>
+            <th className="w-32 border-l border-b border-gray-700 p-2 text-xs sticky right-0 z-10 bg-dark-primary">Acciones</th>
           </tr>
         </thead>
         <tbody className="select-none">
           {days.map((day, dayIndex) => (
             <tr key={dayIndex} className="border-t border-gray-700">
-              <td className="border-r border-gray-700 p-2 text-center font-semibold text-text-primary">
+              {/* --- ESTILO MEJORADO ---
+                Añadimos 'sticky left-0' para fijar el día al hacer scroll horizontal
+              */}
+              <td className="border-r border-gray-700 p-2 text-center font-semibold text-text-primary sticky left-0 z-10 bg-dark-secondary">
                 {day}
               </td>
-              {schedule[dayIndex].map((isSet, slotIndex) => (
+              
+              {schedule && schedule[dayIndex] && schedule[dayIndex].map((isSet, slotIndex) => (
                 <TimeSlot
                   key={slotIndex}
                   isSet={isSet}
@@ -92,7 +100,11 @@ const ScheduleEditor = ({ schedule, onChange }) => {
                   }}
                 />
               ))}
-               <td className="border-l border-gray-700 p-2 text-center">
+
+               {/* --- ESTILO MEJORADO ---
+                Añadimos 'sticky right-0' para fijar las acciones al hacer scroll
+              */}
+               <td className="border-l border-gray-700 p-2 text-center sticky right-0 z-10 bg-dark-secondary">
                  <button type="button" onClick={() => handleSelectAll(dayIndex)} className="text-xs text-secondary hover:text-green-300">Todo</button>
                  <span className="text-gray-600 mx-1">|</span>
                  <button type="button" onClick={() => handleClearAll(dayIndex)} className="text-xs text-danger hover:text-red-400">Nada</button>
