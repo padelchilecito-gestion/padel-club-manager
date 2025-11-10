@@ -1,92 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { logService } from '../../services/logService';
-import { format } from 'date-fns';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Sidebar from '../../components/admin/Sidebar';
+import AdminHeader from '../../components/admin/AdminHeader';
+import DashboardPage from './DashboardPage';
+import BookingsPage from './BookingsPage';
+import PosPage from './PosPage';
+import InventoryPage from './InventoryPage';
+import CourtsPage from './CourtsPage';
+import UsersPage from './UsersPage';
+import ReportsPage from './ReportsPage';
+import ActivityLogPage from './ActivityLogPage';
+import SettingsPage from './SettingsPage';
 
-const ActivityLogPage = () => {
-  const [logData, setLogData] = useState({ logs: [], totalPages: 1, page: 1 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+// Import route protectors
+import ProtectedRoute from '../../components/auth/ProtectedRoute';
+import AdminRoute from '../../components/auth/AdminRoute';
 
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        setLoading(true);
-        const data = await logService.getLogs(currentPage);
-        setLogData(data);
-      } catch (err) {
-        setError('No se pudo cargar el registro de actividad.');
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchLogs();
-  }, [currentPage]);
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, logData.totalPages));
-  };
-
-  if (loading && currentPage === 1) return <div className="text-center p-8">Cargando actividad...</div>;
-  if (error) return <div className="text-center p-8 text-danger">{error}</div>;
-
+const AdminLayout = () => {
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-text-primary mb-6">Registro de Actividad</h1>
+    <div className="flex h-screen bg-dark-primary text-text-primary">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader />
+        {/* --- CORRECCIÓN ---
+          Se eliminó 'overflow-x-hidden' de la clase de <main>.
+          Esto bloqueaba el scroll horizontal de los componentes hijos (como la grilla de horarios).
+        */}
+        <main className="flex-1 overflow-y-auto bg-dark-primary p-6">
+          <Routes>
+            {/* Redirect /admin to /admin/dashboard */}
+            <Route index element={<Navigate to="dashboard" replace />} />
 
-      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
-        <table className="w-full text-sm text-left text-text-secondary">
-          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
-            <tr>
-              <th scope="col" className="px-6 py-3">Fecha y Hora</th>
-              <th scope="col" className="px-6 py-3">Usuario</th>
-              <th scope="col" className="px-6 py-3">Acción</th>
-              <th scope="col" className="px-6 py-3">Detalles</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logData.logs.map((log) => (
-              <tr key={log._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                <td className="px-6 py-4 font-mono text-xs">{format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm:ss')}</td>
-                <td className="px-6 py-4 font-medium text-text-primary">{log.username}</td>
-                <td className="px-6 py-4">
-                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-dark-primary text-text-secondary">
-                      {log.action}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{log.details}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            {/* Routes for Operator and Admin */}
+            <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
+            <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
+            <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+            <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
 
-      <div className="flex justify-between items-center mt-4">
-        <button
-          onClick={handlePrevPage}
-          disabled={currentPage === 1 || loading}
-          className="px-4 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-md disabled:opacity-50"
-        >
-          Anterior
-        </button>
-        <span className="text-text-secondary">
-          Página {logData.page} de {logData.totalPages}
-        </span>
-        <button
-          onClick={handleNextPage}
-          disabled={currentPage === logData.totalPages || loading}
-          className="px-4 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-md disabled:opacity-50"
-        >
-          Siguiente
-        </button>
+            {/* Routes for Admin only */}
+            <Route path="users" element={<AdminRoute><UsersPage /></AdminRoute>} />
+            <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
+            <Route path="logs" element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
+            <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+
+            {/* Fallback for any other admin route */}
+            <Route path="*" element={<h1 className="text-white">Página no encontrada en el panel</h1>} />
+          </Routes>
+        </main>
       </div>
     </div>
   );
 };
 
-export default ActivityLogPage;
+export default AdminLayout;
