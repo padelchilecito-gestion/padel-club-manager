@@ -22,15 +22,7 @@ const createBooking = async (bookingData) => {
   }
 };
 
-const createPaymentPreference = async (paymentData) => {
-    try {
-        const response = await apiClient.post('/payments/create-preference', paymentData);
-        return response.data;
-    } catch (error) {
-        console.error('Error creating payment preference:', error);
-        throw error.response?.data || error;
-    }
-};
+// --- createPaymentPreference HA SIDO MOVIDO A paymentService.js ---
 
 const getAllBookings = async () => {
     try {
@@ -62,10 +54,10 @@ const cancelBooking = async (id) => {
     }
 }
 
+// Actualizamos la exportación
 export const bookingService = {
   getAvailability,
   createBooking,
-  createPaymentPreference,
   getAllBookings,
   updateBookingStatus,
   cancelBooking,
