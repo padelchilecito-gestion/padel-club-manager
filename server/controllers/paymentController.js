@@ -49,6 +49,7 @@ const createPaymentPreference = async (req, res) => {
 // @access  Public
 const receiveWebhook = async (req, res) => {
   const { type, data } = req.body;
+  const io = req.app.get('socketio'); // Obtenemos socket.io
 
   if (type === 'payment') {
     try {
@@ -58,8 +59,39 @@ const receiveWebhook = async (req, res) => {
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
 
-        // Check if it's a booking payment
-        if (metadata && metadata.booking_id) {
+        // ----------------------------------------------------
+        // Lógica de Reservas (Modificada para auto-creación)
+        // ----------------------------------------------------
+        if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
+          
+          // NOTA: Esta lógica asume que booking_data viene en los metadatos
+          // (Lo cual implementamos en TimeSlotFinder.jsx)
+          try {
+            const bookingData = metadata.booking_data;
+            
+            // (Podríamos añadir validación de conflicto aquí, pero asumimos que la pref. es de corta duración)
+            
+            const booking = new Booking({
+              court: bookingData.courtId,
+              user: bookingData.user,
+              startTime: bookingData.startTime,
+              endTime: bookingData.endTime,
+              price: bookingData.totalPrice, // Asegúrate que el precio venga
+              status: 'Confirmed',
+              isPaid: true,
+              paymentMethod: 'Mercado Pago',
+            });
+            const createdBooking = await booking.save();
+            console.log(`Booking ${createdBooking._id} created and paid via webhook.`);
+            
+            io.emit('booking_update', createdBooking);
+
+          } catch (bookingError) {
+             console.error('Webhook booking creation failed:', bookingError.message);
+          }
+
+        // Lógica de Reservas (Existente - por si acaso)
+        } else if (metadata && metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
           if (booking) {
             booking.isPaid = true;
@@ -68,12 +100,13 @@ const receiveWebhook = async (req, res) => {
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
             
-            const io = req.app.get('socketio');
             io.emit('booking_update', booking);
           }
         }
 
-        // Check if it's a POS sale payment
+        // ----------------------------------------------------
+        // Lógica de Ventas POS (Modificada para emitir socket)
+        // ----------------------------------------------------
         if (metadata && metadata.sale_items) {
           const saleData = {
             items: metadata.sale_items,
@@ -97,6 +130,12 @@ const receiveWebhook = async (req, res) => {
             await sale.save({ session });
             await session.commitTransaction();
             console.log(`Sale created and stock updated for payment ${data.id}.`);
+            
+            // --- ¡AQUÍ ESTÁ LA MAGIA! ---
+            // Emitimos el evento al frontend (PosPage)
+            io.emit('pos_sale_completed', sale);
+            // -----------------------------
+
           } catch (saleError) {
             await session.abortTransaction();
             console.error('Webhook sale creation failed:', saleError.message);
