@@ -100,18 +100,13 @@ const SettingsPage = () => {
 
       {/* --- CORRECCIÓN DE ESTILO ---
         Se eliminaron las clases 'max-w-5xl' y 'mx-auto' del formulario.
-        Esto permite que el formulario ocupe todo el ancho del contenedor principal,
-        solucionando el problema del "marco corto" que viste en la captura.
+        Esto permite que el formulario (y su fondo) ocupe todo el ancho disponible.
       */}
-      <form onSubmit={handleSubmit} className="bg-dark-secondary p-8 rounded-lg shadow-lg">
+      <form onSubmit={handleSubmit} className="bg-dark-secondary p-4 md:p-8 rounded-lg shadow-lg">
         
         {/* --- NUEVO EDITOR DE HORARIOS --- */}
         <fieldset className="border border-gray-700 p-4 rounded-lg mb-6">
           <legend className="px-2 text-lg font-semibold text-primary">Horarios de Apertura</legend>
-          <p className="text-sm text-text-secondary mb-4">
-            Selecciona los bloques de 30 minutos en los que el club está abierto. 
-            (Click y arrastra para seleccionar/deseleccionar).
-          </p>
           <ScheduleEditor 
             schedule={businessHours} 
             onChange={handleScheduleChange} 
