@@ -1,23 +1,35 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import ShopPage from './pages/ShopPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Navbar from './components/Navbar'; // Importa la nueva Navbar
-
-// --- IMPORTAMOS LAS NUEVAS PÁGINAS DE PAGO ---
+import Navbar from './components/Navbar';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import PaymentFailurePage from './pages/PaymentFailurePage';
-// -------------------------------------------
+import { usePublicSettings } from './contexts/PublicSettingsContext'; // --- IMPORTADO ---
 
 // Componente para el layout de las páginas públicas
 const PublicLayout = () => (
   <>
     <Navbar />
-    <Outlet /> {/* Aquí se renderizarán HomePage, ShopPage y las páginas de pago */}
+    <Outlet /> 
   </>
 );
+
+// --- NUEVO COMPONENTE DE RUTA PROTEGIDA PARA LA TIENDA ---
+const ShopRoute = () => {
+  const { settings } = usePublicSettings();
+  
+  if (!settings.shopEnabled) {
+    // Si la tienda está deshabilitada, redirige al inicio
+    return <Navigate to="/" replace />;
+  }
+  
+  // Si está habilitada, muestra la tienda
+  return <ShopPage />;
+};
+// ----------------------------------------------------
 
 function App() {
   return (
@@ -25,13 +37,13 @@ function App() {
       {/* Rutas Públicas con Navbar */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
         
-        {/* --- AÑADIMOS LAS NUEVAS RUTAS --- */}
+        {/* --- RUTA MODIFICADA --- */}
+        <Route path="/shop" element={<ShopRoute />} />
+        {/* ----------------------- */}
+        
         <Route path="/payment-success" element={<PaymentSuccessPage />} />
         <Route path="/payment-failure" element={<PaymentFailurePage />} />
-        {/* ------------------------------- */}
-
       </Route>
 
       {/* Rutas sin Navbar */}
