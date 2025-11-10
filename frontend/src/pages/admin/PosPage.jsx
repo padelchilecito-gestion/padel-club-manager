@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
-import { bookingService } from '../../services/bookingService';
-import { PlusCircleIcon, MinusCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
+// --- IMPORTAMOS EL NUEVO SERVICIO DE PAGO ---
+import { paymentService } from '../../services/paymentService';
+// ------------------------------------------
+import { PlusCircleIcon, MinusCircleIcon, XCircleIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
-// --- AÑADIDO ---
 import QRCode from 'react-qr-code';
-// ---------------
+// --- IMPORTAMOS EL SOCKET ---
+import socket from '../../services/socketService';
+// ----------------------------
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -14,7 +17,11 @@ const PosPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [paymentQR, setPaymentQR] = useState(''); // Esto guardará el link para el QR
+  
+  const [paymentQR, setPaymentQR] = useState(''); 
+  const [paymentTotal, setPaymentTotal] = useState(0); // Guardamos el total en el momento del pago
+  const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pending, successful
+  
   const { user } = useAuth();
 
   const fetchProducts = async () => {
@@ -32,6 +39,26 @@ const PosPage = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  // --- EFECTO PARA SOCKET.IO ---
+  useEffect(() => {
+    socket.connect();
+    
+    const handleSaleCompleted = (saleData) => {
+      // Comprobamos si el pago recibido coincide con el que estamos esperando
+      if (saleData.total === paymentTotal && paymentStatus === 'pending') {
+          setPaymentStatus('successful');
+      }
+    };
+
+    socket.on('pos_sale_completed', handleSaleCompleted);
+
+    return () => {
+      socket.off('pos_sale_completed', handleSaleCompleted);
+      socket.disconnect();
+    };
+  }, [paymentTotal, paymentStatus]); // Dependemos de estos estados
+  // -----------------------------
 
   const filteredProducts = useMemo(() => {
     return products.filter(p =>
@@ -67,7 +94,7 @@ const PosPage = () => {
     }
   };
 
-  const total = useMemo(() => {
+  const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
@@ -77,7 +104,9 @@ const PosPage = () => {
     setLoading(true);
     setError('');
     setPaymentQR('');
+    setPaymentStatus('idle');
 
+    const saleTotal = cartTotal; // Guardamos el total actual
     const saleData = {
       items: cart.map(item => ({ 
           productId: item._id, 
@@ -85,7 +114,7 @@ const PosPage = () => {
           quantity: item.quantity, 
           price: item.price 
       })),
-      total,
+      total: saleTotal,
       paymentMethod,
     };
 
@@ -97,17 +126,15 @@ const PosPage = () => {
         fetchProducts(); // Refetch products to update stock
       } else if (paymentMethod === 'Mercado Pago') {
         
-        // --- CORRECCIÓN ---
-        // El objeto payer era el que faltaba y causaba el crash
         const paymentData = {
           items: [{
             title: 'Compra en Padel Club',
-            unit_price: total,
+            unit_price: saleTotal,
             quantity: 1,
           }],
           payer: {
-            name: "Cliente", // Puedes usar un dato genérico
-            email: "test_user@test.com" // MP requiere un email
+            name: "Cliente", 
+            email: "test_user@test.com" 
           },
           metadata: { 
             sale_items: saleData.items,
@@ -115,15 +142,15 @@ const PosPage = () => {
             username: user.username,
           }
         };
-        // ------------------
 
-        const preference = await bookingService.createPaymentPreference(paymentData);
+        // --- USAMOS EL NUEVO SERVICIO ---
+        const preference = await paymentService.createPaymentPreference(paymentData);
+        // ---------------------------------
         
-        // --- MODIFICADO ---
-        // Guardamos el link para mostrar el QR
-        setPaymentQR(preference.init_point);
-        // ------------------
-
+        setPaymentTotal(saleTotal); // Guardamos el total que esperamos
+        setPaymentQR(preference.init_point); // Mostramos el QR
+        setPaymentStatus('pending'); // Ponemos el estado en "esperando"
+        
         setCart([]); // Limpiamos el carrito
         fetchProducts(); // Recargamos el stock
       }
@@ -134,27 +161,61 @@ const PosPage = () => {
     }
   };
 
-  // --- AÑADIDO ---
-  // Lógica para mostrar el QR o el carrito
+  const handleNewSale = () => {
+    setPaymentQR('');
+    setPaymentStatus('idle');
+    setPaymentTotal(0);
+    setCart([]);
+    setError('');
+  };
+
+  // --- LÓGICA DE RENDERIZADO MODIFICADA ---
   const renderCartOrQR = () => {
-    if (paymentQR) {
+    
+    // 1. Vista de Pago Exitoso
+    if (paymentStatus === 'successful') {
       return (
-        <div className="flex flex-col items-center justify-center h-full">
-          <h2 className="text-xl font-bold mb-4 text-primary">Escanea para Pagar</h2>
-          <div className="bg-white p-4 rounded-lg">
-            <QRCode value={paymentQR} size={256} />
-          </div>
-          <p className="text-2xl font-bold text-secondary mt-4">${total.toFixed(2)}</p>
+        <div className="flex flex-col items-center justify-center h-full text-center">
+          <CheckCircleIcon className="h-32 w-32 text-secondary" />
+          <h2 className="text-2xl font-bold mt-4 text-text-primary">¡Pago Recibido!</h2>
+          <p className="text-2xl font-bold text-secondary mt-2">${paymentTotal.toFixed(2)}</p>
           <button 
-            onClick={() => setPaymentQR('')} 
-            className="w-full mt-4 bg-gray-600 hover:bg-gray-500 text-white font-bold p-3 rounded-md"
+            onClick={handleNewSale} 
+            className="w-full mt-8 bg-primary hover:bg-primary-dark text-white font-bold p-3 rounded-md"
           >
             Nueva Venta
           </button>
         </div>
       );
     }
+    
+    // 2. Vista de QR (Esperando pago)
+    if (paymentQR) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+          <h2 className="text-xl font-bold mb-4 text-primary">Escanea para Pagar</h2>
+          <div className="bg-white p-4 rounded-lg">
+            <QRCode value={paymentQR} size={256} />
+          </div>
+          <p className="text-2xl font-bold text-secondary mt-4">${paymentTotal.toFixed(2)}</p>
+          
+          {paymentStatus === 'pending' && (
+            <p className="text-lg text-yellow-400 mt-2 animate-pulse">
+              Esperando confirmación de pago...
+            </p>
+          )}
 
+          <button 
+            onClick={handleNewSale} 
+            className="w-full mt-4 bg-gray-600 hover:bg-gray-500 text-white font-bold p-3 rounded-md"
+          >
+            Cancelar / Nueva Venta
+          </button>
+        </div>
+      );
+    }
+
+    // 3. Vista de Carrito (Default)
     return (
       <>
         <h2 className="text-2xl font-bold mb-4">Carrito</h2>
@@ -181,7 +242,7 @@ const PosPage = () => {
         <div className="border-t border-gray-700 pt-4">
           <div className="flex justify-between text-2xl font-bold mb-4">
             <span>Total:</span>
-            <span className="text-primary">${total.toFixed(2)}</span>
+            <span className="text-primary">${cartTotal.toFixed(2)}</span>
           </div>
           {error && <p className="text-danger text-center text-sm mb-2">{error}</p>}
           <div className="grid grid-cols-2 gap-4">
@@ -192,13 +253,13 @@ const PosPage = () => {
       </>
     );
   };
-  // ------------------
+  // ------------------------------------
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
       <div className="lg:col-span-2 bg-dark-secondary p-4 rounded-lg overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">Productos</h2>
-        <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.trg.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
+        <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
         {loading && <p>Cargando...</p>}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.map(product => (
@@ -212,9 +273,7 @@ const PosPage = () => {
       </div>
 
       <div className="bg-dark-secondary p-4 rounded-lg flex flex-col">
-        {/* --- MODIFICADO --- */}
         {renderCartOrQR()}
-        {/* ------------------ */}
       </div>
     </div>
   );
