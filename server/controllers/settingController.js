@@ -42,20 +42,33 @@ const updateSettings = async (req, res) => {
     }
 };
 
-// --- NUEVA FUNCIÓN ---
-// @desc    Get only the business hours
-// @route   GET /api/settings/business-hours
+// --- FUNCIÓN MODIFICADA Y RENOMBRADA ---
+// @desc    Get all public settings
+// @route   GET /api/settings/public
 // @access  Public
-const getPublicBusinessHours = async (req, res) => {
+const getPublicSettings = async (req, res) => {
     try {
-        const businessHoursSetting = await Setting.findOne({ key: 'BUSINESS_HOURS' });
+        // Obtenemos solo las claves públicas que nos interesan
+        const settingsArray = await Setting.find({ 
+            key: { $in: ['BUSINESS_HOURS', 'SHOP_ENABLED'] } 
+        });
+
+        const publicSettings = {
+            businessHours: null,
+            shopEnabled: false // Por defecto, la tienda está deshabilitada
+        };
+
+        settingsArray.forEach(setting => {
+            if (setting.key === 'BUSINESS_HOURS') {
+                publicSettings.businessHours = JSON.parse(setting.value);
+            }
+            if (setting.key === 'SHOP_ENABLED') {
+                publicSettings.shopEnabled = (setting.value === 'true');
+            }
+        });
         
-        if (businessHoursSetting) {
-            res.json(JSON.parse(businessHoursSetting.value));
-        } else {
-            // Si no hay configuración, se devuelve un objeto vacío (todo cerrado)
-            res.json({});
-        }
+        res.json(publicSettings);
+        
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
@@ -66,5 +79,5 @@ const getPublicBusinessHours = async (req, res) => {
 module.exports = {
     getSettings,
     updateSettings,
-    getPublicBusinessHours, // Exportamos la nueva función
+    getPublicSettings, // Exportamos la nueva función
 };
