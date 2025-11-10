@@ -6,7 +6,11 @@ import { utcToZonedTime } from 'date-fns-tz';
 import { PencilIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 import BookingFormModal from '../../components/admin/BookingFormModal';
 
+// --- COMPONENTE 'PaymentActions' MODIFICADO ---
 const PaymentActions = ({ booking, onUpdate }) => {
+  // Estado para controlar el menú
+  const [isOpen, setIsOpen] = useState(false);
+
   if (booking.isPaid) {
     return (
       <span className={`px-2 py-1 text-xs font-semibold rounded-full bg-secondary text-dark-primary`}>
@@ -17,6 +21,7 @@ const PaymentActions = ({ booking, onUpdate }) => {
 
   const handlePayment = (method) => {
     onUpdate(booking._id, 'Confirmed', true, method);
+    setIsOpen(false); // Cerramos el menú
   };
 
   return (
@@ -24,19 +29,30 @@ const PaymentActions = ({ booking, onUpdate }) => {
       <span className={`px-2 py-1 text-xs font-semibold rounded-full bg-gray-500 text-white`}>
         Pendiente
       </span>
-      <div className="relative group">
-        <button className="text-secondary hover:text-green-400" title="Marcar como Pagado">
+      {/* Usamos 'relative' para posicionar el menú */}
+      <div className="relative">
+        <button 
+          // Cambiamos a onClick
+          onClick={() => setIsOpen(!isOpen)} 
+          className="text-secondary hover:text-green-400" 
+          title="Marcar como Pagado"
+        >
           <CurrencyDollarIcon className="h-6 w-6" />
         </button>
-        <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-dark-primary border border-gray-600 rounded-md shadow-lg z-10">
-          <button onClick={() => handlePayment('Efectivo')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Efectivo</button>
-          <button onClick={() => handlePayment('Transferencia')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Transferencia</button>
-          <button onClick={() => handlePayment('QR')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">QR</button>
-        </div>
+        
+        {/* Mostramos el menú condicionalmente */}
+        {isOpen && (
+          <div className="absolute bottom-full mb-2 right-0 bg-dark-primary border border-gray-600 rounded-md shadow-lg z-10 w-36">
+            <button onClick={() => handlePayment('Efectivo')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Efectivo</button>
+            <button onClick={() => handlePayment('Transferencia')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Transferencia</button>
+            <button onClick={() => handlePayment('QR')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">QR</button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+// ---------------------------------------------
 
 
 const BookingsPage = () => {
