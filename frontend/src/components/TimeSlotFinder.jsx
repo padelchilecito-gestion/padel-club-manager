@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
-// --- SERVICIO IMPORTADO ---
 import { settingService } from '../services/settingService';
-// --- FUNCIONES DE DATE-FNS IMPORTADAS ---
+// --- IMPORTAMOS EL NUEVO SERVICIO DE PAGO ---
+import { paymentService } from '../services/paymentService';
+// ------------------------------------------
 import { format, addMinutes, setHours, setMinutes, startOfDay, getDay } from 'date-fns';
 
-// --- LÓGICA DE GENERACIÓN DE TURNOS REESCRITA ---
 /**
  * Genera los turnos de 30 min basándose en 3 criterios:
  * 1. El turno es en el futuro.
@@ -50,30 +50,24 @@ const generateTimeSlots = (date, bookedSlots, businessHours) => {
     }
     return slots;
 };
-// ------------------------------------------------
 
 const TimeSlotFinder = () => {
+    // ... (estados sin cambios)
     const [courts, setCourts] = useState([]);
     const [selectedCourt, setSelectedCourt] = useState('');
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    
-    // --- NUEVO ESTADO PARA HORARIOS ---
     const [businessHours, setBusinessHours] = useState(null);
-    // ----------------------------------
-
     const [bookedSlots, setBookedSlots] = useState([]);
     const [availableSlots, setAvailableSlots] = useState([]);
     const [selectedSlots, setSelectedSlots] = useState([]);
-
     const [showUserForm, setShowUserForm] = useState(false);
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
-    
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [bookingError, setBookingError] = useState('');
 
-    // Efecto 1: Cargar canchas (sin cambios)
+    // ... (Efectos 1, 2, 3 y 4 sin cambios)
     useEffect(() => {
         const fetchCourts = async () => {
             try {
@@ -93,23 +87,18 @@ const TimeSlotFinder = () => {
         fetchCourts();
     }, []);
 
-    // --- NUEVO EFECTO ---
-    // Efecto 2: Cargar horarios de apertura
     useEffect(() => {
         const fetchBusinessHours = async () => {
             try {
                 const hoursData = await settingService.getPublicBusinessHours();
                 setBusinessHours(hoursData);
             } catch (err) {
-                // No bloqueamos al usuario, pero mostramos un error si falla
                 setError(prev => prev + ' No se pudieron cargar los horarios del club.');
             }
         };
         fetchBusinessHours();
     }, []);
-    // --------------------
 
-    // Efecto 3: Cargar turnos ocupados (sin cambios)
     useEffect(() => {
         if (!selectedCourt || !selectedDate) return;
         const fetchAvailability = async () => {
@@ -127,20 +116,15 @@ const TimeSlotFinder = () => {
         fetchAvailability();
     }, [selectedCourt, selectedDate]);
 
-    // --- EFECTO MODIFICADO ---
-    // Efecto 4: Generar turnos disponibles
-    // Ahora depende de businessHours
     useEffect(() => {
         const dateForSlots = new Date(selectedDate + 'T00:00:00'); // Asume zona horaria local
-        
-        // Pasamos los horarios de apertura a la función
         const slots = generateTimeSlots(dateForSlots, bookedSlots, businessHours);
-        
         setAvailableSlots(slots);
         setSelectedSlots([]);
     }, [bookedSlots, selectedDate, businessHours]);
-    // -------------------------
 
+
+    // ... (handleSlotClick y useMemo sin cambios)
     const handleSlotClick = (slot) => {
         setShowUserForm(false); 
         setSelectedSlots(prev =>
@@ -196,11 +180,20 @@ const TimeSlotFinder = () => {
                         quantity: 1,
                     }],
                     payer: { name: userName, email: "test_user@test.com" },
-                    metadata: { bookingData }
+                    // NOTA: Enviamos 'bookingData' en los metadatos
+                    // El webhook usará esto para crear la reserva DESPUÉS de que se apruebe el pago.
+                    // (Esto requiere una actualización en paymentController.js que ya hicimos)
+                    metadata: { booking_id: "PENDING", booking_data: bookingData }
                 };
-                const preference = await bookingService.createPaymentPreference(paymentData);
+                
+                // --- USAMOS EL NUEVO SERVICIO ---
+                const preference = await paymentService.createPaymentPreference(paymentData);
+                // ---------------------------------
+                
                 window.location.href = preference.init_point;
+            
             } else {
+                // El pago en efectivo crea la reserva directamente
                 const newBooking = await bookingService.createBooking(bookingData);
                 alert(`¡Reserva confirmada! Tu turno para el ${format(new Date(newBooking.startTime), 'dd/MM/yyyy HH:mm')} ha sido creado.`);
 
@@ -218,6 +211,7 @@ const TimeSlotFinder = () => {
     };
 
     return (
+        // ... (El JSX del return no cambia en absoluto)
         <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
             {error && <p className="text-danger text-center mb-4">{error}</p>}
 
@@ -254,8 +248,6 @@ const TimeSlotFinder = () => {
                 <h3 className="text-xl font-semibold text-text-primary mb-3">Turnos Disponibles</h3>
                 {(loading || !businessHours) && <p className="text-text-secondary">Cargando turnos...</p>}
                 
-                {/* --- LÓGICA DE RENDERIZADO MODIFICADA --- */}
-                {/* Solo mostramos slots si businessHours cargó */}
                 {businessHours && !loading && availableSlots.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                         {availableSlots.map(slot => (
@@ -275,7 +267,6 @@ const TimeSlotFinder = () => {
                 ) : (
                     businessHours && !loading && <p className="text-text-secondary">No hay turnos disponibles para esta fecha.</p>
                 )}
-                {/* -------------------------------------- */}
             </div>
 
             {selectedSlots.length > 0 && (
