@@ -1,46 +1,34 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { courtService } from '../services/courtService';
 import { bookingService } from '../services/bookingService';
-import { settingService } from '../services/settingService';
-// --- IMPORTAMOS EL NUEVO SERVICIO DE PAGO ---
+// --- IMPORTAMOS EL HOOK DEL CONTEXTO ---
+import { usePublicSettings } from '../contexts/PublicSettingsContext';
+// ------------------------------------
 import { paymentService } from '../services/paymentService';
-// ------------------------------------------
 import { format, addMinutes, setHours, setMinutes, startOfDay, getDay } from 'date-fns';
 
-/**
- * Genera los turnos de 30 min basándose en 3 criterios:
- * 1. El turno es en el futuro.
- * 2. El turno NO está ya reservado (bookedSlots).
- * 3. El club ESTÁ abierto en ese horario (businessHours).
- */
+// ... (La función generateTimeSlots no cambia)
 const generateTimeSlots = (date, bookedSlots, businessHours) => {
     const slots = [];
-    if (!businessHours) return slots; // No generar nada si no se cargaron los horarios
+    if (!businessHours) return slots; 
 
     const now = new Date();
     const dayStart = startOfDay(date);
-    const dayIndex = getDay(date); // 0 = Domingo, 1 = Lunes, ...
+    const dayIndex = getDay(date); 
 
     const scheduleForDay = businessHours[dayIndex];
-    if (!scheduleForDay) return slots; // No hay horario para este día
+    if (!scheduleForDay) return slots; 
 
-    // Iteramos por los 48 bloques de 30 minutos del día (24 horas * 2)
     for (let i = 0; i < 48; i++) {
         const slotStart = addMinutes(dayStart, i * 30);
         
-        // Criterio 1: El turno es en el futuro
         if (slotStart < now) continue;
-
-        // Criterio 2: El club ESTÁ abierto (basado en la grilla)
-        // scheduleForDay[i] debe ser 'true'
         if (!scheduleForDay[i]) continue;
 
-        // Criterio 3: El turno NO está ya reservado
         const slotEnd = addMinutes(slotStart, 30);
         const isBooked = bookedSlots.some(booked => {
             const bookedStart = new Date(booked.startTime);
             const bookedEnd = new Date(booked.endTime);
-            // Revisa si el slot (ej: 10:00-10:30) se superpone con una reserva (ej: 09:30-10:30)
             return (slotStart < bookedEnd && slotEnd > bookedStart);
         });
 
@@ -51,27 +39,35 @@ const generateTimeSlots = (date, bookedSlots, businessHours) => {
     return slots;
 };
 
+
 const TimeSlotFinder = () => {
-    // ... (estados sin cambios)
     const [courts, setCourts] = useState([]);
     const [selectedCourt, setSelectedCourt] = useState('');
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [businessHours, setBusinessHours] = useState(null);
+    
+    // --- OBTENEMOS LOS HORARIOS DESDE EL CONTEXTO ---
+    const { settings, isLoading: settingsLoading } = usePublicSettings();
+    const businessHours = settings.businessHours;
+    // ------------------------------------------------
+
     const [bookedSlots, setBookedSlots] = useState([]);
     const [availableSlots, setAvailableSlots] = useState([]);
     const [selectedSlots, setSelectedSlots] = useState([]);
+
     const [showUserForm, setShowUserForm] = useState(false);
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
-    const [loading, setLoading] = useState(true);
+    
+    const [loadingCourts, setLoadingCourts] = useState(true);
+    const [loadingBookings, setLoadingBookings] = useState(true);
     const [error, setError] = useState('');
     const [bookingError, setBookingError] = useState('');
 
-    // ... (Efectos 1, 2, 3 y 4 sin cambios)
+    // Efecto 1: Cargar canchas (sin cambios)
     useEffect(() => {
         const fetchCourts = async () => {
             try {
-                setLoading(true);
+                setLoadingCourts(true);
                 const data = await courtService.getAllCourts();
                 const activeCourts = data.filter(c => c.isActive);
                 setCourts(activeCourts);
@@ -81,50 +77,47 @@ const TimeSlotFinder = () => {
             } catch (err) {
                 setError('No se pudieron cargar las canchas.');
             } finally {
-                setLoading(false);
+                setLoadingCourts(false);
             }
         };
         fetchCourts();
     }, []);
 
-    useEffect(() => {
-        const fetchBusinessHours = async () => {
-            try {
-                const hoursData = await settingService.getPublicBusinessHours();
-                setBusinessHours(hoursData);
-            } catch (err) {
-                setError(prev => prev + ' No se pudieron cargar los horarios del club.');
-            }
-        };
-        fetchBusinessHours();
-    }, []);
+    // --- EFECTO 2 (Cargar horarios) ELIMINADO ---
+    // Ya no es necesario, los horarios vienen del contexto.
+    // -------------------------------------------
 
+    // Efecto 3: Cargar turnos ocupados (sin cambios)
     useEffect(() => {
         if (!selectedCourt || !selectedDate) return;
         const fetchAvailability = async () => {
             try {
-                setLoading(true);
+                setLoadingBookings(true);
                 setError('');
                 const data = await bookingService.getAvailability(selectedCourt, selectedDate);
                 setBookedSlots(data);
             } catch (err) {
                 setError('No se pudo cargar la disponibilidad.');
             } finally {
-                setLoading(false);
+                setLoadingBookings(false);
             }
         };
         fetchAvailability();
     }, [selectedCourt, selectedDate]);
 
+    // Efecto 4: Generar turnos disponibles (ahora depende de 'businessHours' del contexto)
     useEffect(() => {
-        const dateForSlots = new Date(selectedDate + 'T00:00:00'); // Asume zona horaria local
+        if (settingsLoading) return; // Esperar a que cargue la configuración
+        
+        const dateForSlots = new Date(selectedDate + 'T00:00:00'); 
         const slots = generateTimeSlots(dateForSlots, bookedSlots, businessHours);
+        
         setAvailableSlots(slots);
         setSelectedSlots([]);
-    }, [bookedSlots, selectedDate, businessHours]);
+    }, [bookedSlots, selectedDate, businessHours, settingsLoading]); // Añadimos dependencias
 
-
-    // ... (handleSlotClick y useMemo sin cambios)
+    // ... (El resto del componente: handleSlotClick, useMemo, handleProceedToBooking, handleFinalizeBooking)
+    // ... (NO TIENE MÁS CAMBIOS)
     const handleSlotClick = (slot) => {
         setShowUserForm(false); 
         setSelectedSlots(prev =>
@@ -136,7 +129,7 @@ const TimeSlotFinder = () => {
         if (selectedSlots.length === 0) return { totalPrice: 0, startTime: null, endTime: null };
 
         const court = courts.find(c => c._id === selectedCourt);
-        const price = court ? selectedSlots.length * (court.pricePerHour / 2) : 0; // Precio por slot de 30 min
+        const price = court ? selectedSlots.length * (court.pricePerHour / 2) : 0; 
         const start = selectedSlots[0];
         const end = addMinutes(selectedSlots[selectedSlots.length - 1], 30);
 
@@ -159,7 +152,7 @@ const TimeSlotFinder = () => {
         }
 
         setBookingError('');
-        setLoading(true);
+        setLoadingCourts(true); // Reusamos el estado de loading
 
         const bookingData = {
             courtId: selectedCourt,
@@ -168,6 +161,7 @@ const TimeSlotFinder = () => {
             endTime,
             paymentMethod,
             isPaid: paymentMethod !== 'Efectivo',
+            totalPrice: totalPrice // Añadimos el precio
         };
 
         try {
@@ -180,20 +174,13 @@ const TimeSlotFinder = () => {
                         quantity: 1,
                     }],
                     payer: { name: userName, email: "test_user@test.com" },
-                    // NOTA: Enviamos 'bookingData' en los metadatos
-                    // El webhook usará esto para crear la reserva DESPUÉS de que se apruebe el pago.
-                    // (Esto requiere una actualización en paymentController.js que ya hicimos)
                     metadata: { booking_id: "PENDING", booking_data: bookingData }
                 };
                 
-                // --- USAMOS EL NUEVO SERVICIO ---
                 const preference = await paymentService.createPaymentPreference(paymentData);
-                // ---------------------------------
-                
                 window.location.href = preference.init_point;
             
             } else {
-                // El pago en efectivo crea la reserva directamente
                 const newBooking = await bookingService.createBooking(bookingData);
                 alert(`¡Reserva confirmada! Tu turno para el ${format(new Date(newBooking.startTime), 'dd/MM/yyyy HH:mm')} ha sido creado.`);
 
@@ -206,12 +193,14 @@ const TimeSlotFinder = () => {
         } catch (err) {
             setBookingError(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
         } finally {
-            setLoading(false);
+            setLoadingCourts(false);
         }
     };
-
+    
+    // --- Lógica de Carga y Renderizado (Actualizada) ---
+    const isLoading = settingsLoading || loadingCourts;
+    
     return (
-        // ... (El JSX del return no cambia en absoluto)
         <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
             {error && <p className="text-danger text-center mb-4">{error}</p>}
 
@@ -223,7 +212,7 @@ const TimeSlotFinder = () => {
                         value={selectedCourt}
                         onChange={(e) => setSelectedCourt(e.target.value)}
                         className="w-full bg-dark-primary border border-gray-600 rounded-md p-2 text-text-primary focus:ring-primary focus:border-primary"
-                        disabled={loading}
+                        disabled={isLoading}
                     >
                         {courts.map(court => (
                             <option key={court._id} value={court._id}>{court.name} ({court.courtType})</option>
@@ -239,16 +228,16 @@ const TimeSlotFinder = () => {
                         onChange={(e) => setSelectedDate(e.target.value)}
                         min={format(new Date(), 'yyyy-MM-dd')}
                         className="w-full bg-dark-primary border border-gray-600 rounded-md p-2 text-text-primary focus:ring-primary focus:border-primary"
-                        disabled={loading}
+                        disabled={isLoading}
                     />
                 </div>
             </div>
 
             <div className="mb-6">
                 <h3 className="text-xl font-semibold text-text-primary mb-3">Turnos Disponibles</h3>
-                {(loading || !businessHours) && <p className="text-text-secondary">Cargando turnos...</p>}
+                {(isLoading || loadingBookings) && <p className="text-text-secondary">Cargando turnos...</p>}
                 
-                {businessHours && !loading && availableSlots.length > 0 ? (
+                {!isLoading && !loadingBookings && availableSlots.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                         {availableSlots.map(slot => (
                             <button
@@ -265,10 +254,11 @@ const TimeSlotFinder = () => {
                         ))}
                     </div>
                 ) : (
-                    businessHours && !loading && <p className="text-text-secondary">No hay turnos disponibles para esta fecha.</p>
+                    !isLoading && !loadingBookings && <p className="text-text-secondary">No hay turnos disponibles para esta fecha.</p>
                 )}
             </div>
 
+            {/* ... (El resto del JSX (resumen de reserva y formulario de usuario) no cambia) ... */}
             {selectedSlots.length > 0 && (
                 <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
                     <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
@@ -307,16 +297,16 @@ const TimeSlotFinder = () => {
                                 <button
                                     onClick={() => handleFinalizeBooking('Efectivo')}
                                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
-                                    disabled={loading}
+                                    disabled={loadingCourts}
                                 >
-                                    {loading ? 'Procesando...' : 'Confirmar (Pago en club)'}
+                                    {loadingCourts ? 'Procesando...' : 'Confirmar (Pago en club)'}
                                 </button>
                                 <button
                                     onClick={() => handleFinalizeBooking('Mercado Pago')}
                                     className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
-                                    disabled={loading}
+                                    disabled={loadingCourts}
                                 >
-                                    {loading ? 'Procesando...' : 'Pagar con Mercado Pago'}
+                                    {loadingCourts ? 'Procesando...' : 'Pagar con Mercado Pago'}
                                 </button>
                             </div>
                         </div>
