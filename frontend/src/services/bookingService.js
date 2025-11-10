@@ -22,7 +22,7 @@ const createBooking = async (bookingData) => {
   }
 };
 
-// --- createPaymentPreference HA SIDO MOVIDO A paymentService.js ---
+// (createPaymentPreference fue movido a paymentService.js)
 
 const getAllBookings = async () => {
     try {
@@ -54,11 +54,40 @@ const cancelBooking = async (id) => {
     }
 }
 
-// Actualizamos la exportación
+// --- NUEVAS FUNCIONES PÚBLICAS ---
+
+const getPublicAvailabilitySlots = async (date) => {
+  try {
+    const response = await apiClient.get('/bookings/public-slots', {
+      params: { date },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching public slots:', error);
+    throw error.response?.data || error;
+  }
+};
+
+const getPublicCourtOptions = async (startTime, endTime) => {
+  try {
+    const response = await apiClient.get('/bookings/public-options', {
+      params: { startTime, endTime },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching court options:', error);
+    throw error.response?.data || error;
+  }
+};
+// --------------------------------
+
 export const bookingService = {
   getAvailability,
   createBooking,
   getAllBookings,
   updateBookingStatus,
   cancelBooking,
+  // --- AÑADIMOS LAS NUEVAS FUNCIONES ---
+  getPublicAvailabilitySlots,
+  getPublicCourtOptions,
 };
