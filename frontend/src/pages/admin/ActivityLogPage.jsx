@@ -1,57 +1,147 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import Sidebar from '../../components/admin/Sidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
-import DashboardPage from './DashboardPage';
-import BookingsPage from './BookingsPage';
-import PosPage from './PosPage';
-import InventoryPage from './InventoryPage';
-import CourtsPage from './CourtsPage';
-import UsersPage from './UsersPage';
-import ReportsPage from './ReportsPage';
-import ActivityLogPage from './ActivityLogPage';
-import SettingsPage from './SettingsPage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { logService } from '../../services/logService';
+import { format } from 'date-fns';
+import { utcToZonedTime } from 'date-fns-tz';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 
-// Import route protectors
-import ProtectedRoute from '../../components/auth/ProtectedRoute';
-import AdminRoute from '../../components/auth/AdminRoute';
+const timeZone = 'America/Argentina/Buenos_Aires';
 
+// Componente para mostrar un "badge" de color según la acción
+const ActionBadge = ({ action }) => {
+  let color = 'bg-gray-500 text-white'; // Default
+  if (action.includes('CREATED') || action.includes('OPENED') || action.includes('REGISTERED')) {
+    color = 'bg-secondary text-dark-primary'; // Verde
+  } else if (action.includes('UPDATED')) {
+    color = 'bg-blue-400 text-white'; // Azul
+  } else if (action.includes('DELETED') || action.includes('CANCELLED') || action.includes('CLOSED')) {
+    color = 'bg-danger text-white'; // Rojo
+  } else if (action.includes('LOGIN')) {
+    color = 'bg-primary text-white'; // Naranja
+  }
 
-const AdminLayout = () => {
   return (
-    <div className="flex h-screen bg-dark-primary text-text-primary">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader />
-        {/* --- CORRECCIÓN ---
-          Se eliminó 'overflow-x-hidden' de la clase de <main>.
-          Esto bloqueaba el scroll horizontal de los componentes hijos (como la grilla de horarios).
-        */}
-        <main className="flex-1 overflow-y-auto bg-dark-primary p-6">
-          <Routes>
-            {/* Redirect /admin to /admin/dashboard */}
-            <Route index element={<Navigate to="dashboard" replace />} />
+    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${color}`}>
+      {action}
+    </span>
+  );
+};
 
-            {/* Routes for Operator and Admin */}
-            <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
-            <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
-            <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-            <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
+const ActivityLogPage = () => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
 
-            {/* Routes for Admin only */}
-            <Route path="users" element={<AdminRoute><UsersPage /></AdminRoute>} />
-            <Route path="reports" element={<AdminRoute><ReportsPage /></AdminRoute>} />
-            <Route path="logs" element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
-            <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+  const fetchLogs = useCallback(async (page) => {
+    setLoading(true);
+    setError('');
+    try {
+      // El servicio y el backend ya soportan paginación
+      const data = await logService.getLogs(page);
+      setLogs(data.logs);
+      setCurrentPage(data.page);
+      setTotalPages(data.totalPages);
+      setTotalLogs(data.totalLogs);
+    } catch (err) {
+      setError('No se pudieron cargar los registros de actividad.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-            {/* Fallback for any other admin route */}
-            <Route path="*" element={<h1 className="text-white">Página no encontrada en el panel</h1>} />
-          </Routes>
-        </main>
+  useEffect(() => {
+    fetchLogs(1); // Cargar la primera página al montar
+  }, [fetchLogs]);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      fetchLogs(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      fetchLogs(currentPage - 1);
+    }
+  };
+
+  if (loading && logs.length === 0) {
+    return <div className="text-center p-8">Cargando registros...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center p-8 text-danger">{error}</div>;
+  }
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold text-text-primary mb-6">Registro de Actividad del Sistema</h1>
+
+      <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
+        <table className="w-full text-sm text-left text-text-secondary">
+          <thead className="text-xs text-text-primary uppercase bg-dark-primary">
+            <tr>
+              <th scope="col" className="px-6 py-3">Fecha y Hora</th>
+              <th scope="col" className="px-6 py-3">Usuario</th>
+              <th scope="col" className="px-6 py-3">Acción</th>
+              <th scope="col" className="px-6 py-3">Detalles</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((log) => {
+              const zonedTime = utcToZonedTime(new Date(log.timestamp), timeZone);
+              return (
+                <tr key={log._id} className="border-b border-gray-700 hover:bg-dark-primary">
+                  <td className="px-6 py-4 font-mono">
+                    {format(zonedTime, 'dd/MM/yyyy HH:mm:ss')}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-text-primary">
+                    {log.username}
+                  </td>
+                  <td className="px-6 py-4">
+                    <ActionBadge action={log.action} />
+                  </td>
+                  <td className="px-6 py-4">
+                    {log.details}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* --- Paginación --- */}
+      <div className="flex justify-between items-center bg-dark-secondary px-6 py-3 rounded-b-lg border-t border-gray-700">
+        <span className="text-sm text-text-secondary">
+          Total de registros: {totalLogs}
+        </span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage <= 1 || loading}
+            className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
+          >
+            <ChevronLeftIcon className="h-4 w-4 mr-1" />
+            Anterior
+          </button>
+          <span className="text-text-primary font-semibold">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage >= totalPages || loading}
+            className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
+          >
+            Siguiente
+            <ChevronRightIcon className="h-4 w-4 ml-1" />
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default AdminLayout;
+export default ActivityLogPage;
