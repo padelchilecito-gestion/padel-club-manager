@@ -8,60 +8,50 @@ const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
 
 const startServer = async () => {
-  // Connect to Database first
   await connectDB();
 
   const app = express();
   const server = http.createServer(app);
 
-  // --- MODIFICACIÓN DE CORS ---
-  // 1. Definimos la URL de Vercel explícitamente
   const vercelURL = 'https://padel-club-manager-xi.vercel.app';
-  
-  // 2. Creamos la lista de orígenes permitidos
   const allowedOrigins = [
-    'http://localhost:5173', // Desarrollo local
-    vercelURL, // Producción en Vercel
+    'http://localhost:5173',
+    vercelURL,
   ];
 
-  // 3. Añadimos la CLIENT_URL de Render (si existe)
-  // Esto es útil si Render tiene una URL de preview o si migras el front a Render
-  if (process.env.CLIENT_URL && process.env.CLIENT_URL !== vercelURL) {
+  if (process.env.CLIENT_URL && allowedOrigins.indexOf(process.env.CLIENT_URL) === -1) {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
-  // -----------------------------
 
   const corsOptions = {
     origin: function (origin, callback) {
-      // Permitimos peticiones sin 'origin' (como Postman o apps móviles)
-      // Y comprobamos si el 'origin' está en nuestra lista
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.error(`CORS Error: Origin ${origin} not allowed.`); // Logueamos el origen bloqueado
+        console.error(`CORS Error: Origin ${origin} not allowed.`);
         callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true
   };
-  // -----------------------------
 
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // Socket.IO setup
+  // --- MODIFICACIÓN DE SOCKET.IO ---
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, // Usamos la misma lista para Socket.IO
+      origin: corsOptions.origin, // <-- USAMOS LA MISMA FUNCIÓN DE ORIGEN
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
   });
+  // ---------------------------------
 
   app.set('socketio', io);
 
   io.on('connection', (socket) => {
-    console.log('A user connected via WebSocket');
+    console.log(`A user connected via WebSocket (Origin: ${socket.handshake.headers.origin})`);
     socket.on('disconnect', () => {
       console.log('User disconnected');
     });
@@ -69,7 +59,6 @@ const startServer = async () => {
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
-  // Define Routes
   app.use('/api', apiRoutes);
 
   const PORT = process.env.PORT || 5000;
