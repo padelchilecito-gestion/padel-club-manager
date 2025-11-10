@@ -1,12 +1,16 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
+const Setting = require('../models/Setting'); // --- IMPORTAMOS SETTING ---
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
+
+// --- FUNCIONES EXISTENTES (createBooking, getBookingAvailability, etc. no cambian) ---
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
 // @access  Public or Admin
 const createBooking = async (req, res) => {
+  // ... (código existente sin cambios)
   const { courtId, user, startTime, endTime, paymentMethod, isPaid, price } = req.body;
 
   try {
@@ -36,7 +40,12 @@ const createBooking = async (req, res) => {
     }
     
     // Si el precio no viene (desde el admin), se calcula.
-    let finalPrice = price;
+    // MODIFICADO: Usamos 'totalPrice' (que viene de la lógica del front) o 'price' (del admin)
+    let finalPrice = price; 
+    if (finalPrice === undefined && req.body.totalPrice !== undefined) {
+        finalPrice = req.body.totalPrice;
+    }
+
     if (finalPrice === undefined) {
       const durationHours = (end - start) / (1000 * 60 * 60);
       finalPrice = durationHours * court.pricePerHour;
@@ -58,8 +67,11 @@ const createBooking = async (req, res) => {
     const io = req.app.get('socketio');
     io.emit('booking_update', createdBooking);
     
-    const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
-    await logActivity(req.user, 'BOOKING_CREATED', logDetails);
+    // El log de actividad solo funciona si la crea un admin (req.user existe)
+    if (req.user) {
+        const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
+        await logActivity(req.user, 'BOOKING_CREATED', logDetails);
+    }
 
     if (createdBooking.user.phone) {
         const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
@@ -77,6 +89,7 @@ const createBooking = async (req, res) => {
 // @route   GET /api/bookings/availability
 // @access  Public
 const getBookingAvailability = async (req, res) => {
+    // ... (código existente sin cambios)
     const { courtId, date } = req.query;
     if (!courtId || !date) {
         return res.status(400).json({ message: 'Court ID and date are required.' });
@@ -105,8 +118,8 @@ const getBookingAvailability = async (req, res) => {
 // @route   GET /api/bookings
 // @access  Operator/Admin
 const getBookings = async (req, res) => {
+  // ... (código existente sin cambios)
   try {
-    // NOTA: Se añade un filtro para no mostrar los turnos cancelados de hace más de 2 días.
     const twoDaysAgo = new Date();
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
@@ -128,6 +141,7 @@ const getBookings = async (req, res) => {
 // @route   PUT /api/bookings/:id
 // @access  Operator/Admin
 const updateBooking = async (req, res) => {
+  // ... (código existente sin cambios)
   try {
     const { courtId, user, startTime, endTime, price, status, isPaid, paymentMethod } = req.body;
     const booking = await Booking.findById(req.params.id);
@@ -166,12 +180,12 @@ const updateBooking = async (req, res) => {
 // @route   PUT /api/bookings/:id/status
 // @access  Operator/Admin
 const updateBookingStatus = async (req, res) => {
+  // ... (código existente sin cambios)
   try {
     const booking = await Booking.findById(req.params.id);
     if (booking) {
       booking.status = req.body.status || booking.status;
       booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
-      // NOTA: Se actualiza también el método de pago si se envía.
       booking.paymentMethod = req.body.paymentMethod || booking.paymentMethod;
       
       const updatedBooking = await booking.save();
@@ -196,6 +210,7 @@ const updateBookingStatus = async (req, res) => {
 // @route   PUT /api/bookings/:id/cancel
 // @access  Operator/Admin
 const cancelBooking = async (req, res) => {
+    // ... (código existente sin cambios)
     try {
         const booking = await Booking.findById(req.params.id);
         if (booking) {
@@ -203,7 +218,7 @@ const cancelBooking = async (req, res) => {
             const updatedBooking = await booking.save();
 
             const io = req.app.get('socketio');
-            io.emit('booking_update', updatedBooking); // Usamos 'update' para que se vea el cambio a cancelado
+            io.emit('booking_update', updatedBooking); 
             
             const logDetails = `Booking ID ${updatedBooking._id} was cancelled.`;
             await logActivity(req.user, 'BOOKING_CANCELLED', logDetails);
@@ -219,6 +234,170 @@ const cancelBooking = async (req, res) => {
 };
 
 
+// ---
+// --- NUEVAS FUNCIONES DE API PÚBLICA ---
+// ---
+
+// Helper para crear un horario por defecto (todo cerrado)
+const createDefaultSchedule = () => {
+    const schedule = {};
+    for (let i = 0; i < 7; i++) {
+      schedule[i] = Array(48).fill(false);
+    }
+    return schedule;
+};
+
+/**
+ * @desc    Get all available 30-min slots for a given date
+ * @route   GET /api/bookings/public-slots
+ * @access  Public
+ */
+const getPublicAvailabilitySlots = async (req, res) => {
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date is required.' });
+    }
+
+    try {
+        // 1. Obtener configuraciones, canchas y reservas en paralelo
+        const settingsPromise = Setting.findOne({ key: 'BUSINESS_HOURS' });
+        const courtsPromise = Court.find({ isActive: true }).select('_id');
+        
+        const [year, month, day] = date.split('T')[0].split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        // Creamos una ventana de 36 horas (el día completo + 12h del día siguiente)
+        const endOfWindow = new Date(startOfDay.getTime() + 36 * 60 * 60 * 1000); 
+        const now = new Date();
+
+        const bookingsPromise = Booking.find({
+            status: { $ne: 'Cancelled' },
+            startTime: { $gte: startOfDay, $lt: endOfWindow }
+        }).select('court startTime endTime');
+
+        const [settings, activeCourts, bookings] = await Promise.all([
+            settingsPromise,
+            courtsPromise,
+            bookingsPromise
+        ]);
+
+        const businessHours = settings ? JSON.parse(settings.value) : createDefaultSchedule();
+        const courtIds = activeCourts.map(c => c._id.toString());
+        const totalActiveCourts = activeCourts.length;
+
+        if (totalActiveCourts === 0) {
+            return res.json([]); // No hay canchas, no hay turnos
+        }
+        
+        // 2. Mapear reservas para búsqueda rápida
+        const bookingMap = {}; // { 'ISOTime': ['courtId1', 'courtId2'] }
+        for (const booking of bookings) {
+            let current = new Date(booking.startTime);
+            while (current < booking.endTime) {
+                const iso = current.toISOString();
+                if (!bookingMap[iso]) bookingMap[iso] = [];
+                bookingMap[iso].push(booking.court.toString());
+                current.setMinutes(current.getMinutes() + 30);
+            }
+        }
+
+        // 3. Generar y filtrar los slots en la ventana de 36 horas
+        const availableSlots = [];
+        let currentSlotTime = new Date(startOfDay);
+        const totalSlotsInWindow = (36 * 60) / 30; // 36 horas * 2 slots/hora = 72 slots
+
+        for (let i = 0; i < totalSlotsInWindow; i++) {
+            const slotEnd = new Date(currentSlotTime.getTime() + 30 * 60 * 1000);
+
+            // Criterio 1: El slot es en el futuro
+            if (slotEnd < now) {
+                currentSlotTime = slotEnd; // Avanzar al siguiente slot
+                continue;
+            }
+
+            // Criterio 2: El club está abierto (BusinessHours)
+            const dayIndex = currentSlotTime.getDay(); // 0 = Domingo, 1 = Lunes...
+            const slotIndex = (currentSlotTime.getHours() * 2) + (currentSlotTime.getMinutes() / 30);
+            
+            if (!businessHours[dayIndex] || !businessHours[dayIndex][slotIndex]) {
+                currentSlotTime = slotEnd;
+                continue;
+            }
+
+            // Criterio 3: Hay al menos una cancha libre
+            const bookedCourtsForSlot = bookingMap[currentSlotTime.toISOString()] || [];
+            const availableCourtCount = totalActiveCourts - bookedCourtsForSlot.length;
+
+            if (availableCourtCount > 0) {
+                availableSlots.push(currentSlotTime.toISOString());
+            }
+
+            currentSlotTime = slotEnd; // Avanzar al siguiente slot
+        }
+
+        res.json(availableSlots);
+
+    } catch (error) {
+        console.error('Error fetching public slots:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+/**
+ * @desc    Get available courts and prices for a selected time range
+ * @route   GET /api/bookings/public-options
+ * @access  Public
+ */
+const getPublicCourtOptions = async (req, res) => {
+    const { startTime, endTime } = req.query;
+    if (!startTime || !endTime) {
+        return res.status(400).json({ message: 'Start time and end time are required.' });
+    }
+
+    try {
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const durationHours = (end - start) / (1000 * 60 * 60);
+
+        if (durationHours <= 0) {
+            return res.status(400).json({ message: 'Invalid time range.' });
+        }
+
+        // 1. Encontrar canchas en conflicto en ese rango
+        const conflictingBookings = await Booking.find({
+            status: { $ne: 'Cancelled' },
+            $or: [
+                { startTime: { $lt: end, $gte: start } },
+                { endTime: { $gt: start, $lte: end } },
+                { startTime: { $lte: start }, endTime: { $gte: end } }
+            ],
+        }).select('court');
+        
+        const bookedCourtIds = conflictingBookings.map(b => b.court.toString());
+        const uniqueBookedCourtIds = [...new Set(bookedCourtIds)];
+
+        // 2. Obtener todas las canchas activas que NO estén en la lista de conflicto
+        const availableCourts = await Court.find({
+            isActive: true,
+            _id: { $nin: uniqueBookedCourtIds }
+        }).select('name courtType pricePerHour');
+
+        // 3. Calcular el precio para cada opción
+        const options = availableCourts.map(court => ({
+            id: court._id,
+            name: court.name,
+            type: court.courtType,
+            price: court.pricePerHour * durationHours
+        }));
+
+        res.json(options);
+
+    } catch (error) {
+        console.error('Error fetching court options:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+
 module.exports = {
   createBooking,
   getBookings,
@@ -226,4 +405,7 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
+  // --- EXPORTAMOS LAS NUEVAS FUNCIONES ---
+  getPublicAvailabilitySlots,
+  getPublicCourtOptions,
 };
