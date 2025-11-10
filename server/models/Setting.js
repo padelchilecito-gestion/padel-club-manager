@@ -13,15 +13,13 @@ const SettingSchema = new mongoose.Schema({
       'CLOUDINARY_API_SECRET',
       'WHATSAPP_SENDER_NUMBER',
       'WHATSAPP_API_TOKEN',
-      // Claves de horarios anteriores (se reemplazan)
       'TIMEZONE',
       'WEEKDAY_OPENING_HOUR',
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
-      // --- NUEVAS CLAVES ---
-      'BUSINESS_HOURS', // Almacena un JSON con los 336 slots de 30 min.
-      'SHOP_ENABLED',   // Controla si la tienda pública está activa (true/false)
+      'BUSINESS_HOURS',
+      'SHOP_ENABLED',   // <-- Asegúrate de que esta línea esté en tu archivo en Render
     ],
   },
   value: {
