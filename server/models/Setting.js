@@ -19,8 +19,9 @@ const SettingSchema = new mongoose.Schema({
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
-      // --- NUEVA CLAVE ---
+      // --- NUEVAS CLAVES ---
       'BUSINESS_HOURS', // Almacena un JSON con los 336 slots de 30 min.
+      'SHOP_ENABLED',   // Controla si la tienda pública está activa (true/false)
     ],
   },
   value: {
