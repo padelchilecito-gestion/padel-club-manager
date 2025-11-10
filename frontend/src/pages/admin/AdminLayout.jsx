@@ -11,6 +11,8 @@ import UsersPage from './UsersPage';
 import ReportsPage from './ReportsPage';
 import ActivityLogPage from './ActivityLogPage';
 import SettingsPage from './SettingsPage';
+// --- IMPORTAMOS LA NUEVA PÁGINA ---
+import CashboxPage from './CashboxPage';
 
 // Import route protectors
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
@@ -23,12 +25,6 @@ const AdminLayout = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader />
-        {/* --- CORRECCIÓN DE ESTILO ---
-          Se eliminó 'overflow-x-hidden' de la clase de <main>.
-          Esto permitía que el layout principal bloqueara el scroll horizontal 
-          del componente ScheduleEditor en la página de Configuración.
-          Ahora, <main> solo gestiona el scroll vertical.
-        */}
         <main className="flex-1 overflow-y-auto bg-dark-primary p-6">
           <Routes>
             {/* Redirect /admin to /admin/dashboard */}
@@ -38,6 +34,9 @@ const AdminLayout = () => {
             <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
             <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
+            {/* --- AÑADIMOS LA NUEVA RUTA --- */}
+            <Route path="cashbox" element={<ProtectedRoute><CashboxPage /></ProtectedRoute>} />
+            {/* --------------------------- */}
             <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
             <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
 
