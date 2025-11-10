@@ -231,7 +231,7 @@ const PosPage = () => {
         {/* Columna de Productos (Izquierda) */}
         <div className="lg:col-span-2 bg-dark-secondary p-4 rounded-lg overflow-y-auto">
           <h2 className="text-2xl font-bold mb-4">Productos</h2>
-          <input type*="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
+          <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
           {loading && <p>Cargando...</p>}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map(product => (
