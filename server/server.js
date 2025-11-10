@@ -14,22 +14,37 @@ const startServer = async () => {
   const app = express();
   const server = http.createServer(app);
 
-  // CORS configuration
+  // --- MODIFICACIÓN DE CORS ---
+  // 1. Definimos la URL de Vercel explícitamente
+  const vercelURL = 'https://padel-club-manager-xi.vercel.app';
+  
+  // 2. Creamos la lista de orígenes permitidos
   const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:5173',
-    'https://padel-club-manager-xi.vercel.app',
+    'http://localhost:5173', // Desarrollo local
+    vercelURL, // Producción en Vercel
   ];
+
+  // 3. Añadimos la CLIENT_URL de Render (si existe)
+  // Esto es útil si Render tiene una URL de preview o si migras el front a Render
+  if (process.env.CLIENT_URL && process.env.CLIENT_URL !== vercelURL) {
+    allowedOrigins.push(process.env.CLIENT_URL);
+  }
+  // -----------------------------
 
   const corsOptions = {
     origin: function (origin, callback) {
+      // Permitimos peticiones sin 'origin' (como Postman o apps móviles)
+      // Y comprobamos si el 'origin' está en nuestra lista
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
+        console.error(`CORS Error: Origin ${origin} not allowed.`); // Logueamos el origen bloqueado
         callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true
   };
+  // -----------------------------
 
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
@@ -37,7 +52,7 @@ const startServer = async () => {
   // Socket.IO setup
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: allowedOrigins, // Usamos la misma lista para Socket.IO
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
