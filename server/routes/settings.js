@@ -3,15 +3,15 @@ const router = express.Router();
 const { 
   getSettings, 
   updateSettings,
-  getPublicBusinessHours // --- IMPORTADO ---
+  getPublicSettings // --- IMPORTADO ---
 } = require('../controllers/settingController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
-// --- NUEVA RUTA PÚBLICA ---
-// @route   GET api/settings/business-hours
-// @desc    Get business hours for public booking page
+// --- RUTA PÚBLICA MODIFICADA ---
+// @route   GET api/settings/public
+// @desc    Get public settings (shop status, business hours)
 // @access  Public
-router.get('/business-hours', getPublicBusinessHours);
+router.get('/public', getPublicSettings);
 // -------------------------
 
 // @route   GET api/settings
