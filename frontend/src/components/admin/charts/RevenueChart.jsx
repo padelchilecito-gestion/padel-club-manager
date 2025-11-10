@@ -1,9 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { 
+  Chart as ChartJS, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  Title, 
+  Tooltip, 
+  Legend,
+  Filler // --- 1. IMPORTAR FILLER ---
+} from 'chart.js';
 import { reportService } from '../../../services/reportService';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+// --- 2. REGISTRAR FILLER ---
+ChartJS.register(
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  Title, 
+  Tooltip, 
+  Legend,
+  Filler 
+);
 
 const RevenueChart = () => {
   const [chartData, setChartData] = useState(null);
@@ -26,7 +46,7 @@ const RevenueChart = () => {
               borderColor: '#FF6700', // primary
               backgroundColor: 'rgba(255, 103, 0, 0.2)',
               tension: 0.3,
-              fill: true,
+              fill: true, // <-- Esta línea es la que necesita Filler
             },
           ],
         });
