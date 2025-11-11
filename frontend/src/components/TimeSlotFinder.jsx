@@ -1,9 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bookingService } from '../services/bookingService';
-import { usePublicSettings } from '../contexts/PublicSettingsContext'; // Usamos el contexto
-import { paymentService } from '../services/paymentService'; // Usamos el servicio de pago
-import { format, addMinutes, parseISO, startOfToday, isToday, getDay, startOfDay } from 'date-fns';
+import { usePublicSettings } from '../contexts/PublicSettingsContext';
+import { paymentService } from '../services/paymentService';
+import { 
+  format, 
+  addMinutes, 
+  parseISO, 
+  startOfToday, 
+  isSameDay, 
+  startOfDay,
+  addDays,
+  subDays,
+  isBefore
+} from 'date-fns';
+import { es } from 'date-fns/locale'; // Importamos el locale en español
 import { utcToZonedTime } from 'date-fns-tz';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
@@ -55,46 +67,48 @@ const TimeSlotFinder = () => {
   const [courtOptions, setCourtOptions] = useState([]); // Canchas/precios (de API 2)
 
   // Estados de Selección del Usuario
-  const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState(startOfToday()); // Usamos un objeto Date
   const [selectedSlots, setSelectedSlots] = useState([]); // Arreglo de ISO Strings
   const [selectedCourt, setSelectedCourt] = useState(null); // { id, name, price }
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
 
   // --- PASO 1: Cargar slots cuando cambia la fecha ---
-  useEffect(() => {
-    if (!selectedDate || settingsLoading) return;
+  const fetchSlots = useCallback(async () => {
+    if (settingsLoading) return;
 
-    const fetchSlots = async () => {
-      setLoadingSlots(true);
-      setAllSlots([]);
-      setBookingError('');
-      // Reseteamos la selección
-      setSelectedSlots([]);
-      setCourtOptions([]);
-      setSelectedCourt(null);
+    setLoadingSlots(true);
+    setAllSlots([]);
+    setBookingError('');
+    // Reseteamos la selección
+    setSelectedSlots([]);
+    setCourtOptions([]);
+    setSelectedCourt(null);
 
-      try {
-        const slotsISO = await bookingService.getPublicAvailabilitySlots(selectedDate);
-        setAllSlots(slotsISO);
-      } catch (err) {
-        setBookingError('No se pudieron cargar los horarios. Intente más tarde.');
-      } finally {
-        setLoadingSlots(false);
-      }
-    };
-    fetchSlots();
+    try {
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      const slotsISO = await bookingService.getPublicAvailabilitySlots(dateString);
+      setAllSlots(slotsISO);
+    } catch (err) {
+      setBookingError('No se pudieron cargar los horarios. Intente más tarde.');
+    } finally {
+      setLoadingSlots(false);
+    }
   }, [selectedDate, settingsLoading]);
+
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
 
   // --- Lógica de la Grilla (Hoy vs Mañana) ---
   const { todaySlots, nextDaySlots } = useMemo(() => {
-    const selectedDayStart = startOfDay(parseISO(selectedDate));
+    const selectedDayStart = startOfDay(selectedDate);
     const today = [];
     const nextDay = [];
 
     allSlots.forEach(slotISO => {
       const slotDate = startOfDay(parseISO(slotISO));
-      if (slotDate.getTime() === selectedDayStart.getTime()) {
+      if (isSameDay(slotDate, selectedDayStart)) {
         today.push(slotISO);
       } else {
         nextDay.push(slotISO);
@@ -184,7 +198,10 @@ const TimeSlotFinder = () => {
         setLoadingOptions(false);
       }
     };
-    fetchCourtOptions();
+    // Usamos un timeout corto para no saturar la API mientras el usuario hace clic rápido
+    const timer = setTimeout(fetchCourtOptions, 300);
+    return () => clearTimeout(timer);
+
   }, [selectedTimeRange]);
   
   // --- PASO 4: Finalizar Reserva ---
@@ -229,14 +246,11 @@ const TimeSlotFinder = () => {
         window.location.href = preference.init_point;
       
       } else {
-        const newBooking = await bookingService.createBooking(bookingData);
+        await bookingService.createBooking(bookingData);
         alert(`¡Reserva confirmada! Tu turno para el ${format(start, 'dd/MM/yyyy HH:mm')} ha sido creado.`);
         
         // Recargamos los slots para el día actual
-        setLoadingSlots(true);
-        const slotsISO = await bookingService.getPublicAvailabilitySlots(selectedDate);
-        setAllSlots(slotsISO);
-        setLoadingSlots(false);
+        fetchSlots(); // El hook useCallback se encarga de recargar
 
         // Reseteamos el formulario
         setSelectedSlots([]);
@@ -252,44 +266,72 @@ const TimeSlotFinder = () => {
     }
   };
 
+  // --- Funciones de Navegación de Fecha ---
+  const today = startOfToday();
+  const isViewingToday = isSameDay(selectedDate, today);
+
+  const handlePrevDay = () => {
+    if (isViewingToday) return; // No ir antes de hoy
+    setSelectedDate(subDays(selectedDate, 1));
+  };
+
+  const handleNextDay = () => {
+    setSelectedDate(addDays(selectedDate, 1));
+  };
+  
   // Función para formatear el botón de horario
   const formatSlotLabel = (isoString) => {
     const zonedTime = utcToZonedTime(parseISO(isoString), timeZone);
     return format(zonedTime, 'HH:mm');
   };
 
+  // Capitalizar el nombre del día
+  const formatDateHeader = (date) => {
+    const formatted = format(date, 'EEEE dd/MM', { locale: es });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  };
+
   return (
     <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
       
-      {/* --- PASO 1: ELEGIR FECHA --- */}
-      <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 1: Elige el día</h3>
-      <input
-        type="date"
-        id="date-select"
-        value={selectedDate}
-        onChange={(e) => setSelectedDate(e.target.value)}
-        min={format(startOfToday(), 'yyyy-MM-dd')}
-        className="w-full bg-dark-primary border border-gray-600 rounded-md p-2 text-text-primary focus:ring-primary focus:border-primary"
-        disabled={settingsLoading || loadingSlots}
-      />
-
-      {/* --- PASO 2: ELEGIR HORARIO --- */}
-      <div className="mt-6">
-        <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 2: Elige los horarios (puedes elegir varios seguidos)</h3>
+      {/* --- PASO 1: NAVEGADOR DE FECHA --- */}
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={handlePrevDay}
+          disabled={isViewingToday || loadingSlots}
+          className="p-3 bg-dark-primary rounded-full disabled:opacity-30 hover:bg-primary-dark transition-colors"
+        >
+          <ChevronLeftIcon className="h-6 w-6" />
+        </button>
+        <h2 className="text-2xl font-bold text-text-primary text-center">
+          {formatDateHeader(selectedDate)}
+        </h2>
+        <button
+          onClick={handleNextDay}
+          disabled={loadingSlots}
+          className="p-3 bg-dark-primary rounded-full hover:bg-primary-dark transition-colors"
+        >
+          <ChevronRightIcon className="h-6 w-6" />
+        </button>
+      </div>
+      
+      {/* --- PASO 2: GRILLAS DE HORARIOS --- */}
+      <div>
+        <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
-        {loadingSlots && <p className="text-text-secondary">Cargando turnos...</p>}
+        {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
         {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
         
         {!loadingSlots && allSlots.length === 0 && (
-          <p className="text-text-secondary">No hay turnos disponibles para este día.</p>
+          <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Grilla "Hoy" */}
           {todaySlots.length > 0 && (
             <div>
-              <h4 className="text-lg font-bold text-text-secondary mb-2 text-center">
-                {format(parseISO(selectedDate), 'EEEE dd/MM')}
+              <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
+                Día Seleccionado
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {todaySlots.map(slotISO => (
@@ -309,7 +351,7 @@ const TimeSlotFinder = () => {
           {/* Grilla "Día Siguiente" (Madrugada) */}
           {nextDaySlots.length > 0 && (
             <div>
-              <h4 className="text-lg font-bold text-text-secondary mb-2 text-center">
+              <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
                 Día Siguiente (Madrugada)
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -332,7 +374,7 @@ const TimeSlotFinder = () => {
       {/* --- PASO 3: ELEGIR CANCHA (SI HAY HORARIOS SELECCIONADOS) --- */}
       {selectedSlots.length > 0 && (
         <div className="mt-6 pt-6 border-t border-gray-700">
-          <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 3: Elige tu cancha</h3>
+          <h3 className="text-xl font-semibold text-text-primary mb-3">Elige tu cancha</h3>
           {loadingOptions && <p className="text-text-secondary">Buscando canchas disponibles...</p>}
           
           {!loadingOptions && courtOptions.length > 0 && (
@@ -370,7 +412,7 @@ const TimeSlotFinder = () => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="userName" className="block text-sm font-medium text-text-secondary">Nombre Completo</label>
-                <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.g.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
+                <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
               <div>
                 <label htmlFor="userPhone" className="block text-sm font-medium text-text-secondary">Teléfono (con código de área)</label>
