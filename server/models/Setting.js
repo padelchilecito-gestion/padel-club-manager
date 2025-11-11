@@ -11,15 +11,24 @@ const SettingSchema = new mongoose.Schema({
       'CLOUDINARY_CLOUD_NAME',
       'CLOUDINARY_API_KEY',
       'CLOUDINARY_API_SECRET',
-      'WHATSAPP_SENDER_NUMBER',
-      'WHATSAPP_API_TOKEN',
+      
+      // Claves antiguas de WhatsApp (Eliminadas)
+      // 'WHATSAPP_SENDER_NUMBER',
+      // 'WHATSAPP_API_TOKEN',
+      
       'TIMEZONE',
       'WEEKDAY_OPENING_HOUR',
       'WEEKDAY_CLOSING_HOUR',
       'WEEKEND_OPENING_HOUR',
       'WEEKEND_CLOSING_HOUR',
       'BUSINESS_HOURS',
-      'SHOP_ENABLED',   // <-- Asegúrate de que esta línea esté en tu archivo en Render
+      'SHOP_ENABLED',
+
+      // --- NUEVAS CLAVES DE PERSONALIZACIÓN ---
+      'PUBLIC_TITLE',           // Ej: "Padel Club Manager"
+      'PUBLIC_SUBTITLE',        // Ej: "Encuentra y reserva tu cancha..."
+      'PUBLIC_CONTACT_NUMBER',  // Número para el botón "Contacto"
+      'OWNER_NOTIFICATION_NUMBER' // Número del dueño para recibir avisos
     ],
   },
   value: {
