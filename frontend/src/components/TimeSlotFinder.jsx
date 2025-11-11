@@ -272,10 +272,14 @@ const TimeSlotFinder = () => {
     setSelectedDate(addDays(selectedDate, 1));
   };
   
-  const formatSlotLabel = (isoString) => {
-    const zonedTime = utcToZonedTime(parseISO(isoString), timeZone);
+  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+  // Quitamos 'parseISO'. utcToZonedTime puede manejar
+  // tanto un string ISO como un objeto Date.
+  const formatSlotLabel = (dateOrIsoString) => {
+    const zonedTime = utcToZonedTime(dateOrIsoString, timeZone);
     return format(zonedTime, 'HH:mm');
   };
+  // ---------------------------------
 
   // Capitalizar el nombre del día
   const formatDateHeader = (date, includeDayName = true) => {
@@ -316,8 +320,6 @@ const TimeSlotFinder = () => {
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
         {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
-        
-        {/* --- CORRECCIÓN 1: className* a className --- */}
         {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
         
         {!loadingSlots && allSlots.length === 0 && (
@@ -395,7 +397,10 @@ const TimeSlotFinder = () => {
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
           <p className="text-text-primary mt-2">
-            Horario: <span className="font-semibold">{formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)}</span>
+            Horario: <span className="font-semibold">
+              {/* Esta llamada ahora es segura */}
+              {formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)}
+            </span>
           </p>
           <p className="text-text-primary">
             Cancha: <span className="font-semibold">{selectedCourt.name}</span>
@@ -410,7 +415,6 @@ const TimeSlotFinder = () => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="userName" className="block text-sm font-medium text-text-secondary">Nombre Completo</label>
-                {/* --- CORRECCIÓN 2: e.g.value a e.target.value --- */}
                 <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
               <div>
