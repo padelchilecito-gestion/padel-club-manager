@@ -12,78 +12,79 @@ import {
   addDays,
   subDays
 } from 'date-fns';
-import { es } from 'date-fns/locale'; // Importamos el locale en español
+import { es } from 'date-fns/locale'; 
 import { utcToZonedTime } from 'date-fns-tz';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// --- Componente de Botón de Slot ---
+// ... (Componentes SlotButton y CourtOptionButton no cambian) ...
 const SlotButton = ({ isoSlot, label, onClick, isSelected, isDisabled }) => (
-  <button
-    onClick={() => onClick(isoSlot)}
-    disabled={isDisabled}
-    className={`p-3 w-full rounded-md text-center font-semibold transition-colors
-      ${isSelected
-        ? 'bg-primary text-white scale-105 shadow-lg'
-        : 'bg-dark-primary hover:bg-primary-dark'}
-      ${isDisabled
-        ? 'opacity-30 bg-dark-primary cursor-not-allowed'
-        : ''}
-    `}
-  >
-    {label}
-  </button>
+    <button
+      onClick={() => onClick(isoSlot)}
+      disabled={isDisabled}
+      className={`p-3 w-full rounded-md text-center font-semibold transition-colors
+        ${isSelected
+          ? 'bg-primary text-white scale-105 shadow-lg'
+          : 'bg-dark-primary hover:bg-primary-dark'}
+        ${isDisabled
+          ? 'opacity-30 bg-dark-primary cursor-not-allowed'
+          : ''}
+      `}
+    >
+      {label}
+    </button>
 );
-
-// --- Componente de Opción de Cancha ---
 const CourtOptionButton = ({ option, onClick, isSelected }) => (
-  <button
-    onClick={() => onClick(option)}
-    className={`p-3 w-full rounded-md text-center font-semibold transition-colors
-      ${isSelected
-        ? 'bg-primary text-white scale-105 shadow-lg'
-        : 'bg-dark-primary hover:bg-primary-dark'}
-    `}
-  >
-    {option.name}
-    <span className="block text-sm font-normal opacity-80">${option.price.toFixed(2)}</span>
-  </button>
+    <button
+      onClick={() => onClick(option)}
+      className={`p-3 w-full rounded-md text-center font-semibold transition-colors
+        ${isSelected
+          ? 'bg-primary text-white scale-105 shadow-lg'
+          : 'bg-dark-primary hover:bg-primary-dark'}
+      `}
+    >
+      {option.name}
+      <span className="block text-sm font-normal opacity-80">${option.price.toFixed(2)}</span>
+    </button>
 );
 
 
-// --- Componente Principal (Reescrito) ---
 const TimeSlotFinder = () => {
+  // --- OBTENEMOS EL NÚMERO DEL DUEÑO ---
+  const { settings, isLoading: settingsLoading } = usePublicSettings();
+  const ownerNumber = settings.ownerNotificationNumber.replace(/[^0-9]/g, '');
+
   // Estados de Carga y Errores
-  const { isLoading: settingsLoading } = usePublicSettings();
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [bookingError, setBookingError] = useState('');
 
   // Estados de Datos
-  const [allSlots, setAllSlots] = useState([]); // Slots de 30 min (de API 1)
-  const [courtOptions, setCourtOptions] = useState([]); // Canchas/precios (de API 2)
+  const [allSlots, setAllSlots] = useState([]);
+  const [courtOptions, setCourtOptions] = useState([]);
 
-  // Estados de Selección del Usuario
-  const [selectedDate, setSelectedDate] = useState(startOfToday()); // Usamos un objeto Date
-  const [selectedSlots, setSelectedSlots] = useState([]); // Arreglo de ISO Strings
-  const [selectedCourt, setSelectedCourt] = useState(null); // { id, name, price }
+  // Estados de Selección
+  const [selectedDate, setSelectedDate] = useState(startOfToday());
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [selectedCourt, setSelectedCourt] = useState(null);
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
 
-  // --- PASO 1: Cargar slots cuando cambia la fecha ---
+  // --- NUEVO ESTADO: ÉXITO DE RESERVA EN EFECTIVO ---
+  const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
+
+  // ... (fetchSlots, Lógica de Grilla, handleSlotClick, selectedTimeRange, useEffect de Opciones de Cancha... todo esto no cambia) ...
   const fetchSlots = useCallback(async () => {
     if (settingsLoading) return;
-
     setLoadingSlots(true);
     setAllSlots([]);
     setBookingError('');
-    // Reseteamos la selección
     setSelectedSlots([]);
     setCourtOptions([]);
     setSelectedCourt(null);
-
+    setCashBookingSuccess(null); // Limpiamos el éxito al cambiar de día
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       const slotsISO = await bookingService.getPublicAvailabilitySlots(dateString);
@@ -99,12 +100,10 @@ const TimeSlotFinder = () => {
     fetchSlots();
   }, [fetchSlots]);
 
-  // --- Lógica de la Grilla (Hoy vs Mañana) ---
   const { todaySlots, nextDaySlots } = useMemo(() => {
     const selectedDayStart = startOfDay(selectedDate);
     const today = [];
     const nextDay = [];
-
     allSlots.forEach(slotISO => {
       const slotDate = startOfDay(parseISO(slotISO));
       if (isSameDay(slotDate, selectedDayStart)) {
@@ -116,21 +115,15 @@ const TimeSlotFinder = () => {
     return { todaySlots: today, nextDaySlots: nextDay };
   }, [allSlots, selectedDate]);
 
-
-  // --- PASO 2: Lógica de selección de slots (consecutivos) ---
   const handleSlotClick = (slotISO) => {
+    setCashBookingSuccess(null); // Limpiamos el éxito al cambiar de slot
     const newSelection = [...selectedSlots];
     const index = newSelection.indexOf(slotISO);
-
     if (index > -1) {
-      // Deseleccionar
       newSelection.splice(index, 1);
     } else {
-      // Añadir
       newSelection.push(slotISO);
     }
-
-    // Validar si son consecutivos
     if (newSelection.length > 1) {
       const sortedTimestamps = newSelection.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
       let isConsecutive = true;
@@ -141,26 +134,21 @@ const TimeSlotFinder = () => {
           break;
         }
       }
-
       if (!isConsecutive) {
         setSelectedSlots([slotISO]);
         setBookingError('');
         return;
       }
     }
-
     setSelectedSlots(newSelection);
     setBookingError('');
   };
 
-  // --- PASO 3: Cargar Opciones de Cancha ---
   const selectedTimeRange = useMemo(() => {
     if (selectedSlots.length === 0) return null;
-
     const sortedTimestamps = selectedSlots.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
     const start = new Date(sortedTimestamps[0]);
     const end = addMinutes(new Date(sortedTimestamps[sortedTimestamps.length - 1]), 30);
-    
     return { start, end };
   }, [selectedSlots]);
 
@@ -170,15 +158,12 @@ const TimeSlotFinder = () => {
       setSelectedCourt(null);
       return;
     }
-
     const fetchCourtOptions = async () => {
       setLoadingOptions(true);
       setCourtOptions([]);
       setSelectedCourt(null);
       setBookingError('');
-
       const { start, end } = selectedTimeRange;
-      
       try {
         const options = await bookingService.getPublicCourtOptions(start.toISOString(), end.toISOString());
         if (options.length === 0) {
@@ -196,10 +181,10 @@ const TimeSlotFinder = () => {
     };
     const timer = setTimeout(fetchCourtOptions, 300);
     return () => clearTimeout(timer);
-
   }, [selectedTimeRange]);
   
-  // --- PASO 4: Finalizar Reserva ---
+
+  // --- PASO 4: Finalizar Reserva (MODIFICADO) ---
   const handleFinalizeBooking = async (paymentMethod) => {
     if (!userName || !userPhone) {
       setBookingError('El nombre y el teléfono son obligatorios.');
@@ -227,6 +212,7 @@ const TimeSlotFinder = () => {
 
     try {
       if (paymentMethod === 'Mercado Pago') {
+        // ... (lógica de MP sin cambios)
         const paymentData = {
           items: [{
             title: `Reserva ${selectedCourt.name} - ${format(start, 'dd/MM HH:mm')}`,
@@ -236,16 +222,26 @@ const TimeSlotFinder = () => {
           payer: { name: userName, email: "test_user@test.com" },
           metadata: { booking_id: "PENDING", booking_data: bookingData }
         };
-        
         const preference = await paymentService.createPaymentPreference(paymentData);
         window.location.href = preference.init_point;
       
       } else {
+        // --- LÓGICA DE PAGO EN EFECTIVO MODIFICADA ---
         await bookingService.createBooking(bookingData);
-        alert(`¡Reserva confirmada! Tu turno para el ${format(start, 'dd/MM/yyyy HH:mm')} ha sido creado.`);
+        
+        // Creamos el mensaje de WhatsApp
+        const fechaStr = formatSlotLabel(start);
+        const diaStr = formatDateHeader(start, true);
+        const msg = `¡Nueva reserva (pago en club)!\nCliente: ${userName}\nCancha: ${selectedCourt.name}\nDía: ${diaStr}\nHora: ${fechaStr}`;
+        const whatsappLink = `https://wa.me/${ownerNumber}?text=${encodeURIComponent(msg)}`;
+
+        // Mostramos el mensaje de éxito en lugar del alert
+        setCashBookingSuccess({
+            message: `¡Reserva confirmada para ${diaStr} a las ${fechaStr}!`,
+            whatsappLink: whatsappLink
+        });
         
         fetchSlots(); // Recargamos
-
         setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
@@ -259,29 +255,21 @@ const TimeSlotFinder = () => {
     }
   };
 
-  // --- Funciones de Navegación y Formato de Fecha ---
+  // ... (Funciones de navegación y formato de fecha no cambian) ...
   const today = startOfToday();
   const isViewingToday = isSameDay(selectedDate, today);
 
   const handlePrevDay = () => {
-    if (isViewingToday) return; // No ir antes de hoy
+    if (isViewingToday) return; 
     setSelectedDate(subDays(selectedDate, 1));
   };
-
   const handleNextDay = () => {
     setSelectedDate(addDays(selectedDate, 1));
   };
-  
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-  // Quitamos 'parseISO'. utcToZonedTime puede manejar
-  // tanto un string ISO como un objeto Date.
   const formatSlotLabel = (dateOrIsoString) => {
     const zonedTime = utcToZonedTime(dateOrIsoString, timeZone);
     return format(zonedTime, 'HH:mm');
   };
-  // ---------------------------------
-
-  // Capitalizar el nombre del día
   const formatDateHeader = (date, includeDayName = true) => {
     const formatString = includeDayName ? 'EEEE dd/MM' : 'dd/MM';
     let formatted = format(date, formatString, { locale: es });
@@ -291,43 +279,34 @@ const TimeSlotFinder = () => {
     return formatted;
   };
 
+
   return (
     <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
       
-      {/* --- PASO 1: NAVEGADOR DE FECHA --- */}
+      {/* --- NAVEGADOR DE FECHA --- */}
       <div className="flex justify-between items-center mb-6">
-        <button
-          onClick={handlePrevDay}
-          disabled={isViewingToday || loadingSlots}
-          className="p-3 bg-dark-primary rounded-full disabled:opacity-30 hover:bg-primary-dark transition-colors"
-        >
+        <button onClick={handlePrevDay} disabled={isViewingToday || loadingSlots} className="p-3 bg-dark-primary rounded-full disabled:opacity-30 hover:bg-primary-dark transition-colors">
           <ChevronLeftIcon className="h-6 w-6" />
         </button>
         <h2 className="text-2xl font-bold text-text-primary text-center">
           {formatDateHeader(selectedDate)}
         </h2>
-        <button
-          onClick={handleNextDay}
-          disabled={loadingSlots}
-          className="p-3 bg-dark-primary rounded-full hover:bg-primary-dark transition-colors"
-        >
+        <button onClick={handleNextDay} disabled={loadingSlots} className="p-3 bg-dark-primary rounded-full hover:bg-primary-dark transition-colors">
           <ChevronRightIcon className="h-6 w-6" />
         </button>
       </div>
       
-      {/* --- PASO 2: GRILLAS DE HORARIOS --- */}
+      {/* --- GRILLAS DE HORARIOS --- */}
       <div>
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
         {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
         {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
-        
         {!loadingSlots && allSlots.length === 0 && (
           <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-          {/* Grilla "Hoy" */}
           {todaySlots.length > 0 && (
             <div>
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
@@ -335,20 +314,11 @@ const TimeSlotFinder = () => {
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {todaySlots.map(slotISO => (
-                  <SlotButton
-                    key={slotISO}
-                    isoSlot={slotISO}
-                    label={formatSlotLabel(slotISO)}
-                    onClick={handleSlotClick}
-                    isSelected={selectedSlots.includes(slotISO)}
-                    isDisabled={loadingOptions}
-                  />
+                  <SlotButton key={slotISO} isoSlot={slotISO} label={formatSlotLabel(slotISO)} onClick={handleSlotClick} isSelected={selectedSlots.includes(slotISO)} isDisabled={loadingOptions} />
                 ))}
               </div>
             </div>
           )}
-
-          {/* Grilla "Día Siguiente" (Madrugada) */}
           {nextDaySlots.length > 0 && (
             <div>
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
@@ -356,14 +326,7 @@ const TimeSlotFinder = () => {
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {nextDaySlots.map(slotISO => (
-                  <SlotButton
-                    key={slotISO}
-                    isoSlot={slotISO}
-                    label={formatSlotLabel(slotISO)}
-                    onClick={handleSlotClick}
-                    isSelected={selectedSlots.includes(slotISO)}
-                    isDisabled={loadingOptions}
-                  />
+                  <SlotButton key={slotISO} isoSlot={slotISO} label={formatSlotLabel(slotISO)} onClick={handleSlotClick} isSelected={selectedSlots.includes(slotISO)} isDisabled={loadingOptions} />
                 ))}
               </div>
             </div>
@@ -371,36 +334,44 @@ const TimeSlotFinder = () => {
         </div>
       </div>
 
-      {/* --- PASO 3: ELEGIR CANCHA (SI HAY HORARIOS SELECCIONADOS) --- */}
-      {selectedSlots.length > 0 && (
+      {/* --- MENSAJE DE ÉXITO (PARA PAGO EN EFECTIVO) --- */}
+      {cashBookingSuccess && (
+        <div className="mt-6 p-4 bg-green-800 border border-secondary rounded-lg text-center">
+            <CheckCircleIcon className="h-12 w-12 text-secondary mx-auto mb-2" />
+            <h3 className="text-xl font-bold text-white mb-2">{cashBookingSuccess.message}</h3>
+            <p className="text-gray-300 mb-4">Por favor, notifica al club para confirmar tu llegada.</p>
+            <a
+                href={cashBookingSuccess.whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-6 py-2 bg-secondary text-dark-primary font-bold rounded-md transition-colors hover:bg-green-400"
+            >
+                Notificar por WhatsApp
+            </a>
+        </div>
+      )}
+
+      {/* --- ELEGIR CANCHA (SI HAY SLOTS) --- */}
+      {selectedSlots.length > 0 && !cashBookingSuccess && (
         <div className="mt-6 pt-6 border-t border-gray-700">
           <h3 className="text-xl font-semibold text-text-primary mb-3">Elige tu cancha</h3>
           {loadingOptions && <p className="text-text-secondary">Buscando canchas disponibles...</p>}
-          
           {!loadingOptions && courtOptions.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {courtOptions.map(option => (
-                <CourtOptionButton
-                  key={option.id}
-                  option={option}
-                  onClick={setSelectedCourt}
-                  isSelected={selectedCourt?.id === option.id}
-                />
+                <CourtOptionButton key={option.id} option={option} onClick={setSelectedCourt} isSelected={selectedCourt?.id === option.id} />
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* --- PASO 4: DATOS Y PAGO (SI HAY CANCHA SELECCIONADA) --- */}
-      {selectedCourt && (
+      {/* --- DATOS Y PAGO (SI HAY CANCHA) --- */}
+      {selectedCourt && !cashBookingSuccess && (
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
           <p className="text-text-primary mt-2">
-            Horario: <span className="font-semibold">
-              {/* Esta llamada ahora es segura */}
-              {formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)}
-            </span>
+            Horario: <span className="font-semibold">{formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)}</span>
           </p>
           <p className="text-text-primary">
             Cancha: <span className="font-semibold">{selectedCourt.name}</span>
