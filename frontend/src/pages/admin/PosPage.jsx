@@ -1,77 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
-import { paymentService } from '../../services/paymentService';
+import { paymentService } from '../../services/paymentService'; // (Usaremos este)
 import { 
     PlusCircleIcon, 
     MinusCircleIcon, 
     XCircleIcon, 
-    CheckCircleIcon, 
-    XMarkIcon // --- Icono para cerrar ---
+    CheckCircleIcon 
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
-import QRCode from 'react-qr-code';
 import socket from '../../services/socketService';
+// --- IMPORTAMOS EL MODAL REUTILIZABLE ---
+import FullScreenQRModal from '../../components/admin/FullScreenQRModal';
+// ----------------------------------------
 
-// --- NUEVO SUB-COMPONENTE: MODAL DE PANTALLA COMPLETA ---
-const FullScreenQRModal = ({ qrValue, total, status, onClose }) => {
-  return (
-    // Fondo oscuro semi-transparente que cubre toda la pantalla
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
-      
-      {/* Contenedor del QR */}
-      <div className="bg-dark-secondary p-8 rounded-lg shadow-xl w-full max-w-md text-center relative">
-        
-        {/* Botón de Cerrar (Cancelar) */}
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 text-gray-500 hover:text-white"
-        >
-          <XMarkIcon className="h-8 w-8" />
-        </button>
-
-        {/* Vista de Pago Exitoso */}
-        {status === 'successful' ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <CheckCircleIcon className="h-32 w-32 text-secondary" />
-            <h2 className="text-2xl font-bold mt-4 text-text-primary">¡Pago Recibido!</h2>
-            <p className="text-3xl font-bold text-secondary mt-2">${total.toFixed(2)}</p>
-            <button 
-              onClick={onClose} 
-              className="w-full mt-12 bg-primary hover:bg-primary-dark text-white font-bold p-3 rounded-md"
-            >
-              Nueva Venta
-            </button>
-          </div>
-        ) : (
-          // Vista de QR (Esperando pago)
-          <div className="flex flex-col items-center justify-center h-full">
-            <h2 className="text-2xl font-bold mb-6 text-primary">Escanea para Pagar</h2>
-            <div className="bg-white p-4 rounded-lg">
-              <QRCode value={qrValue} size={256} />
-            </div>
-            <p className="text-3xl font-bold text-secondary mt-6">${total.toFixed(2)}</p>
-            
-            {status === 'pending' && (
-              <p className="text-xl text-yellow-400 mt-4 animate-pulse">
-                Esperando confirmación de pago...
-              </p>
-            )}
-            
-            <button 
-              onClick={onClose} 
-              className="w-full mt-8 bg-gray-600 hover:bg-gray-500 text-white font-bold p-3 rounded-md"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-// --- FIN DEL NUEVO SUB-COMPONENTE ---
-
+// (El sub-componente FullScreenQRModal se ha eliminado de aquí)
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -102,11 +45,12 @@ const PosPage = () => {
     fetchProducts();
   }, []);
 
-  // Efecto para Socket.IO (sin cambios)
+  // Efecto para Socket.IO
   useEffect(() => {
     socket.connect();
     
     const handleSaleCompleted = (saleData) => {
+      // Comprobamos si el pago recibido coincide con el que estamos esperando
       if (saleData.total === paymentTotal && paymentStatus === 'pending') {
           setPaymentStatus('successful');
       }
@@ -216,7 +160,6 @@ const PosPage = () => {
     }
   };
 
-  // Esta función ahora se pasa al Modal
   const handleNewSale = () => {
     setPaymentQR('');
     setPaymentStatus('idle');
@@ -231,7 +174,13 @@ const PosPage = () => {
         {/* Columna de Productos (Izquierda) */}
         <div className="lg:col-span-2 bg-dark-secondary p-4 rounded-lg overflow-y-auto">
           <h2 className="text-2xl font-bold mb-4">Productos</h2>
-          <input type="text" placeholder="Buscar producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" />
+          <input 
+            type="text" 
+            placeholder="Buscar producto..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full bg-dark-primary p-2 rounded-md mb-4 border border-gray-600" 
+          />
           {loading && <p>Cargando...</p>}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map(product => (
@@ -244,7 +193,7 @@ const PosPage = () => {
           </div>
         </div>
 
-        {/* Columna de Carrito (Derecha) - Ahora solo muestra el carrito */}
+        {/* Columna de Carrito (Derecha) */}
         <div className="bg-dark-secondary p-4 rounded-lg flex flex-col">
           <h2 className="text-2xl font-bold mb-4">Carrito</h2>
           <div className="flex-grow overflow-y-auto">
@@ -281,8 +230,7 @@ const PosPage = () => {
         </div>
       </div>
 
-      {/* --- RENDERIZADO DEL MODAL DE PANTALLA COMPLETA --- */}
-      {/* Se mostrará por encima de todo cuando paymentQR tenga un valor */}
+      {/* --- RENDERIZADO DEL MODAL (AHORA IMPORTADO) --- */}
       {paymentQR && (
         <FullScreenQRModal
           qrValue={paymentQR}
