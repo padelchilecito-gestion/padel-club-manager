@@ -1,49 +1,62 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bookingService } from '../services/bookingService';
-import { usePublicSettings } from '../contexts/PublicSettingsContext';
-import { paymentService } from '../services/paymentService';
-import { format, addMinutes, parseISO, startOfToday } from 'date-fns';
+import { usePublicSettings } from '../contexts/PublicSettingsContext'; // Usamos el contexto
+import { paymentService } from '../services/paymentService'; // Usamos el servicio de pago
+import { format, addMinutes, parseISO, startOfToday, isToday, getDay, startOfDay } from 'date-fns';
 import { utcToZonedTime } from 'date-fns-tz';
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
 // --- Componente de Botón de Slot ---
-// Reutilizable para horarios y canchas
-const OptionButton = ({ label, subLabel, onClick, isSelected, disabled = false }) => (
+const SlotButton = ({ isoSlot, label, onClick, isSelected, isDisabled }) => (
   <button
-    onClick={onClick}
-    disabled={disabled}
+    onClick={() => onClick(isoSlot)}
+    disabled={isDisabled}
     className={`p-3 w-full rounded-md text-center font-semibold transition-colors
       ${isSelected
         ? 'bg-primary text-white scale-105 shadow-lg'
         : 'bg-dark-primary hover:bg-primary-dark'}
-      ${disabled
-        ? 'opacity-50 bg-gray-700 cursor-not-allowed'
+      ${isDisabled
+        ? 'opacity-30 bg-dark-primary cursor-not-allowed'
         : ''}
     `}
   >
     {label}
-    {subLabel && <span className="block text-sm font-normal opacity-80">{subLabel}</span>}
   </button>
 );
 
+// --- Componente de Opción de Cancha ---
+const CourtOptionButton = ({ option, onClick, isSelected }) => (
+  <button
+    onClick={() => onClick(option)}
+    className={`p-3 w-full rounded-md text-center font-semibold transition-colors
+      ${isSelected
+        ? 'bg-primary text-white scale-105 shadow-lg'
+        : 'bg-dark-primary hover:bg-primary-dark'}
+    `}
+  >
+    {option.name}
+    <span className="block text-sm font-normal opacity-80">${option.price.toFixed(2)}</span>
+  </button>
+);
+
+
 // --- Componente Principal (Reescrito) ---
 const TimeSlotFinder = () => {
-  // Estados de carga
+  // Estados de Carga y Errores
   const { isLoading: settingsLoading } = usePublicSettings();
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [bookingError, setBookingError] = useState('');
   const [isBooking, setIsBooking] = useState(false);
+  const [bookingError, setBookingError] = useState('');
 
-  // Estados de datos
-  const [availableSlots, setAvailableSlots] = useState([]); // Slots de 30 min (de API 1)
+  // Estados de Datos
+  const [allSlots, setAllSlots] = useState([]); // Slots de 30 min (de API 1)
   const [courtOptions, setCourtOptions] = useState([]); // Canchas/precios (de API 2)
 
-  // Estados de selección del usuario
+  // Estados de Selección del Usuario
   const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
-  const [selectedStartTime, setSelectedStartTime] = useState(null); // Slot de inicio (ISO String)
-  const [selectedDuration, setSelectedDuration] = useState(60); // Duración en minutos (60, 90, 120)
+  const [selectedSlots, setSelectedSlots] = useState([]); // Arreglo de ISO Strings
   const [selectedCourt, setSelectedCourt] = useState(null); // { id, name, price }
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
@@ -54,15 +67,16 @@ const TimeSlotFinder = () => {
 
     const fetchSlots = async () => {
       setLoadingSlots(true);
-      setAvailableSlots([]);
+      setAllSlots([]);
+      setBookingError('');
       // Reseteamos la selección
-      setSelectedStartTime(null);
+      setSelectedSlots([]);
       setCourtOptions([]);
       setSelectedCourt(null);
 
       try {
         const slotsISO = await bookingService.getPublicAvailabilitySlots(selectedDate);
-        setAvailableSlots(slotsISO);
+        setAllSlots(slotsISO);
       } catch (err) {
         setBookingError('No se pudieron cargar los horarios. Intente más tarde.');
       } finally {
@@ -72,27 +86,93 @@ const TimeSlotFinder = () => {
     fetchSlots();
   }, [selectedDate, settingsLoading]);
 
-  // --- PASO 2: Calcular el Rango y Cargar Opciones de Cancha ---
-  const selectedTimeRange = useMemo(() => {
-    if (!selectedStartTime) return null;
+  // --- Lógica de la Grilla (Hoy vs Mañana) ---
+  const { todaySlots, nextDaySlots } = useMemo(() => {
+    const selectedDayStart = startOfDay(parseISO(selectedDate));
+    const today = [];
+    const nextDay = [];
 
-    const start = parseISO(selectedStartTime);
-    const end = addMinutes(start, selectedDuration);
+    allSlots.forEach(slotISO => {
+      const slotDate = startOfDay(parseISO(slotISO));
+      if (slotDate.getTime() === selectedDayStart.getTime()) {
+        today.push(slotISO);
+      } else {
+        nextDay.push(slotISO);
+      }
+    });
+    return { todaySlots: today, nextDaySlots: nextDay };
+  }, [allSlots, selectedDate]);
+
+
+  // --- PASO 2: Lógica de selección de slots (consecutivos) ---
+  const handleSlotClick = (slotISO) => {
+    const newSelection = [...selectedSlots];
+    const index = newSelection.indexOf(slotISO);
+
+    if (index > -1) {
+      // Deseleccionar
+      newSelection.splice(index, 1);
+    } else {
+      // Añadir
+      newSelection.push(slotISO);
+    }
+
+    // Validar si son consecutivos
+    if (newSelection.length > 1) {
+      const sortedTimestamps = newSelection.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
+      let isConsecutive = true;
+      for (let i = 0; i < sortedTimestamps.length - 1; i++) {
+        const diff = sortedTimestamps[i+1] - sortedTimestamps[i];
+        // Diferencia debe ser exactamente 30 minutos
+        if (diff !== 30 * 60 * 1000) {
+          isConsecutive = false;
+          break;
+        }
+      }
+
+      if (!isConsecutive) {
+        // Si no son consecutivos, solo seleccionamos el último clic
+        setSelectedSlots([slotISO]);
+        setBookingError(''); // Limpiamos error anterior
+        return;
+      }
+    }
+
+    setSelectedSlots(newSelection);
+    setBookingError('');
+  };
+
+  // --- PASO 3: Cargar Opciones de Cancha ---
+  const selectedTimeRange = useMemo(() => {
+    if (selectedSlots.length === 0) return null;
+
+    const sortedTimestamps = selectedSlots.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
+    const start = new Date(sortedTimestamps[0]);
+    const end = addMinutes(new Date(sortedTimestamps[sortedTimestamps.length - 1]), 30);
+    
     return { start, end };
-  }, [selectedStartTime, selectedDuration]);
+  }, [selectedSlots]);
 
   useEffect(() => {
-    if (!selectedTimeRange) return;
+    if (!selectedTimeRange) {
+      setCourtOptions([]); // Limpiamos si no hay selección
+      setSelectedCourt(null);
+      return;
+    }
 
     const fetchCourtOptions = async () => {
       setLoadingOptions(true);
       setCourtOptions([]);
       setSelectedCourt(null);
+      setBookingError('');
 
       const { start, end } = selectedTimeRange;
       
       try {
         const options = await bookingService.getPublicCourtOptions(start.toISOString(), end.toISOString());
+        if (options.length === 0) {
+          setBookingError('No hay una misma cancha disponible para todo el rango seleccionado. Prueba un rango más corto.');
+        }
         setCourtOptions(options);
         // Si solo hay una opción, la seleccionamos automáticamente
         if (options.length === 1) {
@@ -107,11 +187,6 @@ const TimeSlotFinder = () => {
     fetchCourtOptions();
   }, [selectedTimeRange]);
   
-  // --- Lógica de selección de slot ---
-  const handleSlotClick = (slotISO) => {
-    setSelectedStartTime(prev => (prev === slotISO ? null : slotISO));
-  };
-
   // --- PASO 4: Finalizar Reserva ---
   const handleFinalizeBooking = async (paymentMethod) => {
     if (!userName || !userPhone) {
@@ -157,18 +232,18 @@ const TimeSlotFinder = () => {
         const newBooking = await bookingService.createBooking(bookingData);
         alert(`¡Reserva confirmada! Tu turno para el ${format(start, 'dd/MM/yyyy HH:mm')} ha sido creado.`);
         
-        // Resetear todo después de reservar en efectivo
-        setLoadingSlots(true); // Forzar recarga de slots
-        setSelectedDate(format(startOfToday(), 'yyyy-MM-dd'));
-        setSelectedStartTime(null);
+        // Recargamos los slots para el día actual
+        setLoadingSlots(true);
+        const slotsISO = await bookingService.getPublicAvailabilitySlots(selectedDate);
+        setAllSlots(slotsISO);
+        setLoadingSlots(false);
+
+        // Reseteamos el formulario
+        setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
         setUserName('');
         setUserPhone('');
-        // Disparamos la recarga
-        const slotsISO = await bookingService.getPublicAvailabilitySlots(selectedDate);
-        setAvailableSlots(slotsISO);
-        setLoadingSlots(false);
       }
     } catch (err) {
       setBookingError(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
@@ -198,35 +273,64 @@ const TimeSlotFinder = () => {
         disabled={settingsLoading || loadingSlots}
       />
 
-      {/* --- PASO 2: ELEGIR HORARIO Y DURACIÓN --- */}
+      {/* --- PASO 2: ELEGIR HORARIO --- */}
       <div className="mt-6">
-        <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 2: Elige el horario de inicio y la duración</h3>
+        <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 2: Elige los horarios (puedes elegir varios seguidos)</h3>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <DurationOption value={60} label="60 min" selected={selectedDuration} onChange={setSelectedDuration} />
-          <DurationOption value={90} label="90 min" selected={selectedDuration} onChange={setSelectedDuration} />
-          <DurationOption value={120} label="120 min" selected={selectedDuration} onChange={setSelectedDuration} />
-        </div>
-
         {loadingSlots && <p className="text-text-secondary">Cargando turnos...</p>}
-        {!loadingSlots && availableSlots.length > 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-            {availableSlots.map(slotISO => (
-              <OptionButton
-                key={slotISO}
-                label={formatSlotLabel(slotISO)}
-                onClick={() => handleSlotClick(slotISO)}
-                isSelected={selectedStartTime === slotISO}
-              />
-            ))}
-          </div>
-        ) : (
-          !loadingSlots && <p className="text-text-secondary">No hay turnos disponibles para este día.</p>
+        {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
+        
+        {!loadingSlots && allSlots.length === 0 && (
+          <p className="text-text-secondary">No hay turnos disponibles para este día.</p>
         )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Grilla "Hoy" */}
+          {todaySlots.length > 0 && (
+            <div>
+              <h4 className="text-lg font-bold text-text-secondary mb-2 text-center">
+                {format(parseISO(selectedDate), 'EEEE dd/MM')}
+              </h4>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {todaySlots.map(slotISO => (
+                  <SlotButton
+                    key={slotISO}
+                    isoSlot={slotISO}
+                    label={formatSlotLabel(slotISO)}
+                    onClick={handleSlotClick}
+                    isSelected={selectedSlots.includes(slotISO)}
+                    isDisabled={loadingOptions}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Grilla "Día Siguiente" (Madrugada) */}
+          {nextDaySlots.length > 0 && (
+            <div>
+              <h4 className="text-lg font-bold text-text-secondary mb-2 text-center">
+                Día Siguiente (Madrugada)
+              </h4>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {nextDaySlots.map(slotISO => (
+                  <SlotButton
+                    key={slotISO}
+                    isoSlot={slotISO}
+                    label={formatSlotLabel(slotISO)}
+                    onClick={handleSlotClick}
+                    isSelected={selectedSlots.includes(slotISO)}
+                    isDisabled={loadingOptions}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* --- PASO 3: ELEGIR CANCHA (SI HAY HORARIO) --- */}
-      {selectedStartTime && (
+      {/* --- PASO 3: ELEGIR CANCHA (SI HAY HORARIOS SELECCIONADOS) --- */}
+      {selectedSlots.length > 0 && (
         <div className="mt-6 pt-6 border-t border-gray-700">
           <h3 className="text-xl font-semibold text-text-primary mb-3">Paso 3: Elige tu cancha</h3>
           {loadingOptions && <p className="text-text-secondary">Buscando canchas disponibles...</p>}
@@ -234,34 +338,23 @@ const TimeSlotFinder = () => {
           {!loadingOptions && courtOptions.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {courtOptions.map(option => (
-                <OptionButton
+                <CourtOptionButton
                   key={option.id}
-                  label={option.name}
-                  subLabel={`$${option.price.toFixed(2)}`}
-                  onClick={() => setSelectedCourt(option)}
+                  option={option}
+                  onClick={setSelectedCourt}
                   isSelected={selectedCourt?.id === option.id}
                 />
               ))}
             </div>
           )}
-
-          {!loadingOptions && courtOptions.length === 0 && (
-            <p className="text-text-secondary">
-              No hay canchas disponibles que cubran el rango de {formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)} ({selectedDuration} min).
-              Por favor, elige un horario de inicio más temprano o una duración menor.
-            </p>
-          )}
         </div>
       )}
 
-      {/* --- PASO 4: DATOS Y PAGO (SI HAY CANCHA) --- */}
+      {/* --- PASO 4: DATOS Y PAGO (SI HAY CANCHA SELECCIONADA) --- */}
       {selectedCourt && (
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
           <p className="text-text-primary mt-2">
-            Día: <span className="font-semibold">{format(parseISO(selectedDate), 'dd/MM/yyyy')}</span>
-          </p>
-          <p className="text-text-primary">
             Horario: <span className="font-semibold">{formatSlotLabel(selectedTimeRange.start)} a {formatSlotLabel(selectedTimeRange.end)}</span>
           </p>
           <p className="text-text-primary">
@@ -273,11 +366,11 @@ const TimeSlotFinder = () => {
 
           <div className="mt-4 pt-4 border-t border-gray-600">
             <h4 className="text-md font-semibold text-text-primary mb-3">Completa tus datos</h4>
-            {bookingError && <p className="text-danger text-sm text-center mb-2">{bookingError}</p>}
+            {bookingError && isBooking && <p className="text-danger text-sm text-center mb-2">{bookingError}</p>}
             <div className="space-y-4">
               <div>
                 <label htmlFor="userName" className="block text-sm font-medium text-text-secondary">Nombre Completo</label>
-                <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
+                <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.g.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
               <div>
                 <label htmlFor="userPhone" className="block text-sm font-medium text-text-secondary">Teléfono (con código de área)</label>
@@ -307,19 +400,5 @@ const TimeSlotFinder = () => {
     </div>
   );
 };
-
-// Componente helper para los botones de duración
-const DurationOption = ({ value, label, selected, onChange }) => (
-  <button
-    onClick={() => onChange(value)}
-    className={`p-2 rounded-md font-semibold ${
-      selected === value 
-      ? 'bg-primary text-white' 
-      : 'bg-dark-primary hover:bg-primary-dark'
-    }`}
-  >
-    {label}
-  </button>
-);
 
 export default TimeSlotFinder;
