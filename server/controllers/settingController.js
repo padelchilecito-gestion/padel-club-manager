@@ -6,7 +6,6 @@ const Setting = require('../models/Setting');
 const getSettings = async (req, res) => {
     try {
         const settingsArray = await Setting.find({});
-        // Convert array to a key-value object for easier use in the frontend
         const settingsObject = settingsArray.reduce((acc, setting) => {
             acc[setting.key] = setting.value;
             return acc;
@@ -22,14 +21,14 @@ const getSettings = async (req, res) => {
 // @route   PUT /api/settings
 // @access  Admin
 const updateSettings = async (req, res) => {
-    const settings = req.body; // Expects an object like { KEY: 'value', ... }
+    const settings = req.body; 
 
     try {
         const promises = Object.keys(settings).map(key => {
             return Setting.findOneAndUpdate(
                 { key },
                 { value: settings[key], lastUpdatedBy: req.user.id },
-                { new: true, upsert: true, runValidators: true } // upsert: create if not found
+                { new: true, upsert: true, runValidators: true } 
             );
         });
 
@@ -42,28 +41,55 @@ const updateSettings = async (req, res) => {
     }
 };
 
-// --- FUNCIÓN MODIFICADA Y RENOMBRADA ---
+
 // @desc    Get all public settings
 // @route   GET /api/settings/public
 // @access  Public
 const getPublicSettings = async (req, res) => {
     try {
-        // Obtenemos solo las claves públicas que nos interesan
+        // --- Claves públicas que el frontend necesita ---
+        const publicKeys = [
+            'BUSINESS_HOURS', 
+            'SHOP_ENABLED',
+            'PUBLIC_TITLE',
+            'PUBLIC_SUBTITLE',
+            'PUBLIC_CONTACT_NUMBER',
+            'OWNER_NOTIFICATION_NUMBER'
+        ];
+        
         const settingsArray = await Setting.find({ 
-            key: { $in: ['BUSINESS_HOURS', 'SHOP_ENABLED'] } 
+            key: { $in: publicKeys } 
         });
 
+        // --- Valores por defecto ---
         const publicSettings = {
             businessHours: null,
-            shopEnabled: false // Por defecto, la tienda está deshabilitada
+            shopEnabled: false,
+            publicTitle: 'Padel Club Manager',
+            publicSubtitle: 'Encuentra y reserva tu cancha de pádel en segundos',
+            publicContactNumber: '',
+            ownerNotificationNumber: ''
         };
 
+        // --- Mapeamos los valores de la BD ---
         settingsArray.forEach(setting => {
             if (setting.key === 'BUSINESS_HOURS') {
                 publicSettings.businessHours = JSON.parse(setting.value);
             }
             if (setting.key === 'SHOP_ENABLED') {
                 publicSettings.shopEnabled = (setting.value === 'true');
+            }
+            if (setting.key === 'PUBLIC_TITLE') {
+                publicSettings.publicTitle = setting.value;
+            }
+            if (setting.key === 'PUBLIC_SUBTITLE') {
+                publicSettings.publicSubtitle = setting.value;
+            }
+            if (setting.key === 'PUBLIC_CONTACT_NUMBER') {
+                publicSettings.publicContactNumber = setting.value;
+            }
+            if (setting.key === 'OWNER_NOTIFICATION_NUMBER') {
+                publicSettings.ownerNotificationNumber = setting.value;
             }
         });
         
@@ -79,5 +105,5 @@ const getPublicSettings = async (req, res) => {
 module.exports = {
     getSettings,
     updateSettings,
-    getPublicSettings, // Exportamos la nueva función
+    getPublicSettings,
 };
