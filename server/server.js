@@ -13,6 +13,7 @@ const startServer = async () => {
   const app = express();
   const server = http.createServer(app);
 
+  // --- Configuración de Orígenes Permitidos (para HTTP) ---
   const vercelURL = 'https://padel-club-manager-xi.vercel.app';
   const allowedOrigins = [
     'http://localhost:5173',
@@ -28,7 +29,7 @@ const startServer = async () => {
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.error(`CORS Error: Origin ${origin} not allowed.`);
+        console.error(`CORS Error (HTTP): Origin ${origin} not allowed.`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -39,9 +40,11 @@ const startServer = async () => {
   app.use(express.json({ extended: false }));
 
   // --- MODIFICACIÓN DE SOCKET.IO ---
+  // Simplificamos la configuración de CORS para Socket.IO
+  // para que sea más permisiva y evite el error 400.
   const io = new Server(server, {
     cors: {
-      origin: corsOptions.origin, // <-- USAMOS LA MISMA FUNCIÓN DE ORIGEN
+      origin: "*", // Acepta conexiones de cualquier origen
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
@@ -51,6 +54,7 @@ const startServer = async () => {
   app.set('socketio', io);
 
   io.on('connection', (socket) => {
+    // Logueamos el origen real de la conexión de socket
     console.log(`A user connected via WebSocket (Origin: ${socket.handshake.headers.origin})`);
     socket.on('disconnect', () => {
       console.log('User disconnected');
@@ -59,6 +63,7 @@ const startServer = async () => {
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
+  // Define Routes
   app.use('/api', apiRoutes);
 
   const PORT = process.env.PORT || 5000;
