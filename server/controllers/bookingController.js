@@ -4,17 +4,17 @@ const Setting = require('../models/Setting');
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
 
-// --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-// Importamos las funciones de date-fns-tz v3 por separado
-const { utcToZonedTime } = require('date-fns-tz/utcToZonedTime');
-const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
+// --- ¡CORRECCIÓN DE IMPORTACIÓN! ---
+// Volvemos a la sintaxis simple. Esto funcionará
+// una vez que 'date-fns' (del package.json) esté instalado.
+const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 // ----------------------------------
 
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// --- (Las funciones createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking no cambian) ---
-
+// --- (createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking) ---
+// (Estas funciones no cambian, las incluyo para que el archivo esté completo)
 // @desc    Create a new booking
 // @route   POST /api/bookings
 // @access  Public or Admin
@@ -233,7 +233,6 @@ const cancelBooking = async (req, res) => {
     }
 };
 
-
 // ---
 // --- NUEVAS FUNCIONES DE API PÚBLICA (CON CORRECCIÓN DE IMPORT) ---
 // ---
@@ -264,7 +263,6 @@ const getPublicAvailabilitySlots = async (req, res) => {
         
         // El 'date' que recibimos (ej: 2025-11-11) se interpreta como UTC (00:00 UTC)
         // Lo convertimos a la zona horaria de Argentina para que sea 00:00 ARGT
-        // ¡Esta es la línea (261) que fallaba!
         const startOfDayArg = zonedTimeToUtc(date + 'T00:00:00', timeZone);
         
         const endOfWindow = new Date(startOfDayArg.getTime() + 36 * 60 * 60 * 1000); 
