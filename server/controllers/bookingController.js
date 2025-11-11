@@ -3,12 +3,8 @@ const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-
-// --- ¡CORRECCIÓN DE IMPORTACIÓN! ---
-// Volvemos a la sintaxis simple. Esto funcionará
-// una vez que 'date-fns' (del package.json) esté instalado.
+// --- Importación de date-fns-tz ---
 const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
-// ----------------------------------
 
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
