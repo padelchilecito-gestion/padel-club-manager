@@ -58,6 +58,7 @@ const cancelBooking = async (id) => {
 
 const getPublicAvailabilitySlots = async (date) => {
   try {
+    // 'date' debe ser un string 'yyyy-MM-dd'
     const response = await apiClient.get('/bookings/public-slots', {
       params: { date },
     });
@@ -82,7 +83,7 @@ const getPublicCourtOptions = async (startTime, endTime) => {
 // --------------------------------
 
 export const bookingService = {
-  getAvailability, // (Esta ya no la usará el TimeSlotFinder, pero la dejamos por si acaso)
+  getAvailability, // (Esta ya no la usará el TimeSlotFinder, pero la dejamos)
   createBooking,
   getAllBookings,
   updateBookingStatus,
