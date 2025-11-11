@@ -1,12 +1,17 @@
 import React from 'react';
 import TimeSlotFinder from '../components/TimeSlotFinder.jsx';
+import { usePublicSettings } from '../contexts/PublicSettingsContext'; // --- IMPORTADO ---
 
 const HomePage = () => {
+  // --- OBTENEMOS LOS SETTINGS PÚBLICOS ---
+  const { settings } = usePublicSettings();
+
   return (
     <div className="container mx-auto p-4">
       <header className="text-center my-8">
-        <h1 className="text-5xl font-bold text-primary">Padel Club Manager</h1>
-        <p className="text-text-secondary mt-2">Encuentra y reserva tu cancha de pádel en segundos</p>
+        {/* --- TÍTULOS DINÁMICOS --- */}
+        <h1 className="text-5xl font-bold text-primary">{settings.publicTitle}</h1>
+        <p className="text-text-secondary mt-2">{settings.publicSubtitle}</p>
       </header>
       
       <main>
