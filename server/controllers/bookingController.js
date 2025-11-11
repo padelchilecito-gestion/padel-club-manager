@@ -3,14 +3,18 @@ const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-// --- IMPORTAMOS LA LIBRERÍA DE ZONA HORARIA ---
-const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
+
+// --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+// Importamos las funciones de date-fns-tz v3 por separado
+const { utcToZonedTime } = require('date-fns-tz/utcToZonedTime');
+const { zonedTimeToUtc } = require('date-fns-tz/zonedTimeToUtc');
+// ----------------------------------
 
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
 
 // --- (Las funciones createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking no cambian) ---
-// ... (Omitidas por brevedad, asumiendo que están correctas de la vez anterior) ...
+
 // @desc    Create a new booking
 // @route   POST /api/bookings
 // @access  Public or Admin
@@ -228,8 +232,10 @@ const cancelBooking = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
+
 // ---
-// --- FIN DE FUNCIONES EXISTENTES ---
+// --- NUEVAS FUNCIONES DE API PÚBLICA (CON CORRECCIÓN DE IMPORT) ---
 // ---
 
 // Helper para crear un horario por defecto (todo cerrado)
@@ -256,11 +262,11 @@ const getPublicAvailabilitySlots = async (req, res) => {
         const settingsPromise = Setting.findOne({ key: 'BUSINESS_HOURS' });
         const courtsPromise = Court.find({ isActive: true }).select('_id');
         
-        // El 'date' que recibimos (ej: 2025-11-10) se interpreta como UTC (00:00 UTC)
+        // El 'date' que recibimos (ej: 2025-11-11) se interpreta como UTC (00:00 UTC)
         // Lo convertimos a la zona horaria de Argentina para que sea 00:00 ARGT
+        // ¡Esta es la línea (261) que fallaba!
         const startOfDayArg = zonedTimeToUtc(date + 'T00:00:00', timeZone);
         
-        // Creamos una ventana de 36 horas (el día completo + 12h del día siguiente)
         const endOfWindow = new Date(startOfDayArg.getTime() + 36 * 60 * 60 * 1000); 
         const now = new Date(); // 'now' sigue siendo UTC
 
@@ -306,14 +312,12 @@ const getPublicAvailabilitySlots = async (req, res) => {
                 continue;
             }
 
-            // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
             // Convertimos el slot (que está en UTC) a la hora local de Argentina
             // para consultar la grilla de horarios de apertura.
             const localSlotTime = utcToZonedTime(currentSlotTime, timeZone);
             
             const dayIndex = localSlotTime.getDay(); // 0 = Domingo (AR), 1 = Lunes (AR)...
             const slotIndex = (localSlotTime.getHours() * 2) + (localSlotTime.getMinutes() / 30);
-            // ------------------------------------
             
             if (!businessHours[dayIndex] || !businessHours[dayIndex][slotIndex]) {
                 currentSlotTime = slotEnd;
@@ -344,7 +348,6 @@ const getPublicAvailabilitySlots = async (req, res) => {
  * @access  Public
  */
 const getPublicCourtOptions = async (req, res) => {
-    // ... (Esta función ya era correcta, no necesita cambios)
     const { startTime, endTime } = req.query;
     if (!startTime || !endTime) {
         return res.status(400).json({ message: 'Start time and end time are required.' });
