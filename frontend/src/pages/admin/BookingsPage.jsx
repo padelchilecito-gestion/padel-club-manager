@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { bookingService } from '../../services/bookingService';
-import { paymentService } from '../../services/paymentService'; // Importamos el servicio de pago
+import { courtService } from '../../services/courtService'; // --- 1. IMPORTAMOS COURT SERVICE ---
+import { paymentService } from '../../services/paymentService'; 
 import socket from '../../services/socketService';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns'; // --- 2. IMPORTAMOS 'startOfDay' ---
 import { utcToZonedTime } from 'date-fns-tz';
-import { PencilIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
+import { PencilIcon, XCircleIcon, CurrencyDollarIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/solid'; // --- 3. IMPORTAMOS ÍCONOS DE FILTRO ---
 import BookingFormModal from '../../components/admin/BookingFormModal';
-import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; // Importamos el Modal QR
+import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; 
 
-// --- Componente de Acciones de Pago (Sin cambios) ---
+// --- (Componente PaymentActions sin cambios) ---
 const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -26,7 +27,7 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   };
   
   const handleQRClick = () => {
-    onShowQR(booking); // Llamamos a la función del padre
+    onShowQR(booking); 
     setIsOpen(false);
   }
 
@@ -38,7 +39,6 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
       <div className="relative">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          // --- Añadimos onBlur para cerrar si se hace clic fuera ---
           onBlur={() => setTimeout(() => setIsOpen(false), 150)}
           className="text-secondary hover:text-green-400" 
           title="Marcar como Pagado"
@@ -47,7 +47,6 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
         </button>
         
         {isOpen && (
-          // --- POSICIÓN CORREGIDA: 'top-full' (abajo) y 'mt-2' ---
           <div className="absolute top-full mt-2 right-0 bg-dark-primary border border-gray-600 rounded-md shadow-lg z-10 w-36">
             <button onClick={() => handlePayment('Efectivo')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Efectivo</button>
             <button onClick={() => handlePayment('Transferencia')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Transferencia</button>
@@ -58,42 +57,59 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
     </div>
   );
 };
-// ---------------------------------------------
 
 
 const BookingsPage = () => {
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState([]); // Lista original de la API
+  const [courts, setCourts] = useState([]); // Lista de canchas para el filtro
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  // --- NUEVOS ESTADOS PARA EL MODAL QR ---
+  // --- 4. ESTADOS PARA LOS FILTROS ---
+  const [filters, setFilters] = useState({
+    court: 'all',
+    payment: 'all',
+    date: '' // String vacío para "Todos"
+  });
+  // -----------------------------------
+
   const [qrData, setQrData] = useState({
     qrValue: '',
     total: 0,
     status: 'idle',
-    bookingId: null // Para saber qué reserva estamos cobrando
+    bookingId: null 
   });
-  // -------------------------------------
 
   const timeZone = 'America/Argentina/Buenos_Aires';
 
-  const fetchBookings = async () => {
-    try {
+  // --- 5. FUNCIÓN PARA CARGAR CANCHAS Y TURNOS ---
+  useEffect(() => {
+    const loadInitialData = async () => {
       setLoading(true);
-      const data = await bookingService.getAllBookings();
-      setBookings(data);
-    } catch (err) {
-      setError('No se pudieron cargar las reservas.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      setError('');
+      try {
+        // Pedimos turnos y canchas en paralelo
+        const [bookingsData, courtsData] = await Promise.all([
+          bookingService.getAllBookings(),
+          courtService.getAllCourts()
+        ]);
+        setBookings(bookingsData);
+        setCourts(courtsData);
+      } catch (err) {
+        setError('No se pudieron cargar los datos.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []); // Solo se ejecuta una vez al cargar
 
+  // --- (Efecto de Socket.IO sin cambios) ---
   useEffect(() => {
     socket.connect();
-    fetchBookings();
 
     const handleBookingUpdate = (updatedBooking) => {
         setBookings(prevBookings => {
@@ -107,7 +123,6 @@ const BookingsPage = () => {
             }
         });
         
-        // --- LÓGICA DE SOCKET PARA EL MODAL QR ---
         if (
             qrData.bookingId === updatedBooking._id && 
             updatedBooking.isPaid &&
@@ -115,7 +130,6 @@ const BookingsPage = () => {
         ) {
             setQrData(prev => ({ ...prev, status: 'successful' }));
         }
-        // ----------------------------------------
     };
     
     const handleBookingDelete = ({ id }) => {
@@ -130,59 +144,87 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, [qrData.bookingId, qrData.status]); // <-- Dependencias de useEffect
+  }, [qrData.bookingId, qrData.status]);
 
+  // --- 6. LÓGICA DE FILTRADO ---
+  const filteredBookings = useMemo(() => {
+    let filtered = [...bookings];
+
+    // Filtro por Cancha
+    if (filters.court !== 'all') {
+      filtered = filtered.filter(b => b.court?._id === filters.court);
+    }
+
+    // Filtro por Pago
+    if (filters.payment !== 'all') {
+      const isPaidFilter = filters.payment === 'paid';
+      filtered = filtered.filter(b => b.isPaid === isPaidFilter);
+    }
+
+    // Filtro por Fecha
+    if (filters.date) {
+      const filterDateStart = startOfDay(new Date(filters.date + 'T00:00:00')); // Fecha en zona local
+      filtered = filtered.filter(b => {
+        const bookingDate = startOfDay(utcToZonedTime(new Date(b.startTime), timeZone));
+        return bookingDate.getTime() === filterDateStart.getTime();
+      });
+    }
+
+    return filtered;
+  }, [bookings, filters]);
+  
+  // --- 7. MANEJADORES DE FILTROS ---
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ court: 'all', payment: 'all', date: '' });
+  };
+  // ---------------------------------
+
+  // --- (Funciones de Modales y Pago sin cambios) ---
   const handleOpenModal = (booking = null) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
   };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedBooking(null);
   };
-
   const handleSuccess = () => {
-    fetchBookings();
+    // Ya no recargamos todo, el socket y el estado local se encargan
     handleCloseModal();
   };
-
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN DEL BUG (Punto 4)! ---
   const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
     try {
-        // 1. Esperamos a que la API nos devuelva el turno actualizado
         const updatedBooking = await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
-        
-        // 2. Actualizamos el estado de 'bookings' en React manualmente
         setBookings(prevBookings => 
           prevBookings.map(b => 
             b._id === updatedBooking._id ? updatedBooking : b
           )
         );
-        // Esto da una respuesta visual instantánea
-        
     } catch (err) {
         alert('Error al actualizar la reserva.');
     }
   };
-  // ------------------------------------------------
-
   const handleCancel = async (id) => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
           try {
               await bookingService.cancelBooking(id);
-              // El socket (handleBookingUpdate) se encargará de actualizar la UI aquí
+              // El socket actualizará la UI
           } catch (err) {
               alert('Error al cancelar la reserva.');
           }
       }
   };
-
-  // --- (Función handleShowQR sin cambios) ---
   const handleShowQR = async (booking) => {
     setLoading(true);
     setQrData({ qrValue: '', total: booking.price, status: 'idle', bookingId: booking._id });
-    
     try {
         const paymentData = {
           items: [{
@@ -195,31 +237,26 @@ const BookingsPage = () => {
             booking_id: booking._id, 
           }
         };
-
         const preference = await paymentService.createPaymentPreference(paymentData);
-        
         setQrData({
             qrValue: preference.init_point,
             total: booking.price,
             status: 'pending',
             bookingId: booking._id
         });
-
     } catch (err) {
         alert('Error al generar el QR de Mercado Pago.');
     } finally {
         setLoading(false);
     }
   };
-
   const handleCloseQRModal = () => {
     setQrData({ qrValue: '', total: 0, status: 'idle', bookingId: null });
   };
-  
-  // Helper para limpiar el número de WhatsApp
   const cleanPhoneNumber = (number) => {
     return (number || '').replace(/[^0-9]/g, ''); 
   };
+  // ----------------------------------------------------
 
   if (loading && bookings.length === 0) return <div className="text-center p-8">Cargando reservas...</div>;
   if (error) return <div className="text-center p-8 text-danger">{error}</div>;
@@ -236,7 +273,66 @@ const BookingsPage = () => {
         </button>
       </div>
 
-      {/* --- (Aquí irán los filtros del Punto 3) --- */}
+      {/* --- 8. BARRA DE FILTROS (NUEVO) --- */}
+      <div className="mb-6 p-4 bg-dark-secondary rounded-lg shadow-md flex flex-wrap items-end gap-4">
+        <FunnelIcon className="h-6 w-6 text-primary" />
+        
+        {/* Filtro por Fecha */}
+        <div className="flex-grow min-w-[150px]">
+          <label htmlFor="date" className="block text-sm font-medium text-text-secondary">Fecha</label>
+          <input
+            type="date"
+            name="date"
+            id="date"
+            value={filters.date}
+            onChange={handleFilterChange}
+            className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600"
+          />
+        </div>
+
+        {/* Filtro por Cancha */}
+        <div className="flex-grow min-w-[150px]">
+          <label htmlFor="court" className="block text-sm font-medium text-text-secondary">Cancha</label>
+          <select
+            name="court"
+            id="court"
+            value={filters.court}
+            onChange={handleFilterChange}
+            className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600"
+          >
+            <option value="all">Todas las canchas</option>
+            {courts.map(court => (
+              <option key={court._id} value={court._id}>{court.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro por Pago */}
+        <div className="flex-grow min-w-[150px]">
+          <label htmlFor="payment" className="block text-sm font-medium text-text-secondary">Pago</label>
+          <select
+            name="payment"
+            id="payment"
+            value={filters.payment}
+            onChange={handleFilterChange}
+            className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600"
+          >
+            <option value="all">Todos</option>
+            <option value="paid">Pagados</option>
+            <option value="pending">Pendientes</option>
+          </select>
+        </div>
+
+        {/* Botón de Limpiar */}
+        <button
+          onClick={clearFilters}
+          className="p-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white"
+          title="Limpiar filtros"
+        >
+          <XMarkIcon className="h-5 w-5" />
+        </button>
+      </div>
+      {/* --- FIN DE LA BARRA DE FILTROS --- */}
 
       <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
         <table className="w-full text-sm text-left text-text-secondary">
@@ -251,56 +347,65 @@ const BookingsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {bookings.map((booking) => {
-              const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
-              const zonedEndTime = utcToZonedTime(new Date(booking.endTime), timeZone);
-              const whatsappLink = `https://wa.me/${cleanPhoneNumber(booking.user.phone)}`;
+            {/* --- 9. USAMOS 'filteredBookings' EN LUGAR DE 'bookings' --- */}
+            {filteredBookings.length > 0 ? (
+              filteredBookings.map((booking) => {
+                const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
+                const zonedEndTime = utcToZonedTime(new Date(booking.endTime), timeZone);
+                const whatsappLink = `https://wa.me/${cleanPhoneNumber(booking.user.phone)}`;
 
-              return (
-                <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                  <td className="px-6 py-4 font-medium text-text-primary">
-                    <a 
-                      href={whatsappLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="hover:text-primary transition-colors"
-                      title={`Enviar WhatsApp a ${booking.user.name}`}
-                    >
-                      {booking.user.name}
-                    </a>
+                return (
+                  <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
+                    <td className="px-6 py-4 font-medium text-text-primary">
+                      <a 
+                        href={whatsappLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:text-primary transition-colors"
+                        title={`Enviar WhatsApp a ${booking.user.name}`}
+                      >
+                        {booking.user.name}
+                      </a>
+                    </td>
+                    <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
+                    <td className="px-6 py-4">
+                        {format(zonedStartTime, 'dd/MM/yyyy HH:mm')} - {format(zonedEndTime, 'HH:mm')}
+                    </td>
+                    <td className="px-6 py-4">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
+                            booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
+                        }`}>
+                            {booking.status}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4">
+                         <PaymentActions 
+                           booking={booking} 
+                           onUpdate={handleUpdateStatus}
+                           onShowQR={handleShowQR} 
+                         />
+                    </td>
+                    <td className="px-6 py-4 flex items-center gap-4">
+                      <button onClick={() => handleOpenModal(booking)} className="text-blue-400 hover:text-blue-300" title="Editar Turno">
+                          <PencilIcon className="h-5 w-5" />
+                      </button>
+                      {booking.status === 'Confirmed' && (
+                           <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
+                              <XCircleIcon className="h-5 w-5" />
+                          </button>
+                      )}
                   </td>
-                  <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
-                  <td className="px-6 py-4">
-                      {format(zonedStartTime, 'dd/MM/yyyy HH:mm')} - {format(zonedEndTime, 'HH:mm')}
-                  </td>
-                  <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          booking.status === 'Confirmed' ? 'bg-green-500 text-white' :
-                          booking.status === 'Cancelled' ? 'bg-danger text-white' : 'bg-yellow-500 text-dark-primary'
-                      }`}>
-                          {booking.status}
-                      </span>
-                  </td>
-                  <td className="px-6 py-4">
-                       <PaymentActions 
-                         booking={booking} 
-                         onUpdate={handleUpdateStatus}
-                         onShowQR={handleShowQR} 
-                       />
-                  </td>
-                  <td className="px-6 py-4 flex items-center gap-4">
-                    <button onClick={() => handleOpenModal(booking)} className="text-blue-400 hover:text-blue-300" title="Editar Turno">
-                        <PencilIcon className="h-5 w-5" />
-                    </button>
-                    {booking.status === 'Confirmed' && (
-                         <button onClick={() => handleCancel(booking._id)} className="text-danger hover:text-red-400" title="Cancelar Reserva">
-                            <XCircleIcon className="h-5 w-5" />
-                        </button>
-                    )}
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan="6" className="text-center p-8 text-text-secondary">
+                  No se encontraron reservas que coincidan con los filtros.
                 </td>
-                </tr>
-              );
-            })}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
