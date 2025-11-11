@@ -14,10 +14,12 @@ const createDefaultSchedule = () => {
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
     MERCADOPAGO_ACCESS_TOKEN: '',
-    WHATSAPP_SENDER_NUMBER: '',
-    WHATSAPP_API_TOKEN: '',
-    // --- NUEVO ESTADO ---
-    SHOP_ENABLED: 'false', // Guardamos como string 'true'/'false'
+    SHOP_ENABLED: 'false',
+    // --- NUEVOS ESTADOS ---
+    PUBLIC_TITLE: '',
+    PUBLIC_SUBTITLE: '',
+    PUBLIC_CONTACT_NUMBER: '',
+    OWNER_NOTIFICATION_NUMBER: '',
   });
   
   const [businessHours, setBusinessHours] = useState(null);
@@ -35,11 +37,9 @@ const SettingsPage = () => {
         
         const { BUSINESS_HOURS, ...otherSettings } = data;
         
-        // --- Aseguramos que SHOP_ENABLED tenga un valor ---
         if (!otherSettings.SHOP_ENABLED) {
             otherSettings.SHOP_ENABLED = 'false';
         }
-        // --------------------------------------------------
         
         setSettings(prev => ({ ...prev, ...otherSettings }));
 
@@ -61,7 +61,6 @@ const SettingsPage = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
-    // --- LÓGICA PARA EL CHECKBOX ---
     if (type === 'checkbox') {
         setSettings(prev => ({
             ...prev,
@@ -73,7 +72,6 @@ const SettingsPage = () => {
             [name]: value,
         }));
     }
-    // ---------------------------------
   };
 
   const handleScheduleChange = useCallback((newSchedule) => {
@@ -120,7 +118,22 @@ const SettingsPage = () => {
         
         <div className="space-y-6">
 
-          {/* --- NUEVO FIELDSET PARA LA TIENDA --- */}
+          {/* --- NUEVO FIELDSET PARA PERSONALIZACIÓN --- */}
+          <fieldset className="border border-gray-700 p-4 rounded-lg">
+            <legend className="px-2 text-lg font-semibold text-primary">Personalización Pública</legend>
+            <div className="space-y-4 mt-2">
+              <div>
+                <label htmlFor="PUBLIC_TITLE" className="block text-sm font-medium text-text-secondary">Título Principal</label>
+                <input type="text" name="PUBLIC_TITLE" value={settings.PUBLIC_TITLE || ''} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+              <div>
+                <label htmlFor="PUBLIC_SUBTITLE" className="block text-sm font-medium text-text-secondary">Subtítulo</label>
+                <input type="text" name="PUBLIC_SUBTITLE" value={settings.PUBLIC_SUBTITLE || ''} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Fieldset de Tienda (sin cambios) */}
           <fieldset className="border border-gray-700 p-4 rounded-lg">
             <legend className="px-2 text-lg font-semibold text-primary">Tienda Pública</legend>
             <div className="flex items-center gap-4 mt-2">
@@ -128,7 +141,6 @@ const SettingsPage = () => {
                     type="checkbox" 
                     name="SHOP_ENABLED" 
                     id="shop_enabled_checkbox"
-                    // Convertimos string 'true' a boolean
                     checked={settings.SHOP_ENABLED === 'true'} 
                     onChange={handleChange} 
                     className="h-5 w-5 rounded border-gray-600 bg-dark-primary text-primary focus:ring-primary" 
@@ -138,8 +150,7 @@ const SettingsPage = () => {
                 </label>
             </div>
           </fieldset>
-          {/* -------------------------------------- */}
-
+          
           {/* Mercado Pago (sin cambios) */}
           <fieldset className="border border-gray-700 p-4 rounded-lg">
             <legend className="px-2 text-lg font-semibold text-primary">Mercado Pago</legend>
@@ -151,17 +162,19 @@ const SettingsPage = () => {
             </div>
           </fieldset>
 
-          {/* WhatsApp (sin cambios) */}
+          {/* --- FIELDSET DE WHATSAPP MODIFICADO --- */}
           <fieldset className="border border-gray-700 p-4 rounded-lg">
-            <legend className="px-2 text-lg font-semibold text-secondary">WhatsApp</legend>
+            <legend className="px-2 text-lg font-semibold text-secondary">WhatsApp (Sin API)</legend>
             <div className="space-y-4 mt-2">
               <div>
-                <label htmlFor="WHATSAPP_SENDER_NUMBER" className="block text-sm font-medium text-text-secondary">Número de Envío (con código de país)</label>
-                <input type="text" name="WHATSAPP_SENDER_NUMBER" value={settings.WHATSAPP_SENDER_NUMBER} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <label htmlFor="PUBLIC_CONTACT_NUMBER" className="block text-sm font-medium text-text-secondary">N° de Contacto Público (para clientes)</label>
+                <input type="text" name="PUBLIC_CONTACT_NUMBER" value={settings.PUBLIC_CONTACT_NUMBER || ''} onChange={handleChange} placeholder="Ej: 5493825123456" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <p className="text-xs text-gray-400 mt-1">Incluir código de país sin el "+". Se usará para el botón "Contacto" de la web.</p>
               </div>
                <div>
-                <label htmlFor="WHATSAPP_API_TOKEN" className="block text-sm font-medium text-text-secondary">Token de la API</label>
-                <input type="password" name="WHATSAPP_API_TOKEN" value={settings.WHATSAPP_API_TOKEN || ''} onChange={handleChange} className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <label htmlFor="OWNER_NOTIFICATION_NUMBER" className="block text-sm font-medium text-text-secondary">N° de Notificación del Dueño (para avisos)</label>
+                <input type="text" name="OWNER_NOTIFICATION_NUMBER" value={settings.OWNER_NOTIFICATION_NUMBER || ''} onChange={handleChange} placeholder="Ej: 5493825654321" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+                <p className="text-xs text-gray-400 mt-1">El número que recibirá el aviso de WhatsApp cuando se confirme una reserva.</p>
               </div>
             </div>
           </fieldset>
