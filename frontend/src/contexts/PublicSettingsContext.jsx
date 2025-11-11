@@ -9,6 +9,11 @@ export const PublicSettingsProvider = ({ children }) => {
   const [publicSettings, setPublicSettings] = useState({
     businessHours: null,
     shopEnabled: false,
+    // --- NUEVOS VALORES POR DEFECTO ---
+    publicTitle: 'Padel Club Manager',
+    publicSubtitle: 'Encuentra y reserva tu cancha de pádel en segundos',
+    publicContactNumber: '',
+    ownerNotificationNumber: ''
   });
   const [loading, setLoading] = useState(true);
 
@@ -16,7 +21,7 @@ export const PublicSettingsProvider = ({ children }) => {
     const fetchSettings = async () => {
       try {
         const settings = await settingService.getPublicSettings();
-        setPublicSettings(settings);
+        setPublicSettings(settings); // Los settings de la API reemplazan a los por defecto
       } catch (error) {
         console.error("Failed to load public settings", error);
       } finally {
