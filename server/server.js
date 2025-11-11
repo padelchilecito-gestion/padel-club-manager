@@ -17,7 +17,7 @@ const startServer = async () => {
   // --- Configuración de Orígenes Permitidos (para HTTP) ---
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
-    'https://padel-club-manager-xi.vercel.app',
+    'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel
   ];
   
   // (Lógica por si CLIENT_URL está definida en Render y es diferente)
@@ -41,10 +41,11 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- MODIFICACIÓN DE SOCKET.IO (REVERTIDA A LA VERSIÓN CORRECTA) ---
+  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+  // Volvemos a usar la lista explícita de orígenes.
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, // <-- Usamos la lista explícita, NO el wildcard "*"
+      origin: allowedOrigins, // <-- NO USAR EL WILDCARD "*"
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
