@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
+import { paymentService } from '../../services/paymentService'; // <-- Importamos el servicio de pago
 import socket from '../../services/socketService';
 import { format } from 'date-fns';
 import { utcToZonedTime } from 'date-fns-tz';
 import { PencilIcon, XCircleIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 import BookingFormModal from '../../components/admin/BookingFormModal';
+import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; // <-- Importamos el Modal QR
 
-// --- COMPONENTE 'PaymentActions' MODIFICADO ---
-const PaymentActions = ({ booking, onUpdate }) => {
-  // Estado para controlar el menú
+// --- Componente de Acciones de Pago (MODIFICADO) ---
+const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   if (booking.isPaid) {
@@ -21,31 +22,37 @@ const PaymentActions = ({ booking, onUpdate }) => {
 
   const handlePayment = (method) => {
     onUpdate(booking._id, 'Confirmed', true, method);
-    setIsOpen(false); // Cerramos el menú
+    setIsOpen(false);
   };
+  
+  const handleQRClick = () => {
+    onShowQR(booking); // Llamamos a la función del padre
+    setIsOpen(false);
+  }
 
   return (
     <div className="flex items-center gap-2">
       <span className={`px-2 py-1 text-xs font-semibold rounded-full bg-gray-500 text-white`}>
         Pendiente
       </span>
-      {/* Usamos 'relative' para posicionar el menú */}
       <div className="relative">
         <button 
-          // Cambiamos a onClick
-          onClick={() => setIsOpen(!isOpen)} 
+          onClick={() => setIsOpen(!isOpen)}
+          // --- Añadimos onBlur para cerrar si se hace clic fuera ---
+          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
           className="text-secondary hover:text-green-400" 
           title="Marcar como Pagado"
         >
           <CurrencyDollarIcon className="h-6 w-6" />
         </button>
         
-        {/* Mostramos el menú condicionalmente */}
         {isOpen && (
-          <div className="absolute bottom-full mb-2 right-0 bg-dark-primary border border-gray-600 rounded-md shadow-lg z-10 w-36">
+          // --- POSICIÓN CORREGIDA: 'top-full' (abajo) y 'mt-2' ---
+          <div className="absolute top-full mt-2 right-0 bg-dark-primary border border-gray-600 rounded-md shadow-lg z-10 w-36">
             <button onClick={() => handlePayment('Efectivo')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Efectivo</button>
             <button onClick={() => handlePayment('Transferencia')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">Transferencia</button>
-            <button onClick={() => handlePayment('QR')} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">QR</button>
+            {/* --- MODIFICADO: onClick llama a handleQRClick --- */}
+            <button onClick={handleQRClick} className="block w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-primary-dark">QR</button>
           </div>
         )}
       </div>
@@ -61,6 +68,15 @@ const BookingsPage = () => {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+
+  // --- NUEVOS ESTADOS PARA EL MODAL QR ---
+  const [qrData, setQrData] = useState({
+    qrValue: '',
+    total: 0,
+    status: 'idle',
+    bookingId: null // Para saber qué reserva estamos cobrando
+  });
+  // -------------------------------------
 
   const timeZone = 'America/Argentina/Buenos_Aires';
 
@@ -91,6 +107,17 @@ const BookingsPage = () => {
                 return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
             }
         });
+        
+        // --- LÓGICA DE SOCKET PARA EL MODAL QR ---
+        // Si el modal está abierto y la reserva actualizada es la del modal Y AHORA ESTÁ PAGADA
+        if (
+            qrData.bookingId === updatedBooking._id && 
+            updatedBooking.isPaid &&
+            qrData.status === 'pending'
+        ) {
+            setQrData(prev => ({ ...prev, status: 'successful' }));
+        }
+        // ----------------------------------------
     };
     
     const handleBookingDelete = ({ id }) => {
@@ -105,7 +132,7 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, []);
+  }, [qrData.bookingId, qrData.status]); // <-- Añadimos dependencias
 
   const handleOpenModal = (booking = null) => {
     setSelectedBooking(booking);
@@ -140,7 +167,52 @@ const BookingsPage = () => {
       }
   };
 
-  if (loading) return <div className="text-center p-8">Cargando reservas...</div>;
+  // --- NUEVA FUNCIÓN PARA MOSTRAR EL QR ---
+  const handleShowQR = async (booking) => {
+    setLoading(true);
+    setQrData({ qrValue: '', total: booking.price, status: 'idle', bookingId: booking._id });
+    
+    try {
+        const paymentData = {
+          items: [{
+            title: `Pago de reserva para ${booking.user.name}`,
+            unit_price: booking.price,
+            quantity: 1,
+          }],
+          payer: { name: booking.user.name, email: "test_user@test.com" },
+          metadata: { 
+            booking_id: booking._id, // Pasamos el ID de la reserva existente
+          }
+        };
+
+        const preference = await paymentService.createPaymentPreference(paymentData);
+        
+        setQrData({
+            qrValue: preference.init_point,
+            total: booking.price,
+            status: 'pending',
+            bookingId: booking._id
+        });
+
+    } catch (err) {
+        alert('Error al generar el QR de Mercado Pago.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleCloseQRModal = () => {
+    setQrData({ qrValue: '', total: 0, status: 'idle', bookingId: null });
+  };
+  
+  // --- FIN NUEVAS FUNCIONES ---
+
+  // Helper para limpiar el número de WhatsApp
+  const cleanPhoneNumber = (number) => {
+    return number.replace(/[^0-9]/g, ''); // Deja solo números
+  };
+
+  if (loading && bookings.length === 0) return <div className="text-center p-8">Cargando reservas...</div>;
   if (error) return <div className="text-center p-8 text-danger">{error}</div>;
 
   return (
@@ -171,10 +243,23 @@ const BookingsPage = () => {
             {bookings.map((booking) => {
               const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
               const zonedEndTime = utcToZonedTime(new Date(booking.endTime), timeZone);
+              const whatsappLink = `https://wa.me/${cleanPhoneNumber(booking.user.phone)}`;
 
               return (
                 <tr key={booking._id} className="border-b border-gray-700 hover:bg-dark-primary">
-                  <td className="px-6 py-4 font-medium text-text-primary">{booking.user.name}</td>
+                  {/* --- NOMBRE DEL CLIENTE CON ENLACE WHATSAPP --- */}
+                  <td className="px-6 py-4 font-medium text-text-primary">
+                    <a 
+                      href={whatsappLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="hover:text-primary transition-colors"
+                      title={`Enviar WhatsApp a ${booking.user.name}`}
+                    >
+                      {booking.user.name}
+                    </a>
+                  </td>
+                  {/* ------------------------------------------- */}
                   <td className="px-6 py-4">{booking.court?.name || 'N/A'}</td>
                   <td className="px-6 py-4">
                       {format(zonedStartTime, 'dd/MM/yyyy HH:mm')} - {format(zonedEndTime, 'HH:mm')}
@@ -188,7 +273,11 @@ const BookingsPage = () => {
                       </span>
                   </td>
                   <td className="px-6 py-4">
-                       <PaymentActions booking={booking} onUpdate={handleUpdateStatus} />
+                       <PaymentActions 
+                         booking={booking} 
+                         onUpdate={handleUpdateStatus}
+                         onShowQR={handleShowQR} // Pasamos la nueva función
+                       />
                   </td>
                   <td className="px-6 py-4 flex items-center gap-4">
                     <button onClick={() => handleOpenModal(booking)} className="text-blue-400 hover:text-blue-300" title="Editar Turno">
@@ -212,6 +301,16 @@ const BookingsPage = () => {
           booking={selectedBooking}
           onClose={handleCloseModal}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* --- RENDERIZADO DEL MODAL QR --- */}
+      {qrData.qrValue && (
+        <FullScreenQRModal
+          qrValue={qrData.qrValue}
+          total={qrData.total}
+          status={qrData.status}
+          onClose={handleCloseQRModal}
         />
       )}
     </div>
