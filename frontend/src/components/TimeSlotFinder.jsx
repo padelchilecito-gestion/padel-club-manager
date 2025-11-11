@@ -10,8 +10,7 @@ import {
   isSameDay, 
   startOfDay,
   addDays,
-  subDays,
-  isBefore
+  subDays
 } from 'date-fns';
 import { es } from 'date-fns/locale'; // Importamos el locale en español
 import { utcToZonedTime } from 'date-fns-tz';
@@ -137,7 +136,6 @@ const TimeSlotFinder = () => {
       let isConsecutive = true;
       for (let i = 0; i < sortedTimestamps.length - 1; i++) {
         const diff = sortedTimestamps[i+1] - sortedTimestamps[i];
-        // Diferencia debe ser exactamente 30 minutos
         if (diff !== 30 * 60 * 1000) {
           isConsecutive = false;
           break;
@@ -145,9 +143,8 @@ const TimeSlotFinder = () => {
       }
 
       if (!isConsecutive) {
-        // Si no son consecutivos, solo seleccionamos el último clic
         setSelectedSlots([slotISO]);
-        setBookingError(''); // Limpiamos error anterior
+        setBookingError('');
         return;
       }
     }
@@ -169,7 +166,7 @@ const TimeSlotFinder = () => {
 
   useEffect(() => {
     if (!selectedTimeRange) {
-      setCourtOptions([]); // Limpiamos si no hay selección
+      setCourtOptions([]); 
       setSelectedCourt(null);
       return;
     }
@@ -188,7 +185,6 @@ const TimeSlotFinder = () => {
           setBookingError('No hay una misma cancha disponible para todo el rango seleccionado. Prueba un rango más corto.');
         }
         setCourtOptions(options);
-        // Si solo hay una opción, la seleccionamos automáticamente
         if (options.length === 1) {
           setSelectedCourt(options[0]);
         }
@@ -198,7 +194,6 @@ const TimeSlotFinder = () => {
         setLoadingOptions(false);
       }
     };
-    // Usamos un timeout corto para no saturar la API mientras el usuario hace clic rápido
     const timer = setTimeout(fetchCourtOptions, 300);
     return () => clearTimeout(timer);
 
@@ -227,7 +222,7 @@ const TimeSlotFinder = () => {
       endTime: end.toISOString(),
       paymentMethod,
       isPaid: paymentMethod !== 'Efectivo',
-      totalPrice: selectedCourt.price // Usamos el precio ya calculado
+      totalPrice: selectedCourt.price
     };
 
     try {
@@ -249,10 +244,8 @@ const TimeSlotFinder = () => {
         await bookingService.createBooking(bookingData);
         alert(`¡Reserva confirmada! Tu turno para el ${format(start, 'dd/MM/yyyy HH:mm')} ha sido creado.`);
         
-        // Recargamos los slots para el día actual
-        fetchSlots(); // El hook useCallback se encarga de recargar
+        fetchSlots(); // Recargamos
 
-        // Reseteamos el formulario
         setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
@@ -266,7 +259,7 @@ const TimeSlotFinder = () => {
     }
   };
 
-  // --- Funciones de Navegación de Fecha ---
+  // --- Funciones de Navegación y Formato de Fecha ---
   const today = startOfToday();
   const isViewingToday = isSameDay(selectedDate, today);
 
@@ -279,16 +272,19 @@ const TimeSlotFinder = () => {
     setSelectedDate(addDays(selectedDate, 1));
   };
   
-  // Función para formatear el botón de horario
   const formatSlotLabel = (isoString) => {
     const zonedTime = utcToZonedTime(parseISO(isoString), timeZone);
     return format(zonedTime, 'HH:mm');
   };
 
   // Capitalizar el nombre del día
-  const formatDateHeader = (date) => {
-    const formatted = format(date, 'EEEE dd/MM', { locale: es });
-    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  const formatDateHeader = (date, includeDayName = true) => {
+    const formatString = includeDayName ? 'EEEE dd/MM' : 'dd/MM';
+    let formatted = format(date, formatString, { locale: es });
+    if (includeDayName) {
+        formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+    return formatted;
   };
 
   return (
@@ -326,12 +322,13 @@ const TimeSlotFinder = () => {
           <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
           {/* Grilla "Hoy" */}
           {todaySlots.length > 0 && (
             <div>
+              {/* --- TÍTULO CORREGIDO --- */}
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
-                Día Seleccionado
+                {formatDateHeader(selectedDate)}
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {todaySlots.map(slotISO => (
@@ -351,8 +348,9 @@ const TimeSlotFinder = () => {
           {/* Grilla "Día Siguiente" (Madrugada) */}
           {nextDaySlots.length > 0 && (
             <div>
+              {/* --- TÍTULO CORREGIDO --- */}
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
-                Día Siguiente (Madrugada)
+                {formatDateHeader(addDays(selectedDate, 1), false)} (Madrugada)
               </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {nextDaySlots.map(slotISO => (
