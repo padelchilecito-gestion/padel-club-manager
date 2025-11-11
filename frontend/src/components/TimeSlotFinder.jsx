@@ -316,7 +316,9 @@ const TimeSlotFinder = () => {
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
         {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
-        {bookingError && !loadingOptions && <p className*="text-danger text-center mb-4">{bookingError}</p>}
+        
+        {/* --- CORRECCIÓN 1: className* a className --- */}
+        {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
         
         {!loadingSlots && allSlots.length === 0 && (
           <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
@@ -326,7 +328,6 @@ const TimeSlotFinder = () => {
           {/* Grilla "Hoy" */}
           {todaySlots.length > 0 && (
             <div>
-              {/* --- TÍTULO CORREGIDO (MUESTRA LA FECHA) --- */}
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
                 {formatDateHeader(selectedDate)}
               </h4>
@@ -348,7 +349,6 @@ const TimeSlotFinder = () => {
           {/* Grilla "Día Siguiente" (Madrugada) */}
           {nextDaySlots.length > 0 && (
             <div>
-              {/* --- TÍTULO CORREGIDO (MUESTRA LA FECHA SIGUIENTE) --- */}
               <h4 className="text-lg font-bold text-text-secondary mb-3 text-center md:text-left">
                 {formatDateHeader(addDays(selectedDate, 1))} (Madrugada)
               </h4>
@@ -410,6 +410,7 @@ const TimeSlotFinder = () => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="userName" className="block text-sm font-medium text-text-secondary">Nombre Completo</label>
+                {/* --- CORRECCIÓN 2: e.g.value a e.target.value --- */}
                 <input type="text" id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
               <div>
