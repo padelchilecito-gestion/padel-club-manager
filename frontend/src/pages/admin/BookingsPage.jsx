@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { bookingService } from '../../services/bookingService';
-import { courtService } from '../../services/courtService'; // --- 1. IMPORTAMOS COURT SERVICE ---
+import { courtService } from '../../services/courtService'; // Importamos CourtService
 import { paymentService } from '../../services/paymentService'; 
 import socket from '../../services/socketService';
-import { format, startOfDay } from 'date-fns'; // --- 2. IMPORTAMOS 'startOfDay' ---
+import { format, startOfDay, isSameDay } from 'date-fns'; // Importamos helpers de date-fns
 import { utcToZonedTime } from 'date-fns-tz';
-import { PencilIcon, XCircleIcon, CurrencyDollarIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/solid'; // --- 3. IMPORTAMOS ÍCONOS DE FILTRO ---
+import { PencilIcon, XCircleIcon, CurrencyDollarIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/solid'; 
 import BookingFormModal from '../../components/admin/BookingFormModal';
 import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; 
 
-// --- (Componente PaymentActions sin cambios) ---
+// (Componente PaymentActions sin cambios)
 const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -67,11 +67,12 @@ const BookingsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  // --- 4. ESTADOS PARA LOS FILTROS ---
+  // --- ESTADOS PARA LOS FILTROS (CON EL NUEVO FILTRO DE NOMBRE) ---
   const [filters, setFilters] = useState({
+    name: '', // <-- TU NUEVO FILTRO
     court: 'all',
     payment: 'all',
-    date: '' // String vacío para "Todos"
+    date: '' 
   });
   // -----------------------------------
 
@@ -84,16 +85,15 @@ const BookingsPage = () => {
 
   const timeZone = 'America/Argentina/Buenos_Aires';
 
-  // --- 5. FUNCIÓN PARA CARGAR CANCHAS Y TURNOS ---
+  // Función para cargar canchas y turnos
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       setError('');
       try {
-        // Pedimos turnos y canchas en paralelo
         const [bookingsData, courtsData] = await Promise.all([
           bookingService.getAllBookings(),
-          courtService.getAllCourts()
+          courtService.getAllCourts() // <-- Cargamos las canchas para el selector
         ]);
         setBookings(bookingsData);
         setCourts(courtsData);
@@ -105,9 +105,9 @@ const BookingsPage = () => {
     };
     
     loadInitialData();
-  }, []); // Solo se ejecuta una vez al cargar
+  }, []); 
 
-  // --- (Efecto de Socket.IO sin cambios) ---
+  // (Efecto de Socket.IO sin cambios)
   useEffect(() => {
     socket.connect();
 
@@ -146,34 +146,42 @@ const BookingsPage = () => {
     };
   }, [qrData.bookingId, qrData.status]);
 
-  // --- 6. LÓGICA DE FILTRADO ---
+  // --- LÓGICA DE FILTRADO (CON EL NUEVO FILTRO DE NOMBRE) ---
   const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
 
-    // Filtro por Cancha
+    // --- 1. Filtro por Nombre (NUEVO) ---
+    if (filters.name) {
+      filtered = filtered.filter(b => 
+        b.user.name.toLowerCase().includes(filters.name.toLowerCase())
+      );
+    }
+
+    // --- 2. Filtro por Cancha ---
     if (filters.court !== 'all') {
       filtered = filtered.filter(b => b.court?._id === filters.court);
     }
 
-    // Filtro por Pago
+    // --- 3. Filtro por Pago ---
     if (filters.payment !== 'all') {
       const isPaidFilter = filters.payment === 'paid';
       filtered = filtered.filter(b => b.isPaid === isPaidFilter);
     }
 
-    // Filtro por Fecha
+    // --- 4. Filtro por Fecha ---
     if (filters.date) {
-      const filterDateStart = startOfDay(new Date(filters.date + 'T00:00:00')); // Fecha en zona local
+      const filterDateStart = startOfDay(new Date(filters.date + 'T00:00:00'));
       filtered = filtered.filter(b => {
         const bookingDate = startOfDay(utcToZonedTime(new Date(b.startTime), timeZone));
-        return bookingDate.getTime() === filterDateStart.getTime();
+        // Usamos isSameDay para comparar fechas ignorando la hora
+        return isSameDay(bookingDate, filterDateStart);
       });
     }
 
     return filtered;
   }, [bookings, filters]);
   
-  // --- 7. MANEJADORES DE FILTROS ---
+  // Manejador de Filtros (sin cambios)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -182,12 +190,13 @@ const BookingsPage = () => {
     }));
   };
 
+  // Reseteador de Filtros (actualizado)
   const clearFilters = () => {
-    setFilters({ court: 'all', payment: 'all', date: '' });
+    setFilters({ name: '', court: 'all', payment: 'all', date: '' });
   };
   // ---------------------------------
 
-  // --- (Funciones de Modales y Pago sin cambios) ---
+  // --- (Funciones de Modales y Pago sin cambios, incluyendo la corrección del bug) ---
   const handleOpenModal = (booking = null) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
@@ -197,7 +206,7 @@ const BookingsPage = () => {
     setSelectedBooking(null);
   };
   const handleSuccess = () => {
-    // Ya no recargamos todo, el socket y el estado local se encargan
+    fetchBookings(); // Recargamos todo al crear/editar
     handleCloseModal();
   };
   const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
@@ -273,9 +282,23 @@ const BookingsPage = () => {
         </button>
       </div>
 
-      {/* --- 8. BARRA DE FILTROS (NUEVO) --- */}
+      {/* --- BARRA DE FILTROS (CON EL NUEVO FILTRO DE NOMBRE) --- */}
       <div className="mb-6 p-4 bg-dark-secondary rounded-lg shadow-md flex flex-wrap items-end gap-4">
-        <FunnelIcon className="h-6 w-6 text-primary" />
+        <FunnelIcon className="h-6 w-6 text-primary flex-shrink-0" />
+        
+        {/* --- Filtro por Nombre (NUEVO) --- */}
+        <div className="flex-grow min-w-[200px]">
+          <label htmlFor="name" className="block text-sm font-medium text-text-secondary">Nombre Cliente</label>
+          <input
+            type="text"
+            name="name"
+            id="name"
+            placeholder="Buscar por nombre..."
+            value={filters.name}
+            onChange={handleFilterChange}
+            className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600"
+          />
+        </div>
         
         {/* Filtro por Fecha */}
         <div className="flex-grow min-w-[150px]">
@@ -326,7 +349,7 @@ const BookingsPage = () => {
         {/* Botón de Limpiar */}
         <button
           onClick={clearFilters}
-          className="p-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white"
+          className="p-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white flex-shrink-0"
           title="Limpiar filtros"
         >
           <XMarkIcon className="h-5 w-5" />
@@ -347,7 +370,7 @@ const BookingsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {/* --- 9. USAMOS 'filteredBookings' EN LUGAR DE 'bookings' --- */}
+            {/* Usamos 'filteredBookings' en lugar de 'bookings' */}
             {filteredBookings.length > 0 ? (
               filteredBookings.map((booking) => {
                 const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
