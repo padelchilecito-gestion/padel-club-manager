@@ -82,7 +82,7 @@ const getPublicCourtOptions = async (startTime, endTime) => {
 // --------------------------------
 
 export const bookingService = {
-  getAvailability,
+  getAvailability, // (Esta ya no la usará el TimeSlotFinder, pero la dejamos por si acaso)
   createBooking,
   getAllBookings,
   updateBookingStatus,
