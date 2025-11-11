@@ -18,64 +18,57 @@ import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/r
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// ... (Componentes SlotButton y CourtOptionButton no cambian) ...
+// (Componentes SlotButton y CourtOptionButton no cambian)
 const SlotButton = ({ isoSlot, label, onClick, isSelected, isDisabled }) => (
-    <button
-      onClick={() => onClick(isoSlot)}
-      disabled={isDisabled}
-      className={`p-3 w-full rounded-md text-center font-semibold transition-colors
-        ${isSelected
-          ? 'bg-primary text-white scale-105 shadow-lg'
-          : 'bg-dark-primary hover:bg-primary-dark'}
-        ${isDisabled
-          ? 'opacity-30 bg-dark-primary cursor-not-allowed'
-          : ''}
-      `}
-    >
-      {label}
-    </button>
+  <button
+    onClick={() => onClick(isoSlot)}
+    disabled={isDisabled}
+    className={`p-3 w-full rounded-md text-center font-semibold transition-colors
+      ${isSelected
+        ? 'bg-primary text-white scale-105 shadow-lg'
+        : 'bg-dark-primary hover:bg-primary-dark'}
+      ${isDisabled
+        ? 'opacity-30 bg-dark-primary cursor-not-allowed'
+        : ''}
+    `}
+  >
+    {label}
+  </button>
 );
 const CourtOptionButton = ({ option, onClick, isSelected }) => (
-    <button
-      onClick={() => onClick(option)}
-      className={`p-3 w-full rounded-md text-center font-semibold transition-colors
-        ${isSelected
-          ? 'bg-primary text-white scale-105 shadow-lg'
-          : 'bg-dark-primary hover:bg-primary-dark'}
-      `}
-    >
-      {option.name}
-      <span className="block text-sm font-normal opacity-80">${option.price.toFixed(2)}</span>
-    </button>
+  <button
+    onClick={() => onClick(option)}
+    className={`p-3 w-full rounded-md text-center font-semibold transition-colors
+      ${isSelected
+        ? 'bg-primary text-white scale-105 shadow-lg'
+        : 'bg-dark-primary hover:bg-primary-dark'}
+    `}
+  >
+    {option.name}
+    <span className="block text-sm font-normal opacity-80">${option.price.toFixed(2)}</span>
+  </button>
 );
 
 
 const TimeSlotFinder = () => {
-  // --- OBTENEMOS EL NÚMERO DEL DUEÑO ---
   const { settings, isLoading: settingsLoading } = usePublicSettings();
-  const ownerNumber = settings.ownerNotificationNumber.replace(/[^0-9]/g, '');
+  const ownerNumber = (settings.ownerNotificationNumber || '').replace(/[^0-9]/g, '');
 
-  // Estados de Carga y Errores
+  // (Estados de Carga, Datos y Selección no cambian)
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [bookingError, setBookingError] = useState('');
-
-  // Estados de Datos
-  const [allSlots, setAllSlots] = useState([]);
-  const [courtOptions, setCourtOptions] = useState([]);
-
-  // Estados de Selección
-  const [selectedDate, setSelectedDate] = useState(startOfToday());
-  const [selectedSlots, setSelectedSlots] = useState([]);
-  const [selectedCourt, setSelectedCourt] = useState(null);
+  const [allSlots, setAllSlots] = useState([]); 
+  const [courtOptions, setCourtOptions] = useState([]); 
+  const [selectedDate, setSelectedDate] = useState(startOfToday()); 
+  const [selectedSlots, setSelectedSlots] = useState([]); 
+  const [selectedCourt, setSelectedCourt] = useState(null); 
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
-
-  // --- NUEVO ESTADO: ÉXITO DE RESERVA EN EFECTIVO ---
   const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
 
-  // ... (fetchSlots, Lógica de Grilla, handleSlotClick, selectedTimeRange, useEffect de Opciones de Cancha... todo esto no cambia) ...
+  // --- PASO 1: Cargar slots (FUNCIÓN MODIFICADA) ---
   const fetchSlots = useCallback(async () => {
     if (settingsLoading) return;
     setLoadingSlots(true);
@@ -84,7 +77,8 @@ const TimeSlotFinder = () => {
     setSelectedSlots([]);
     setCourtOptions([]);
     setSelectedCourt(null);
-    setCashBookingSuccess(null); // Limpiamos el éxito al cambiar de día
+    // setCashBookingSuccess(null); // <-- ¡LÍNEA PROBLEMÁTICA ELIMINADA!
+    
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       const slotsISO = await bookingService.getPublicAvailabilitySlots(dateString);
@@ -96,10 +90,13 @@ const TimeSlotFinder = () => {
     }
   }, [selectedDate, settingsLoading]);
 
+  // --- EFECTO DE CARGA (MODIFICADO) ---
   useEffect(() => {
+    setCashBookingSuccess(null); // <-- Limpiamos el cartel de éxito al cambiar de día
     fetchSlots();
-  }, [fetchSlots]);
+  }, [fetchSlots]); // fetchSlots depende de selectedDate
 
+  // (Lógica de la Grilla (Hoy vs Mañana) no cambia)
   const { todaySlots, nextDaySlots } = useMemo(() => {
     const selectedDayStart = startOfDay(selectedDate);
     const today = [];
@@ -115,15 +112,20 @@ const TimeSlotFinder = () => {
     return { todaySlots: today, nextDaySlots: nextDay };
   }, [allSlots, selectedDate]);
 
+
+  // --- PASO 2: Lógica de selección de slots (MODIFICADA) ---
   const handleSlotClick = (slotISO) => {
-    setCashBookingSuccess(null); // Limpiamos el éxito al cambiar de slot
+    setCashBookingSuccess(null); // <-- Limpiamos el cartel de éxito al seleccionar un nuevo slot
     const newSelection = [...selectedSlots];
     const index = newSelection.indexOf(slotISO);
+
     if (index > -1) {
       newSelection.splice(index, 1);
     } else {
       newSelection.push(slotISO);
     }
+
+    // (Validación de slots consecutivos no cambia)
     if (newSelection.length > 1) {
       const sortedTimestamps = newSelection.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
       let isConsecutive = true;
@@ -144,6 +146,7 @@ const TimeSlotFinder = () => {
     setBookingError('');
   };
 
+  // (selectedTimeRange y useEffect de Opciones de Cancha no cambian)
   const selectedTimeRange = useMemo(() => {
     if (selectedSlots.length === 0) return null;
     const sortedTimestamps = selectedSlots.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
@@ -183,9 +186,9 @@ const TimeSlotFinder = () => {
     return () => clearTimeout(timer);
   }, [selectedTimeRange]);
   
-
   // --- PASO 4: Finalizar Reserva (MODIFICADO) ---
   const handleFinalizeBooking = async (paymentMethod) => {
+    // (Validaciones no cambian)
     if (!userName || !userPhone) {
       setBookingError('El nombre y el teléfono son obligatorios.');
       return;
@@ -194,12 +197,10 @@ const TimeSlotFinder = () => {
       setBookingError('Por favor, selecciona una cancha y un horario válidos.');
       return;
     }
-
     setBookingError('');
     setIsBooking(true);
 
     const { start, end } = selectedTimeRange;
-    
     const bookingData = {
       courtId: selectedCourt.id,
       user: { name: userName, phone: userPhone },
@@ -212,7 +213,7 @@ const TimeSlotFinder = () => {
 
     try {
       if (paymentMethod === 'Mercado Pago') {
-        // ... (lógica de MP sin cambios)
+        // (Lógica de MP no cambia)
         const paymentData = {
           items: [{
             title: `Reserva ${selectedCourt.name} - ${format(start, 'dd/MM HH:mm')}`,
@@ -229,19 +230,21 @@ const TimeSlotFinder = () => {
         // --- LÓGICA DE PAGO EN EFECTIVO MODIFICADA ---
         await bookingService.createBooking(bookingData);
         
-        // Creamos el mensaje de WhatsApp
         const fechaStr = formatSlotLabel(start);
         const diaStr = formatDateHeader(start, true);
         const msg = `¡Nueva reserva (pago en club)!\nCliente: ${userName}\nCancha: ${selectedCourt.name}\nDía: ${diaStr}\nHora: ${fechaStr}`;
         const whatsappLink = `https://wa.me/${ownerNumber}?text=${encodeURIComponent(msg)}`;
 
-        // Mostramos el mensaje de éxito en lugar del alert
+        // Mostramos el mensaje de éxito
         setCashBookingSuccess({
             message: `¡Reserva confirmada para ${diaStr} a las ${fechaStr}!`,
             whatsappLink: whatsappLink
         });
         
-        fetchSlots(); // Recargamos
+        // Recargamos los slots
+        fetchSlots(); // <-- Esta llamada ya NO borra el cartel
+        
+        // Reseteamos el formulario
         setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
@@ -255,7 +258,7 @@ const TimeSlotFinder = () => {
     }
   };
 
-  // ... (Funciones de navegación y formato de fecha no cambian) ...
+  // (Funciones de navegación y formato de fecha no cambian)
   const today = startOfToday();
   const isViewingToday = isSameDay(selectedDate, today);
 
@@ -279,11 +282,11 @@ const TimeSlotFinder = () => {
     return formatted;
   };
 
-
+  // --- RENDERIZADO (sin cambios, pero ahora funcionará) ---
   return (
     <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
       
-      {/* --- NAVEGADOR DE FECHA --- */}
+      {/* NAVEGADOR DE FECHA */}
       <div className="flex justify-between items-center mb-6">
         <button onClick={handlePrevDay} disabled={isViewingToday || loadingSlots} className="p-3 bg-dark-primary rounded-full disabled:opacity-30 hover:bg-primary-dark transition-colors">
           <ChevronLeftIcon className="h-6 w-6" />
@@ -296,7 +299,7 @@ const TimeSlotFinder = () => {
         </button>
       </div>
       
-      {/* --- GRILLAS DE HORARIOS --- */}
+      {/* GRILLAS DE HORARIOS */}
       <div>
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
@@ -351,7 +354,7 @@ const TimeSlotFinder = () => {
         </div>
       )}
 
-      {/* --- ELEGIR CANCHA (SI HAY SLOTS) --- */}
+      {/* --- ELEGIR CANCHA (Oculto si hay éxito) --- */}
       {selectedSlots.length > 0 && !cashBookingSuccess && (
         <div className="mt-6 pt-6 border-t border-gray-700">
           <h3 className="text-xl font-semibold text-text-primary mb-3">Elige tu cancha</h3>
@@ -366,7 +369,7 @@ const TimeSlotFinder = () => {
         </div>
       )}
 
-      {/* --- DATOS Y PAGO (SI HAY CANCHA) --- */}
+      {/* --- DATOS Y PAGO (Oculto si hay éxito) --- */}
       {selectedCourt && !cashBookingSuccess && (
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
