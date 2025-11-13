@@ -26,8 +26,21 @@ const deleteUser = async (id) => {
   }
 };
 
+// --- NUEVA FUNCIÓN ---
+const updateUserRole = async (id, role) => {
+  try {
+    const response = await apiClient.put(`/users/${id}/role`, { role });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error.response?.data || error;
+  }
+};
+// --------------------
+
 export const userService = {
   getAllUsers,
   createUser,
   deleteUser,
+  updateUserRole, // <-- Exportar
 };
