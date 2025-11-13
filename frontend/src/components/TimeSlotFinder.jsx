@@ -54,7 +54,6 @@ const TimeSlotFinder = () => {
   const { settings, isLoading: settingsLoading } = usePublicSettings();
   const ownerNumber = (settings.ownerNotificationNumber || '').replace(/[^0-9]/g, '');
 
-  // (Estados de Carga, Datos y Selección no cambian)
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
@@ -64,11 +63,15 @@ const TimeSlotFinder = () => {
   const [selectedDate, setSelectedDate] = useState(startOfToday()); 
   const [selectedSlots, setSelectedSlots] = useState([]); 
   const [selectedCourt, setSelectedCourt] = useState(null); 
+  
+  // --- NUEVOS ESTADOS DE FORMULARIO ---
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
+  const [userEmail, setUserEmail] = useState(''); // <-- NUEVO
+  // ------------------------------------
+
   const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
 
-  // --- PASO 1: Cargar slots (FUNCIÓN MODIFICADA) ---
   const fetchSlots = useCallback(async () => {
     if (settingsLoading) return;
     setLoadingSlots(true);
@@ -77,7 +80,6 @@ const TimeSlotFinder = () => {
     setSelectedSlots([]);
     setCourtOptions([]);
     setSelectedCourt(null);
-    // setCashBookingSuccess(null); // <-- ¡LÍNEA PROBLEMÁTICA ELIMINADA!
     
     try {
       const dateString = format(selectedDate, 'yyyy-MM-dd');
@@ -90,13 +92,11 @@ const TimeSlotFinder = () => {
     }
   }, [selectedDate, settingsLoading]);
 
-  // --- EFECTO DE CARGA (MODIFICADO) ---
   useEffect(() => {
-    setCashBookingSuccess(null); // <-- Limpiamos el cartel de éxito al cambiar de día
+    setCashBookingSuccess(null); 
     fetchSlots();
-  }, [fetchSlots]); // fetchSlots depende de selectedDate
+  }, [fetchSlots]); 
 
-  // (Lógica de la Grilla (Hoy vs Mañana) no cambia)
   const { todaySlots, nextDaySlots } = useMemo(() => {
     const selectedDayStart = startOfDay(selectedDate);
     const today = [];
@@ -113,9 +113,8 @@ const TimeSlotFinder = () => {
   }, [allSlots, selectedDate]);
 
 
-  // --- PASO 2: Lógica de selección de slots (MODIFICADA) ---
   const handleSlotClick = (slotISO) => {
-    setCashBookingSuccess(null); // <-- Limpiamos el cartel de éxito al seleccionar un nuevo slot
+    setCashBookingSuccess(null); 
     const newSelection = [...selectedSlots];
     const index = newSelection.indexOf(slotISO);
 
@@ -125,7 +124,6 @@ const TimeSlotFinder = () => {
       newSelection.push(slotISO);
     }
 
-    // (Validación de slots consecutivos no cambia)
     if (newSelection.length > 1) {
       const sortedTimestamps = newSelection.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
       let isConsecutive = true;
@@ -146,7 +144,6 @@ const TimeSlotFinder = () => {
     setBookingError('');
   };
 
-  // (selectedTimeRange y useEffect de Opciones de Cancha no cambian)
   const selectedTimeRange = useMemo(() => {
     if (selectedSlots.length === 0) return null;
     const sortedTimestamps = selectedSlots.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
@@ -186,13 +183,14 @@ const TimeSlotFinder = () => {
     return () => clearTimeout(timer);
   }, [selectedTimeRange]);
   
-  // --- PASO 4: Finalizar Reserva (MODIFICADO) ---
+  
   const handleFinalizeBooking = async (paymentMethod) => {
-    // (Validaciones no cambian)
-    if (!userName || !userPhone) {
-      setBookingError('El nombre y el teléfono son obligatorios.');
+    // --- VALIDACIÓN ACTUALIZADA ---
+    if (!userName || !userPhone || !userEmail) {
+      setBookingError('El nombre, teléfono y email son obligatorios.');
       return;
     }
+    // ----------------------------
     if (!selectedCourt || !selectedTimeRange) {
       setBookingError('Por favor, selecciona una cancha y un horario válidos.');
       return;
@@ -201,33 +199,39 @@ const TimeSlotFinder = () => {
     setIsBooking(true);
 
     const { start, end } = selectedTimeRange;
+    
+    // --- BOOKING DATA ACTUALIZADO ---
     const bookingData = {
       courtId: selectedCourt.id,
-      user: { name: userName, phone: userPhone },
+      user: { name: userName, phone: userPhone, email: userEmail }, // <-- Email añadido
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       paymentMethod,
       isPaid: paymentMethod !== 'Efectivo',
       totalPrice: selectedCourt.price
     };
+    // ---------------------------------
 
     try {
       if (paymentMethod === 'Mercado Pago') {
-        // (Lógica de MP no cambia)
+        
+        // --- PAYMENT DATA ACTUALIZADO ---
         const paymentData = {
           items: [{
             title: `Reserva ${selectedCourt.name} - ${format(start, 'dd/MM HH:mm')}`,
             unit_price: selectedCourt.price,
             quantity: 1,
           }],
-          payer: { name: userName, email: "test_user@test.com" },
+          payer: { name: userName, email: userEmail }, // <-- Email usado aquí
           metadata: { booking_id: "PENDING", booking_data: bookingData }
         };
+        // ---------------------------------
+
         const preference = await paymentService.createPaymentPreference(paymentData);
         window.location.href = preference.init_point;
       
       } else {
-        // --- LÓGICA DE PAGO EN EFECTIVO MODIFICADA ---
+        // Pago en Efectivo
         await bookingService.createBooking(bookingData);
         
         const fechaStr = formatSlotLabel(start);
@@ -235,21 +239,21 @@ const TimeSlotFinder = () => {
         const msg = `¡Nueva reserva (pago en club)!\nCliente: ${userName}\nCancha: ${selectedCourt.name}\nDía: ${diaStr}\nHora: ${fechaStr}`;
         const whatsappLink = `https://wa.me/${ownerNumber}?text=${encodeURIComponent(msg)}`;
 
-        // Mostramos el mensaje de éxito
         setCashBookingSuccess({
             message: `¡Reserva confirmada para ${diaStr} a las ${fechaStr}!`,
             whatsappLink: whatsappLink
         });
         
-        // Recargamos los slots
-        fetchSlots(); // <-- Esta llamada ya NO borra el cartel
+        fetchSlots(); 
         
-        // Reseteamos el formulario
+        // --- RESETEAMOS EL FORMULARIO (Email incluido) ---
         setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
         setUserName('');
         setUserPhone('');
+        setUserEmail(''); // <-- NUEVO
+        // ---------------------------------------------
       }
     } catch (err) {
       setBookingError(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
@@ -282,7 +286,6 @@ const TimeSlotFinder = () => {
     return formatted;
   };
 
-  // --- RENDERIZADO (sin cambios, pero ahora funcionará) ---
   return (
     <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
       
@@ -385,7 +388,9 @@ const TimeSlotFinder = () => {
 
           <div className="mt-4 pt-4 border-t border-gray-600">
             <h4 className="text-md font-semibold text-text-primary mb-3">Completa tus datos</h4>
-            {bookingError && isBooking && <p className="text-danger text-sm text-center mb-2">{bookingError}</p>}
+            {/* --- Error de booking general --- */}
+            {bookingError && <p className="text-danger text-sm text-center mb-2">{bookingError}</p>}
+            
             <div className="space-y-4">
               <div>
                 <label htmlFor="userName" className="block text-sm font-medium text-text-secondary">Nombre Completo</label>
@@ -395,6 +400,12 @@ const TimeSlotFinder = () => {
                 <label htmlFor="userPhone" className="block text-sm font-medium text-text-secondary">Teléfono (con código de área)</label>
                 <input type="tel" id="userPhone" value={userPhone} onChange={(e) => setUserPhone(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
+              {/* --- CAMPO DE EMAIL NUEVO --- */}
+              <div>
+                <label htmlFor="userEmail" className="block text-sm font-medium text-text-secondary">Email</label>
+                <input type="email" id="userEmail" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} required placeholder="Para recibir tu comprobante" className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
+              </div>
+              {/* ------------------------- */}
             </div>
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
               <button
