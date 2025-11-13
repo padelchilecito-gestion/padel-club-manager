@@ -63,7 +63,8 @@ const deleteUser = async (req, res) => {
                 return res.status(400).json({ message: 'Cannot delete the currently logged-in admin.' });
             }
             const deletedUsername = user.username;
-            await user.remove();
+            // await user.remove(); -> .remove() está obsoleto
+            await User.deleteOne({ _id: req.params.id });
             
             const logDetails = `User '${deletedUsername}' was deleted by admin '${req.user.username}'.`;
             await logActivity(req.user, 'USER_DELETED', logDetails);
@@ -78,9 +79,77 @@ const deleteUser = async (req, res) => {
     }
 };
 
+// --- NUEVAS FUNCIONES ---
+
+// @desc    Update user role
+// @route   PUT /api/users/:id/role
+// @access  Admin
+const updateUserRole = async (req, res) => {
+    const { role } = req.body;
+    
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (user._id.equals(req.user.id)) {
+            return res.status(400).json({ message: 'Admins cannot change their own role.' });
+        }
+
+        user.role = role;
+        await user.save();
+
+        const logDetails = `User '${user.username}' role was changed to '${role}' by admin '${req.user.username}'.`;
+        await logActivity(req.user, 'USER_UPDATED', logDetails); // Asumiendo que tienes USER_UPDATED
+
+        res.json({
+            _id: user._id,
+            username: user.username,
+            role: user.role,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Update user profile (e.g., password)
+// @route   PUT /api/users/profile
+// @access  Private (Self)
+const updateUserProfile = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    try {
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (!(await user.matchPassword(oldPassword))) {
+            return res.status(401).json({ message: 'Invalid old password' });
+        }
+
+        user.password = newPassword;
+        await user.save();
+        
+        const logDetails = `User '${user.username}' changed their own password.`;
+        await logActivity(user, 'USER_UPDATED', logDetails);
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 
 module.exports = {
   registerUser,
   getAllUsers,
   deleteUser,
+  updateUserRole,    // <-- Exportar nuevo
+  updateUserProfile, // <-- Exportar nuevo
 };
