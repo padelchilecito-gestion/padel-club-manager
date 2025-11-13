@@ -15,16 +15,11 @@ const startServer = async () => {
   const app = express();
   const server = http.createServer(app);
 
-  // --- 1. Lista de Orígenes Permitidos ---
+  // --- 1. Lista de Orígenes EXACTOS Permitidos ---
+  // (La URL de producción principal y localhost)
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
-    'https://padel-club-manager-loypu36au-eduardo-miguel-riccis-projects.vercel.app', // Tu URL de Preview 1
-    'https://padel-club-manager-git-main-eduardo-miguel-riccis-projects.vercel.app',  // Tu URL de Preview 2 (main)
-    
-    // --- ¡AQUÍ ESTÁ LA NUEVA CORRECCIÓN! ---
-    'https://padel-club-manager-bvrlz4z3r-eduardo-miguel-riccis-projects.vercel.app'
-    // ------------------------------------
   ];
   
   // (Lógica por si CLIENT_URL está definida en Render y es diferente)
@@ -32,22 +27,40 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  // --- 2. Función de Verificación de CORS (MÁS ROBUSTA) ---
+  // --- 2. Lista de SUFIJOS Permitidos (LA SOLUCIÓN PERMANENTE) ---
+  // Esto permitirá CUALQUIER URL de Vercel que termine con este sufijo
+  const allowedSuffixes = [
+    '-eduardo-miguel-riccis-projects.vercel.app'
+  ];
+
+  // --- 3. Función de Verificación de CORS (Actualizada) ---
   const originCheck = (origin, callback) => {
     // Normalizamos el origen quitando la barra final si existe
     const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
 
-    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
-      // Éxito: El origen está en la lista (o es una petición local sin origen)
-      callback(null, true);
-    } else {
-      // Fracaso: El origen no está en la lista
-      console.error(`CORS Error: Origin ${origin} not allowed.`);
-      callback(new Error('Not allowed by CORS'));
+    if (!normalizedOrigin) {
+      callback(null, true); // Permitir peticiones sin origen (Postman, etc.)
+      return;
     }
+
+    // Chequeo 1: ¿Está en la lista de orígenes exactos?
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    // Chequeo 2: ¿El origen TERMINA con alguno de los sufijos permitidos?
+    if (allowedSuffixes.some(suffix => normalizedOrigin.endsWith(suffix))) {
+      callback(null, true);
+      return;
+    }
+    
+    // Si no cumple ninguna, rechazar
+    console.error(`CORS Error: Origin ${origin} not allowed.`);
+    callback(new Error('Not allowed by CORS'));
   };
 
-  // --- 3. Aplicar CORS a HTTP (Axios) ---
+  // --- 4. Aplicar CORS a HTTP (Axios) ---
   app.use(cors({
     origin: originCheck, // Usamos la nueva función
     credentials: true
@@ -55,7 +68,7 @@ const startServer = async () => {
   
   app.use(express.json({ extended: false }));
 
-  // --- 4. Aplicar CORS a Socket.IO ---
+  // --- 5. Aplicar CORS a Socket.IO ---
   const io = new Server(server, {
     cors: {
       origin: originCheck, // Usamos la MISMA función robusta
