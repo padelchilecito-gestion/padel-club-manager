@@ -20,17 +20,15 @@ import FullScreenQRModal from '../../components/admin/FullScreenQRModal';
 // (Componente PaymentActions CON LA CORRECCIÓN DEFINITIVA)
 const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const timerRef = useRef(null); // 1. Usar useRef para guardar el ID del timer
+  const timerRef = useRef(null); 
 
-  // 2. Hook de efecto para limpiar el timer si el componente se desmonta
   useEffect(() => {
-    // La función de limpieza se ejecutará cuando el componente se desmonte
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
-  }, []); // El array vacío asegura que esto solo se ejecute al montar y desmontar
+  }, []); 
 
   if (booking.isPaid) {
     return (
@@ -50,14 +48,12 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
     setIsOpen(false);
   }
 
-  // 3. Modificamos el onBlur para que use el ref
   const handleBlur = () => {
     timerRef.current = setTimeout(() => {
       setIsOpen(false);
     }, 150);
   };
 
-  // 4. Cancelamos el timer si el usuario vuelve a enfocar
   const handleFocus = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -69,11 +65,9 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
       <span className={`px-2 py-1 text-xs font-semibold rounded-full bg-gray-500 text-white`}>
         Pendiente
       </span>
-      {/* 5. Mover los manejadores de foco/blur al div contenedor */}
       <div className="relative" onBlur={handleBlur} onFocus={handleFocus}>
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          // onBlur se movió al div contenedor
           className="text-secondary hover:text-green-400" 
           title="Marcar como Pagado"
         >
@@ -94,24 +88,22 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
 
 
 const BookingsPage = () => {
-  const [bookings, setBookings] = useState([]); // ¡Ahora solo contiene la página actual!
+  const [bookings, setBookings] = useState([]); 
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  // --- ESTADOS DE FILTRO Y PAGINACIÓN ---
   const [filters, setFilters] = useState({
     name: '',
     court: 'all',
     payment: 'all',
-    date: format(new Date(), 'yyyy-MM-dd') // Filtramos por hoy por defecto
+    date: format(new Date(), 'yyyy-MM-dd') 
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalBookings, setTotalBookings] = useState(0);
-  // -----------------------------------
 
   const [qrData, setQrData] = useState({
     qrValue: '',
@@ -122,15 +114,13 @@ const BookingsPage = () => {
 
   const timeZone = 'America/Argentina/Buenos_Aires';
 
-  // --- NUEVA FUNCIÓN DE CARGA DE DATOS ---
   const fetchBookings = useCallback(async (page, currentFilters) => {
     setLoading(true);
     setError('');
     try {
-      // Preparamos los parámetros para la API
       const params = {
         page,
-        limit: 15, // 15 por página
+        limit: 15, 
         ...currentFilters
       };
       
@@ -146,9 +136,8 @@ const BookingsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // Sin dependencias, no necesita recrearse
+  }, []); 
 
-  // Cargar canchas solo una vez al montar
   useEffect(() => {
     const loadCourts = async () => {
       try {
@@ -161,23 +150,17 @@ const BookingsPage = () => {
     loadCourts();
   }, []);
 
-  // Efecto para recargar datos cuando cambian los filtros o la página
   useEffect(() => {
-    // Usamos 'filters' y 'currentPage' del estado
     fetchBookings(currentPage, filters);
   }, [filters, currentPage, fetchBookings]);
-  // ----------------------------------------
 
 
-  // (Efecto de Socket.IO modificado para recargar la página actual)
   useEffect(() => {
     socket.connect();
 
     const handleBookingUpdate = (updatedBooking) => {
-        // Simple: solo recargamos la data de la página actual
         fetchBookings(currentPage, filters);
         
-        // Lógica del QR (sin cambios)
         if (
             qrData.bookingId === updatedBooking._id && 
             updatedBooking.isPaid &&
@@ -188,7 +171,6 @@ const BookingsPage = () => {
     };
     
     const handleBookingDelete = ({ id }) => {
-        // Simple: solo recargamos la data
         fetchBookings(currentPage, filters);
     };
 
@@ -202,29 +184,25 @@ const BookingsPage = () => {
     };
   }, [currentPage, filters, fetchBookings, qrData.bookingId, qrData.status]);
   
-  // Manejador de Filtros (ahora resetea la página a 1)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
       ...prev,
       [name]: value
     }));
-    setCurrentPage(1); // Volver a la página 1 al cambiar filtros
+    setCurrentPage(1); 
   };
 
-  // Reseteador de Filtros (actualizado)
   const clearFilters = () => {
     setFilters({ 
       name: '', 
       court: 'all', 
       payment: 'all', 
-      date: '' // Limpiamos la fecha también
+      date: '' 
     });
     setCurrentPage(1);
   };
-  // ---------------------------------
   
-  // --- PAGINACIÓN ---
   const handleNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
@@ -235,10 +213,8 @@ const BookingsPage = () => {
       setCurrentPage(currentPage - 1);
     }
   };
-  // ------------------
 
 
-  // --- (Funciones de Modales y Pago sin cambios) ---
   const handleOpenModal = (booking = null) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
@@ -248,13 +224,12 @@ const BookingsPage = () => {
     setSelectedBooking(null);
   };
   const handleSuccess = () => {
-    fetchBookings(currentPage, filters); // Recargamos la página actual
+    fetchBookings(currentPage, filters); 
     handleCloseModal();
   };
   const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
     try {
         await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
-        // El socket se encargará de actualizar la UI
     } catch (err) {
         alert('Error al actualizar la reserva.');
     }
@@ -263,7 +238,6 @@ const BookingsPage = () => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
           try {
               await bookingService.cancelBooking(id);
-              // El socket se encargará de actualizar la UI
           } catch (err) {
               alert('Error al cancelar la reserva.');
           }
@@ -279,7 +253,7 @@ const BookingsPage = () => {
             unit_price: booking.price,
             quantity: 1,
           }],
-          payer: { name: booking.user.name, email: booking.user.email || "test_user@test.com" }, // Usamos el email guardado
+          payer: { name: booking.user.name, email: booking.user.email || "test_user@test.com" }, 
           metadata: { 
             booking_id: booking._id, 
           }
@@ -303,15 +277,15 @@ const BookingsPage = () => {
   const cleanPhoneNumber = (number) => {
     return (number || '').replace(/[^0-9]/g, ''); 
   };
-  // ----------------------------------------------------
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      {/* --- HEADER MODIFICADO --- */}
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary">Gestión de Turnos</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors w-full md:w-auto"
         >
           Añadir Turno
         </button>
@@ -469,7 +443,7 @@ const BookingsPage = () => {
       {/* --- PAGINACIÓN --- */}
       <div className="flex justify-between items-center bg-dark-secondary px-6 py-3 rounded-b-lg border-t border-gray-700">
         <span className="text-sm text-text-secondary">
-          Total de reservas: {totalBookings}
+          Total: {totalBookings}
         </span>
         <div className="flex items-center gap-4">
           <button
@@ -478,17 +452,17 @@ const BookingsPage = () => {
             className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
           >
             <ChevronLeftIcon className="h-4 w-4 mr-1" />
-            Anterior
+            <span className="hidden sm:inline">Anterior</span>
           </button>
           <span className="text-text-primary font-semibold">
-            Página {currentPage} de {totalPages}
+            {currentPage} / {totalPages}
           </span>
           <button
             onClick={handleNextPage}
             disabled={currentPage >= totalPages || loading}
             className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
           >
-            Siguiente
+            <span className="hidden sm:inline">Siguiente</span>
             <ChevronRightIcon className="h-4 w-4 ml-1" />
           </button>
         </div>
