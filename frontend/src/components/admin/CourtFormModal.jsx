@@ -6,6 +6,8 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
     name: '',
     courtType: 'Cemento',
     pricePerHour: '',
+    pricePer90Min: '', // <-- AÑADIDO
+    pricePer120Min: '', // <-- AÑADIDO
     isActive: true,
   });
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,8 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
         name: court.name,
         courtType: court.courtType,
         pricePerHour: court.pricePerHour,
+        pricePer90Min: court.pricePer90Min || '', // <-- AÑADIDO
+        pricePer120Min: court.pricePer120Min || '', // <-- AÑADIDO
         isActive: court.isActive,
       });
     }
@@ -37,11 +41,18 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
     setLoading(true);
     setError('');
 
+    // Preparamos los datos, convirtiendo a null si están vacíos
+    const dataToSave = {
+      ...formData,
+      pricePer90Min: formData.pricePer90Min ? parseFloat(formData.pricePer90Min) : null,
+      pricePer120Min: formData.pricePer120Min ? parseFloat(formData.pricePer120Min) : null,
+    };
+
     try {
       if (isEditMode) {
-        await courtService.updateCourt(court._id, formData);
+        await courtService.updateCourt(court._id, dataToSave);
       } else {
-        await courtService.createCourt(formData);
+        await courtService.createCourt(dataToSave);
       }
       onSuccess();
     } catch (err) {
@@ -68,10 +79,24 @@ const CourtFormModal = ({ court, onClose, onSuccess }) => {
               <option>Cristal</option>
             </select>
           </div>
-          <div>
-            <label htmlFor="pricePerHour" className="block text-sm font-medium text-text-secondary">Precio por Hora</label>
-            <input type="number" name="pricePerHour" value={formData.pricePerHour} onChange={handleChange} required min="0" step="0.01" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+          
+          {/* --- SECCIÓN DE PRECIOS MODIFICADA --- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="pricePerHour" className="block text-sm font-medium text-text-secondary">Precio 60 min</label>
+              <input type="number" name="pricePerHour" value={formData.pricePerHour} onChange={handleChange} required min="0" step="0.01" placeholder="Ej: 10000" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+            </div>
+            <div>
+              <label htmlFor="pricePer90Min" className="block text-sm font-medium text-text-secondary">Precio 90 min (Oferta)</label>
+              <input type="number" name="pricePer90Min" value={formData.pricePer90Min} onChange={handleChange} min="0" step="0.01" placeholder="(Opcional)" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+            </div>
+            <div>
+              <label htmlFor="pricePer120Min" className="block text-sm font-medium text-text-secondary">Precio 120 min (Oferta)</label>
+              <input type="number" name="pricePer120Min" value={formData.pricePer120Min} onChange={handleChange} min="0" step="0.01" placeholder="Ej: 16000" className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
+            </div>
           </div>
+          {/* ------------------------------------- */}
+
           <div className="flex items-center gap-4">
             <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleChange} className="h-4 w-4 rounded border-gray-600 bg-dark-primary text-primary focus:ring-primary" />
             <label htmlFor="isActive" className="text-sm text-text-secondary">Cancha activa</label>
