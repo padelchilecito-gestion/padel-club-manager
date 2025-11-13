@@ -15,6 +15,10 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
     price: '',
     paymentMethod: 'Efectivo',
     isPaid: false,
+    // --- NUEVOS ESTADOS ---
+    isRecurring: false,
+    weeks: '4', // Por defecto 4 semanas
+    // --------------------
   });
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -47,41 +51,39 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
         price: booking.price,
         paymentMethod: booking.paymentMethod,
         isPaid: booking.isPaid,
+        isRecurring: false, // No permitimos editar recurrencia
+        weeks: '4',
       });
     }
   }, [booking, isEditMode]);
 
-  // --- NUEVO EFECTO ---
-  // Autocalcular el precio si no estamos en modo edición
   useEffect(() => {
-    if (!isEditMode && formData.courtId && formData.duration && courts.length > 0) {
-      const court = courts.find(c => c._id === formData.courtId);
-      if (court) {
-        const pricePerMinute = court.pricePerHour / 60;
-        const calculatedPrice = pricePerMinute * parseInt(formData.duration, 10);
-        
-        setFormData(prev => ({
-          ...prev,
-          price: calculatedPrice.toFixed(2) // Aseguramos 2 decimales
-        }));
-      }
+    // Autocalcular precio (solo si no es recurrente, o si cambia el precio base)
+    if (!formData.courtId || !formData.duration || courts.length === 0) return;
+
+    const court = courts.find(c => c._id === formData.courtId);
+    if (court) {
+      const pricePerMinute = court.pricePerHour / 60;
+      const calculatedPrice = pricePerMinute * parseInt(formData.duration, 10);
+      
+      setFormData(prev => ({
+        ...prev,
+        price: calculatedPrice.toFixed(2)
+      }));
     }
   }, [formData.courtId, formData.duration, courts, isEditMode]);
-  // --------------------
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
     if (name === 'paymentMethod') {
-      // Si cambia el método de pago, decidimos el estado de 'isPaid'
-      const newIsPaid = value !== 'Efectivo'; // Pagado para todo excepto Efectivo
+      const newIsPaid = value !== 'Efectivo';
       setFormData(prev => ({
         ...prev,
         paymentMethod: value,
         isPaid: newIsPaid
       }));
     } else {
-      // Lógica original
       setFormData(prev => ({
         ...prev,
         [name]: type === 'checkbox' ? checked : value,
@@ -101,7 +103,7 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
 
       const bookingData = {
         courtId: formData.courtId,
-        user: { name: formData.name, phone: formData.phone },
+        user: { name: formData.name, phone: formData.phone, email: formData.email || '' },
         startTime: zonedStart.toISOString(),
         endTime: zonedEnd.toISOString(),
         price: Number(formData.price),
@@ -111,10 +113,18 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
       };
 
       if (isEditMode) {
+        // --- MODO EDICIÓN: Solo actualiza UN turno ---
         await bookingService.updateBooking(booking._id, bookingData);
+      
+      } else if (formData.isRecurring) {
+        // --- MODO CREACIÓN RECURRENTE ---
+        await bookingService.createRecurringBooking(bookingData, parseInt(formData.weeks, 10));
+      
       } else {
+        // --- MODO CREACIÓN SIMPLE ---
         await bookingService.createBooking(bookingData);
       }
+      
       onSuccess();
     } catch (err) {
       setError(err.response?.data?.message || 'Ocurrió un error al guardar el turno.');
@@ -144,7 +154,7 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="date" className="block text-sm font-medium text-text-secondary">Fecha</label>
+              <label htmlFor="date" className="block text-sm font-medium text-text-secondary">Fecha {isEditMode ? '' : 'de inicio'}</label>
               <input type="date" name="date" value={formData.date} onChange={handleChange} required className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" />
             </div>
             <div>
@@ -163,15 +173,15 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
               </select>
             </div>
             <div>
-              <label htmlFor="price" className="block text-sm font-medium text-text-secondary">Precio</label>
+              <label htmlFor="price" className="block text-sm font-medium text-text-secondary">Precio (por turno)</label>
               <input 
                 type="number" 
                 name="price" 
                 value={formData.price} 
                 onChange={handleChange} 
                 required 
-                min="0" 
-                readOnly={!isEditMode}
+                min="0"
+                readOnly={!isEditMode && !formData.isRecurring} // Solo editable en modo edición
                 className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600 read-only:opacity-70 read-only:bg-gray-700" 
               />
             </div>
@@ -192,6 +202,44 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
               <label htmlFor="isPaid" className="ml-2 text-sm text-text-secondary">¿Está Pagado?</label>
             </div>
           </div>
+
+          {/* --- NUEVOS CAMPOS DE RECURRENCIA (SOLO AL CREAR) --- */}
+          {!isEditMode && (
+            <fieldset className="border border-gray-700 p-4 rounded-md">
+              <legend className="px-2 text-sm text-text-secondary">Turno Fijo (Opcional)</legend>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="checkbox" 
+                  name="isRecurring" 
+                  id="isRecurring" 
+                  checked={formData.isRecurring} 
+                  onChange={handleChange} 
+                  className="h-4 w-4 rounded border-gray-600 bg-dark-primary text-primary focus:ring-primary" 
+                />
+                <label htmlFor="isRecurring" className="text-sm font-medium text-text-primary">Repetir turno semanalmente</label>
+              </div>
+              
+              {formData.isRecurring && (
+                <div className="mt-4">
+                  <label htmlFor="weeks" className="block text-sm font-medium text-text-secondary">Número de semanas</label>
+                  <input 
+                    type="number" 
+                    name="weeks" 
+                    value={formData.weeks} 
+                    onChange={handleChange} 
+                    min="1" 
+                    max="52" 
+                    className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600" 
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Se crearán {formData.weeks || 0} turnos. El precio total será ${((formData.price || 0) * (formData.weeks || 0)).toFixed(2)}.
+                  </p>
+                </div>
+              )}
+            </fieldset>
+          )}
+          {/* --------------------------------------------------- */}
+
           {error && <p className="text-danger text-sm text-center">{error}</p>}
           <div className="flex justify-end gap-4 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-md transition-colors">Cancelar</button>
