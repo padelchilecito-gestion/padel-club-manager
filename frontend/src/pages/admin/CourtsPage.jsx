@@ -58,11 +58,12 @@ const CourtsPage = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      {/* --- HEADER MODIFICADO --- */}
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary">Gestión de Canchas</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors w-full md:w-auto"
         >
           Añadir Cancha
         </button>
