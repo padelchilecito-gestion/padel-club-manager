@@ -9,7 +9,7 @@ const BookingSchema = new mongoose.Schema({
   user: {
     name: { type: String, required: true },
     phone: { type: String, required: true },
-    email: { type: String }, // <-- NUEVO
+    email: { type: String }, 
   },
   startTime: {
     type: Date,
@@ -41,16 +41,25 @@ const BookingSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  paymentId: { // <-- NUEVO: ID de Mercado Pago para idempotencia
+  paymentId: { 
     type: String,
     sparse: true,
   },
+  // --- NUEVO CAMPO ---
+  // Un ID para agrupar todas las reservas de una serie (ej: "todos los lunes a las 8")
+  recurringGroupId: {
+    type: String,
+    sparse: true, // Para que Mongoose no indexe los 'null'
+    index: true,
+    default: null,
+  }
+  // ------------------
 }, { timestamps: true });
 
 // Index to prevent double booking on the same court at the same time
 BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
 
 // Index para asegurar que un ID de pago solo se use una vez
-BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // <-- NUEVO
+BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); 
 
 module.exports = mongoose.model('Booking', BookingSchema);
