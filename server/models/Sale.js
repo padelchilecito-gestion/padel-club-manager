@@ -40,6 +40,13 @@ const SaleSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  paymentId: { // <-- NUEVO: ID de Mercado Pago para idempotencia
+    type: String,
+    sparse: true,
+  },
 });
+
+// Index para asegurar que un ID de pago solo se use una vez
+SaleSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // <-- NUEVO
 
 module.exports = mongoose.model('Sale', SaleSchema);
