@@ -1,12 +1,14 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
-// const { sendWhatsAppMessage } = require('../utils/notificationService'); // <-- Eliminado
 const { logActivity } = require('../utils/logActivity');
 const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
+
+// ... (createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking, createDefaultSchedule, getPublicAvailabilitySlots... STAS FUNCIONES QUEDAN IGUALES) ...
+// ... (scroll down to getPublicCourtOptions) ...
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
@@ -45,10 +47,20 @@ const createBooking = async (req, res) => {
         finalPrice = req.body.totalPrice;
     }
 
+    // --- LÓGICA DE PRECIO MODIFICADA (SI NO VIENE DEFINIDO) ---
     if (finalPrice === undefined) {
-      const durationHours = (end - start) / (1000 * 60 * 60);
-      finalPrice = durationHours * court.pricePerHour;
+      const durationMinutes = (end - start) / (1000 * 60);
+      
+      if (durationMinutes === 120 && court.pricePer120Min) {
+        finalPrice = court.pricePer120Min;
+      } else if (durationMinutes === 90 && court.pricePer90Min) {
+        finalPrice = court.pricePer90Min;
+      } else {
+        const durationHours = durationMinutes / 60;
+        finalPrice = durationHours * court.pricePerHour;
+      }
     }
+    // ----------------------------------------------------
 
     const booking = new Booking({
       court: courtId,
@@ -70,13 +82,6 @@ const createBooking = async (req, res) => {
         const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
         await logActivity(req.user, 'BOOKING_CREATED', logDetails);
     }
-
-    // --- BLOQUE DE WHATSAPP API ELIMINADO ---
-    // if (createdBooking.user.phone) {
-    //     const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
-    //     await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
-    // }
-    // ----------------------------------------
 
     res.status(201).json(createdBooking);
   } catch (error) {
@@ -122,7 +127,6 @@ const getBookings = async (req, res) => {
     const limit = parseInt(req.query.limit) || 15;
     const skip = (page - 1) * limit;
 
-    // --- Construir objeto de filtros ---
     const filters = {};
 
     if (req.query.name) {
@@ -135,26 +139,23 @@ const getBookings = async (req, res) => {
       filters.isPaid = req.query.payment === 'paid';
     }
     if (req.query.date) {
-      // Convertir la fecha 'yyyy-MM-dd' a la zona horaria correcta
       const zonedDate = zonedTimeToUtc(req.query.date + 'T00:00:00', timeZone);
       const startOfDay = new Date(zonedDate);
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
       
       filters.startTime = { $gte: startOfDay, $lte: endOfDay };
     } else {
-      // Por defecto, no mostramos turnos super antiguos
       const twoDaysAgo = new Date();
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
       filters.startTime = { $gte: twoDaysAgo };
     }
 
-    // Contar total de documentos con filtros
     const totalBookings = await Booking.countDocuments(filters);
     const totalPages = Math.ceil(totalBookings / limit);
 
     const bookings = await Booking.find(filters)
       .populate('court', 'name courtType')
-      .sort({ startTime: -1 }) // Ordenar por más reciente
+      .sort({ startTime: -1 }) 
       .skip(skip)
       .limit(limit);
 
@@ -381,9 +382,10 @@ const getPublicCourtOptions = async (req, res) => {
     try {
         const start = new Date(startTime);
         const end = new Date(endTime);
-        const durationHours = (end - start) / (1000 * 60 * 60);
+        // --- LÓGICA DE DURACIÓN MODIFICADA ---
+        const durationMinutes = (end - start) / (1000 * 60);
 
-        if (durationHours <= 0) {
+        if (durationMinutes <= 0) {
             return res.status(400).json({ message: 'Invalid time range.' });
         }
 
@@ -402,14 +404,29 @@ const getPublicCourtOptions = async (req, res) => {
         const availableCourts = await Court.find({
             isActive: true,
             _id: { $nin: uniqueBookedCourtIds }
-        }).select('name courtType pricePerHour');
+        }).select('name courtType pricePerHour pricePer90Min pricePer120Min'); // <-- AÑADIDO
 
-        const options = availableCourts.map(court => ({
-            id: court._id,
-            name: court.name,
-            type: court.courtType,
-            price: court.pricePerHour * durationHours
-        }));
+        // --- LÓGICA DE PRECIOS MODIFICADA ---
+        const options = availableCourts.map(court => {
+            let finalPrice;
+            if (durationMinutes === 120 && court.pricePer120Min) {
+              finalPrice = court.pricePer120Min;
+            } else if (durationMinutes === 90 && court.pricePer90Min) {
+              finalPrice = court.pricePer90Min;
+            } else {
+              // Cálculo estándar si no hay oferta
+              const durationHours = durationMinutes / 60;
+              finalPrice = court.pricePerHour * durationHours;
+            }
+
+            return {
+                id: court._id,
+                name: court.name,
+                type: court.courtType,
+                price: finalPrice // <-- Precio con oferta
+            };
+        });
+        // ------------------------------------
 
         res.json(options);
 
