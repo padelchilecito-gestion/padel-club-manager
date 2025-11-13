@@ -21,26 +21,22 @@ const getSettings = async (req, res) => {
 // @route   PUT /api/settings
 // @access  Admin
 const updateSettings = async (req, res) => {
-    const settings = req.body; // Expects an object like { KEY: 'value', ... }
+    const settings = req.body; // Espera un objeto { KEY: 'value', ... }
 
     try {
-        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-        // Filtramos las claves que realmente tienen un valor.
-        // Si el frontend envía { "PUBLIC_CONTACT_NUMBER": "" }, lo ignoramos.
-        
-        const promises = Object.keys(settings)
-            .filter(key => {
-                // Solo procesamos si la clave tiene un valor (no es null, undefined, o string vacío)
-                // (Mantenemos SHOP_ENABLED porque 'false' es un valor válido que queremos guardar)
-                return settings[key] || key === 'SHOP_ENABLED'; 
-            })
-            .map(key => {
-                return Setting.findOneAndUpdate(
-                    { key },
-                    { value: settings[key], lastUpdatedBy: req.user.id },
-                    { new: true, upsert: true, runValidators: true } // upsert: create if not found
-                );
-            });
+        // --- LÓGICA DE FILTRO CORREGIDA ---
+        // Ahora procesamos todas las claves que nos envía el frontend.
+        // La validación de 'enum' en el modelo se encargará de rechazar claves inválidas.
+        const promises = Object.keys(settings).map(key => {
+            const value = settings[key];
+            
+            // Usamos findOneAndUpdate con 'upsert'
+            return Setting.findOneAndUpdate(
+                { key },
+                { value: value, lastUpdatedBy: req.user.id },
+                { new: true, upsert: true, runValidators: true } // upsert: crea si no existe
+            );
+        });
         // ---------------------------------
 
         await Promise.all(promises);
@@ -48,7 +44,7 @@ const updateSettings = async (req, res) => {
         res.json({ message: 'Settings updated successfully' });
     } catch (error) {
         console.error(error); // Logueamos el error de validación
-        res.status(500).json({ message: 'Server Error' });
+        res.status(400).json({ message: 'Error al guardar la configuración: ' + error.message });
     }
 };
 
@@ -85,12 +81,19 @@ const getPublicSettings = async (req, res) => {
         // --- Mapeamos los valores de la BD ---
         settingsArray.forEach(setting => {
             if (setting.key === 'BUSINESS_HOURS') {
-                publicSettings.businessHours = JSON.parse(setting.value);
+                // --- AÑADIDA PROTECCIÓN ---
+                // Si el JSON está corrupto, lo ignoramos y usamos el default (null)
+                try {
+                    publicSettings.businessHours = JSON.parse(setting.value);
+                } catch (e) {
+                    console.error("Error al parsear BUSINESS_HOURS, usando default.", e.message);
+                }
+                // --------------------------
             }
             if (setting.key === 'SHOP_ENABLED') {
                 publicSettings.shopEnabled = (setting.value === 'true');
             }
-            if (setting.key === 'PUBLIC_TITLE' && setting.value) { // Nos aseguramos que no sea nulo
+            if (setting.key === 'PUBLIC_TITLE' && setting.value) { 
                 publicSettings.publicTitle = setting.value;
             }
             if (setting.key === 'PUBLIC_SUBTITLE' && setting.value) {
