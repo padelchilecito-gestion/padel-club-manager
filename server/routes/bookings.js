@@ -7,31 +7,39 @@ const {
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
-  // --- IMPORTAMOS LAS NUEVAS FUNCIONES ---
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
+  // --- IMPORTAR NUEVAS FUNCIONES ---
+  createRecurringBooking,
+  deleteRecurringBooking,
+  // ---------------------------------
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// --- NUEVAS RUTAS PÚBLICAS ---
-
-// @route   GET /api/bookings/public-slots
-// @desc    Get all available 30-min slots for a given date
-// @access  Public
+// --- RUTAS PÚBLICAS ---
 router.get('/public-slots', getPublicAvailabilitySlots);
-
-// @route   GET /api/bookings/public-options
-// @desc    Get available courts and prices for a selected time range
-// @access  Public
 router.get('/public-options', getPublicCourtOptions);
 
-// --- RUTAS EXISTENTES ---
-
-router.post('/', protect, createBooking);
-router.get('/availability', getBookingAvailability); // <- Esta la reemplazaremos en el front
-router.get('/', protect, getBookings);
+// --- RUTAS DE ADMIN/OPERADOR ---
+router.post('/', protect, createBooking); // Crea una sola reserva
+router.get('/availability', getBookingAvailability); // Legacy
+router.get('/', protect, getBookings); // Obtiene reservas (paginadas)
 router.put('/:id', protect, updateBooking);
 router.put('/:id/status', protect, updateBookingStatus);
-router.put('/:id/cancel', protect, cancelBooking);
+router.put('/:id/cancel', protect, cancelBooking); // Cancela una sola reserva
+
+// --- NUEVAS RUTAS PARA RESERVAS FIJAS ---
+
+// @route   POST /api/bookings/recurring
+// @desc    Create a series of recurring (fixed) bookings
+// @access  Operator/Admin
+router.post('/recurring', protect, createRecurringBooking);
+
+// @route   DELETE /api/bookings/recurring/:groupId
+// @desc    Delete an entire series of recurring bookings
+// @access  Operator/Admin
+router.delete('/recurring/:groupId', protect, deleteRecurringBooking);
+
+// ----------------------------------------
 
 module.exports = router;
