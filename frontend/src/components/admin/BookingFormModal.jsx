@@ -51,14 +51,23 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
     }
   }, [booking, isEditMode]);
 
-  // --- NUEVO EFECTO ---
-  // Autocalcular el precio si no estamos en modo edición
+  // --- EFECTO DE CÁLCULO DE PRECIO MODIFICADO ---
   useEffect(() => {
     if (!isEditMode && formData.courtId && formData.duration && courts.length > 0) {
       const court = courts.find(c => c._id === formData.courtId);
       if (court) {
-        const pricePerMinute = court.pricePerHour / 60;
-        const calculatedPrice = pricePerMinute * parseInt(formData.duration, 10);
+        const duration = parseInt(formData.duration, 10);
+        let calculatedPrice;
+
+        if (duration === 120 && court.pricePer120Min) {
+          calculatedPrice = court.pricePer120Min;
+        } else if (duration === 90 && court.pricePer90Min) {
+          calculatedPrice = court.pricePer90Min;
+        } else {
+          // Cálculo estándar
+          const pricePerMinute = court.pricePerHour / 60;
+          calculatedPrice = pricePerMinute * duration;
+        }
         
         setFormData(prev => ({
           ...prev,
@@ -67,21 +76,19 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
       }
     }
   }, [formData.courtId, formData.duration, courts, isEditMode]);
-  // --------------------
+  // -----------------------------------------------
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
     if (name === 'paymentMethod') {
-      // Si cambia el método de pago, decidimos el estado de 'isPaid'
-      const newIsPaid = value !== 'Efectivo'; // Pagado para todo excepto Efectivo
+      const newIsPaid = value !== 'Efectivo'; 
       setFormData(prev => ({
         ...prev,
         paymentMethod: value,
         isPaid: newIsPaid
       }));
     } else {
-      // Lógica original
       setFormData(prev => ({
         ...prev,
         [name]: type === 'checkbox' ? checked : value,
@@ -96,7 +103,11 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
 
     try {
       const [hour, minute] = formData.time.split(':').map(Number);
-      const zonedStart = zonedTimeToUtc(`${formData.date}T${formData.time}:00`, timeZone);
+      // Corrección: Usar el constructor de Date con los componentes de fecha
+      const [year, month, day] = formData.date.split('-').map(Number);
+      const localStartDate = new Date(year, month - 1, day, hour, minute, 0);
+      
+      const zonedStart = zonedTimeToUtc(localStartDate, timeZone);
       const zonedEnd = new Date(zonedStart.getTime() + formData.duration * 60000);
 
       const bookingData = {
@@ -111,12 +122,16 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
       };
 
       if (isEditMode) {
+        // En modo edición, no usamos el servicio de bookingService, usamos el de la prop
+        // (Asumo que tienes un servicio `updateBooking` en `bookingService`)
+        // Reemplaza `bookingService.updateBooking` si tu servicio se llama diferente
         await bookingService.updateBooking(booking._id, bookingData);
       } else {
         await bookingService.createBooking(bookingData);
       }
       onSuccess();
     } catch (err) {
+      console.log(err); // Para depuración
       setError(err.response?.data?.message || 'Ocurrió un error al guardar el turno.');
     } finally {
       setLoading(false);
@@ -139,6 +154,7 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
           <div>
             <label htmlFor="courtId" className="block text-sm font-medium text-text-secondary">Cancha</label>
             <select name="courtId" value={formData.courtId} onChange={handleChange} required className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600">
+              <option value="">Seleccione una cancha...</option>
               {courts.map(court => <option key={court._id} value={court._id}>{court.name}</option>)}
             </select>
           </div>
@@ -171,7 +187,7 @@ const BookingFormModal = ({ booking, onClose, onSuccess }) => {
                 onChange={handleChange} 
                 required 
                 min="0" 
-                readOnly={!isEditMode}
+                readOnly={!isEditMode} // Solo editable en modo edición
                 className="w-full mt-1 bg-dark-primary p-2 rounded-md border border-gray-600 read-only:opacity-70 read-only:bg-gray-700" 
               />
             </div>
