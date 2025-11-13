@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import UserFormModal from '../../components/admin/UserFormModal';
-import { TrashIcon } from '@heroicons/react/24/solid';
+import UserRoleModal from '../../components/admin/UserRoleModal'; // <-- Importar nuevo modal
+import { TrashIcon, PencilIcon } from '@heroicons/react/24/solid'; // <-- Importar PencilIcon
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // <-- Nuevo estado
+  const [selectedUser, setSelectedUser] = useState(null); // <-- Nuevo estado
+  
   const { user: currentUser } = useAuth();
 
   const fetchUsers = async () => {
@@ -27,17 +32,30 @@ const UsersPage = () => {
     fetchUsers();
   }, []);
 
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
+  const handleOpenCreateModal = () => {
+    setIsCreateModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
   };
+
+  // --- Nuevos manejadores para el modal de edición ---
+  const handleOpenEditModal = (user) => {
+    setSelectedUser(user);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setSelectedUser(null);
+    setIsEditModalOpen(false);
+  };
+  // ------------------------------------------------
 
   const handleSuccess = () => {
-    fetchUsers(); // Refetch users after a successful creation
-    handleCloseModal();
+    fetchUsers(); // Refrescar usuarios
+    handleCloseCreateModal();
+    handleCloseEditModal(); // Cerrar ambos modales por si acaso
   };
 
   const handleDelete = async (userId) => {
@@ -64,7 +82,7 @@ const UsersPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary">Gestión de Usuarios</h1>
         <button
-          onClick={handleOpenModal}
+          onClick={handleOpenCreateModal}
           className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
         >
           Añadir Usuario
@@ -93,12 +111,21 @@ const UsersPage = () => {
                       {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                  {user._id !== currentUser._id && (
-                    <button onClick={() => handleDelete(user._id)} className="text-danger hover:text-red-400" title="Eliminar Usuario">
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+                <td className="px-6 py-4 flex items-center gap-4">
+                  {/* --- ACCIONES MODIFICADAS --- */}
+                  {user._id !== currentUser._id ? (
+                    <>
+                      <button onClick={() => handleOpenEditModal(user)} className="text-blue-400 hover:text-blue-300" title="Editar Rol">
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                      <button onClick={() => handleDelete(user._id)} className="text-danger hover:text-red-400" title="Eliminar Usuario">
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs italic text-gray-500"> (Tú) </span>
                   )}
+                  {/* --------------------------- */}
                 </td>
               </tr>
             ))}
@@ -106,9 +133,18 @@ const UsersPage = () => {
         </table>
       </div>
       
-      {isModalOpen && (
+      {isCreateModalOpen && (
         <UserFormModal
-          onClose={handleCloseModal}
+          onClose={handleCloseCreateModal}
+          onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* --- NUEVO MODAL RENDERIZADO --- */}
+      {isEditModalOpen && selectedUser && (
+        <UserRoleModal
+          user={selectedUser}
+          onClose={handleCloseEditModal}
           onSuccess={handleSuccess}
         />
       )}
