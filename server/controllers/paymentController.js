@@ -11,6 +11,11 @@ const mongoose = require('mongoose');
 const createPaymentPreference = async (req, res) => {
   const { items, payer, metadata } = req.body;
 
+  // Asegurarse de que el email del payer es válido
+  if (!payer || !payer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payer.email)) {
+    return res.status(400).json({ message: 'A valid payer email is required.' });
+  }
+
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
   const preferenceBody = {
@@ -59,27 +64,36 @@ const receiveWebhook = async (req, res) => {
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
 
+        // --- IDEMPOTENCY CHECK ---
+        // Chequeamos si este payment.id ya procesó una reserva O una venta
+        const existingBooking = await Booking.findOne({ paymentId: payment.id });
+        const existingSale = await Sale.findOne({ paymentId: payment.id });
+
+        if (existingBooking || existingSale) {
+          console.log(`Webhook: Payment ${payment.id} already processed. Ignoring.`);
+          return res.status(200).send('Webhook received (already processed).');
+        }
+        // --- END IDEMPOTENCY CHECK ---
+
+
         // ----------------------------------------------------
         // Lógica de Reservas (Modificada para auto-creación)
         // ----------------------------------------------------
         if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
           
-          // NOTA: Esta lógica asume que booking_data viene en los metadatos
-          // (Lo cual implementamos en TimeSlotFinder.jsx)
           try {
             const bookingData = metadata.booking_data;
-            
-            // (Podríamos añadir validación de conflicto aquí, pero asumimos que la pref. es de corta duración)
             
             const booking = new Booking({
               court: bookingData.courtId,
               user: bookingData.user,
               startTime: bookingData.startTime,
               endTime: bookingData.endTime,
-              price: bookingData.totalPrice, // Asegúrate que el precio venga
+              price: bookingData.totalPrice,
               status: 'Confirmed',
               isPaid: true,
               paymentMethod: 'Mercado Pago',
+              paymentId: payment.id, // <-- Guardamos el ID de pago
             });
             const createdBooking = await booking.save();
             console.log(`Booking ${createdBooking._id} created and paid via webhook.`);
@@ -90,13 +104,14 @@ const receiveWebhook = async (req, res) => {
              console.error('Webhook booking creation failed:', bookingError.message);
           }
 
-        // Lógica de Reservas (Existente - por si acaso)
+        // Lógica de Reservas (Existente)
         } else if (metadata && metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
-          if (booking) {
+          if (booking && !booking.isPaid) { // Solo actualiza si no está pagada
             booking.isPaid = true;
             booking.status = 'Confirmed';
             booking.paymentMethod = 'Mercado Pago';
+            booking.paymentId = payment.id; // <-- Guardamos el ID de pago
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
             
@@ -113,6 +128,7 @@ const receiveWebhook = async (req, res) => {
             total: payment.transaction_amount,
             paymentMethod: 'Mercado Pago',
             user: metadata.user_id,
+            paymentId: payment.id, // <-- Guardamos el ID de pago
           };
           
           const session = await mongoose.startSession();
@@ -131,10 +147,7 @@ const receiveWebhook = async (req, res) => {
             await session.commitTransaction();
             console.log(`Sale created and stock updated for payment ${data.id}.`);
             
-            // --- ¡AQUÍ ESTÁ LA MAGIA! ---
-            // Emitimos el evento al frontend (PosPage)
             io.emit('pos_sale_completed', sale);
-            // -----------------------------
 
           } catch (saleError) {
             await session.abortTransaction();
