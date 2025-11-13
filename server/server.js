@@ -20,7 +20,11 @@ const startServer = async () => {
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
     'https://padel-club-manager-loypu36au-eduardo-miguel-riccis-projects.vercel.app', // Tu URL de Preview 1
-    'https://padel-club-manager-git-main-eduardo-miguel-riccis-projects.vercel.app'  // Tu URL de Preview 2 (main)
+    'https://padel-club-manager-git-main-eduardo-miguel-riccis-projects.vercel.app',  // Tu URL de Preview 2 (main)
+    
+    // --- ¡AQUÍ ESTÁ LA NUEVA CORRECCIÓN! ---
+    'https://padel-club-manager-bvrlz4z3r-eduardo-miguel-riccis-projects.vercel.app'
+    // ------------------------------------
   ];
   
   // (Lógica por si CLIENT_URL está definida en Render y es diferente)
@@ -29,7 +33,6 @@ const startServer = async () => {
   }
 
   // --- 2. Función de Verificación de CORS (MÁS ROBUSTA) ---
-  // Esta función ahora maneja si el origen tiene o no una barra al final
   const originCheck = (origin, callback) => {
     // Normalizamos el origen quitando la barra final si existe
     const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
