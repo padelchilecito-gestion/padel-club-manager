@@ -69,11 +69,12 @@ const RecurringBookingsPage = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      {/* --- HEADER MODIFICADO --- */}
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary">Reservas Recurrentes (Turnos Fijos)</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors w-full md:w-auto"
         >
           Añadir Turno Fijo
         </button>
@@ -84,7 +85,7 @@ const RecurringBookingsPage = () => {
           <thead className="text-xs text-text-primary uppercase bg-dark-primary">
             <tr>
               <th scope="col" className="px-6 py-3">Cliente</th>
-              <th scope="col" className="px-6 py-3">Cancha</th>
+              <th scope="col" className"px-6 py-3">Cancha</th>
               <th scope="col" className="px-6 py-3">Día</th>
               <th scope="col" className="px-6 py-3">Hora</th>
               <th scope="col" className="px-6 py-3">Duración</th>
