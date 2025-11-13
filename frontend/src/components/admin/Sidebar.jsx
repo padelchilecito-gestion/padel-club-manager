@@ -12,15 +12,14 @@ import {
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   InboxStackIcon,
-  ArrowPathIcon, // <-- AÑADIDO (O puedes re-usar CalendarDaysIcon)
+  ArrowPathIcon,
+  XMarkIcon, // <-- Añadido
 } from '@heroicons/react/24/outline';
 
 const navLinks = [
   { to: 'dashboard', text: 'Dashboard', icon: ChartBarIcon, role: ['Admin', 'Operator'] },
   { to: 'bookings', text: 'Turnos', icon: CalendarDaysIcon, role: ['Admin', 'Operator'] },
-  // --- AÑADIDO ---
   { to: 'recurring-bookings', text: 'Turnos Fijos', icon: ArrowPathIcon, role: ['Admin', 'Operator'] },
-  // ----------------
   { to: 'pos', text: 'Punto de Venta', icon: BanknotesIcon, role: ['Admin', 'Operator'] },
   { to: 'cashbox', text: 'Caja', icon: InboxStackIcon, role: ['Admin', 'Operator'] },
   { to: 'inventory', text: 'Inventario', icon: ArchiveBoxIcon, role: ['Admin', 'Operator'] },
@@ -32,7 +31,7 @@ const navLinks = [
   { to: 'settings', text: 'Configuración', icon: Cog6ToothIcon, role: ['Admin'] },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => { // <-- Recibe props
   const { isAdmin } = useAuth();
 
   const activeLinkStyle = {
@@ -40,10 +39,25 @@ const Sidebar = () => {
     color: 'white',
   };
 
-  return (
-    <aside className="w-64 bg-dark-secondary flex-shrink-0 flex flex-col">
-      <div className="p-4 border-b border-gray-700">
+  // Cierra el sidebar al hacer clic en un link en móvil
+  const handleLinkClick = () => {
+    if (window.innerWidth < 768) { // 768px es el breakpoint 'md' de Tailwind
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const SidebarContent = () => (
+    <>
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white text-center">Padel Club</h2>
+        {/* Botón de cerrar (solo en móvil) */}
+        <button 
+          onClick={() => setIsSidebarOpen(false)}
+          className="text-text-secondary p-1 md:hidden"
+          title="Cerrar menú"
+        >
+          <XMarkIcon className="h-6 w-6" />
+        </button>
       </div>
       <nav className="mt-6 flex-1">
         <ul>
@@ -60,6 +74,7 @@ const Sidebar = () => {
               <li key={link.to} className="px-4">
                 <NavLink
                   to={link.to}
+                  onClick={handleLinkClick} // <-- Cierra el menú al navegar
                   style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
                   className="flex items-center px-4 py-3 my-1 text-text-secondary hover:bg-primary-dark hover:text-white rounded-md transition-colors"
                 >
@@ -71,7 +86,25 @@ const Sidebar = () => {
           })}
         </ul>
       </nav>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Sidebar Móvil (Oculto por defecto, se muestra con 'isSidebarOpen') */}
+      <aside 
+        className={`fixed inset-y-0 left-0 w-64 bg-dark-secondary flex-shrink-0 flex flex-col z-40
+                    transform transition-transform duration-300 ease-in-out md:hidden
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Sidebar Desktop (Visible por defecto, oculto en móvil) */}
+      <aside className="hidden md:flex w-64 bg-dark-secondary flex-shrink-0 flex-col">
+        <SidebarContent />
+      </aside>
+    </>
   );
 };
 
