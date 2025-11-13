@@ -18,7 +18,12 @@ const startServer = async () => {
   // --- Configuración de Orígenes Permitidos (para HTTP) ---
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
-    'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel
+    'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
+    
+    // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+    // Añadimos la URL de Vercel (Preview/Desarrollo) que daba el error
+    'https://padel-club-manager-loypu36au-eduardo-miguel-riccis-projects.vercel.app'
+    // ----------------------------------
   ];
   
   // (Lógica por si CLIENT_URL está definida en Render y es diferente)
@@ -42,14 +47,16 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- Configuración de Socket.IO ---
+  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+  // Volvemos a usar la lista explícita de orígenes.
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, 
+      origin: allowedOrigins, // <-- Actualizado automáticamente
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
   });
+  // ---------------------------------
 
   app.set('socketio', io);
 
@@ -61,7 +68,6 @@ const startServer = async () => {
   });
 
   // --- Seguridad: Rate Limiting ---
-  // Habilitamos 'trust proxy' si estás detrás de un proxy (Render, Vercel)
   app.set('trust proxy', 1);
 
   const apiLimiter = rateLimit({
