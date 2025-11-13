@@ -11,18 +11,16 @@ const apiRoutes = require('./routes');
 const startServer = async () => {
   // Connect to Database first
   await connectDB();
+
   const app = express();
   const server = http.createServer(app);
 
-  // --- Configuración de Orígenes Permitidos (para HTTP) ---
+  // --- 1. Lista de Orígenes Permitidos ---
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
-    
-    // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-    // Añadimos la URL de Vercel (Preview/Desarrollo) que daba el error
-    'https://padel-club-manager-loypu36au-eduardo-miguel-riccis-projects.vercel.app'
-    // ----------------------------------
+    'https://padel-club-manager-loypu36au-eduardo-miguel-riccis-projects.vercel.app', // Tu URL de Preview 1
+    'https://padel-club-manager-git-main-eduardo-miguel-riccis-projects.vercel.app'  // Tu URL de Preview 2 (main)
   ];
   
   // (Lógica por si CLIENT_URL está definida en Render y es diferente)
@@ -30,32 +28,38 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  const corsOptions = {
-    origin: function (origin, callback) {
-      // Permitimos peticiones sin 'origin' (como Postman) y las de la lista
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.error(`CORS Error (HTTP): Origin ${origin} not allowed.`);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true
+  // --- 2. Función de Verificación de CORS (MÁS ROBUSTA) ---
+  // Esta función ahora maneja si el origen tiene o no una barra al final
+  const originCheck = (origin, callback) => {
+    // Normalizamos el origen quitando la barra final si existe
+    const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
+
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+      // Éxito: El origen está en la lista (o es una petición local sin origen)
+      callback(null, true);
+    } else {
+      // Fracaso: El origen no está en la lista
+      console.error(`CORS Error: Origin ${origin} not allowed.`);
+      callback(new Error('Not allowed by CORS'));
+    }
   };
 
-  app.use(cors(corsOptions));
+  // --- 3. Aplicar CORS a HTTP (Axios) ---
+  app.use(cors({
+    origin: originCheck, // Usamos la nueva función
+    credentials: true
+  }));
+  
   app.use(express.json({ extended: false }));
 
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-  // Volvemos a usar la lista explícita de orígenes.
+  // --- 4. Aplicar CORS a Socket.IO ---
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, // <-- Actualizado automáticamente
+      origin: originCheck, // Usamos la MISMA función robusta
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
   });
-  // ---------------------------------
 
   app.set('socketio', io);
 
@@ -70,24 +74,23 @@ const startServer = async () => {
   app.set('trust proxy', 1);
 
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 200, // Límite de 200 peticiones por IP cada 15 min
+    windowMs: 15 * 60 * 1000, 
+    max: 200, 
     message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 15 minutos',
     standardHeaders: true,
     legacyHeaders: false,
   });
 
   const authLimiter = rateLimit({
-    windowMs: 10 * 60 * 1000, // 10 minutos
-    max: 10, // Límite de 10 intentos de login por IP cada 10 min
+    windowMs: 10 * 60 * 1000, 
+    max: 10, 
     message: 'Demasiados intentos de inicio de sesión, por favor intente de nuevo en 10 minutos',
     standardHeaders: true,
     legacyHeaders: false,
   });
 
-  // Aplicar limitadores
-  app.use('/api', apiLimiter); // Límite general para /api
-  app.use('/api/auth/login', authLimiter); // Límite estricto para /api/auth/login
+  app.use('/api', apiLimiter); 
+  app.use('/api/auth/login', authLimiter); 
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
