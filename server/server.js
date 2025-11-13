@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
 
@@ -41,16 +42,14 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-  // Volvemos a usar la lista explícita de orígenes.
+  // --- Configuración de Socket.IO ---
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, // <-- NO USAR EL WILDCARD "*"
+      origin: allowedOrigins, 
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
   });
-  // ---------------------------------
 
   app.set('socketio', io);
 
@@ -60,6 +59,30 @@ const startServer = async () => {
       console.log('User disconnected');
     });
   });
+
+  // --- Seguridad: Rate Limiting ---
+  // Habilitamos 'trust proxy' si estás detrás de un proxy (Render, Vercel)
+  app.set('trust proxy', 1);
+
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 200, // Límite de 200 peticiones por IP cada 15 min
+    message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 15 minutos',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutos
+    max: 10, // Límite de 10 intentos de login por IP cada 10 min
+    message: 'Demasiados intentos de inicio de sesión, por favor intente de nuevo en 10 minutos',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Aplicar limitadores
+  app.use('/api', apiLimiter); // Límite general para /api
+  app.use('/api/auth/login', authLimiter); // Límite estricto para /api/auth/login
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
