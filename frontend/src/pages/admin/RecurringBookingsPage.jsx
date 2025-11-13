@@ -85,7 +85,7 @@ const RecurringBookingsPage = () => {
           <thead className="text-xs text-text-primary uppercase bg-dark-primary">
             <tr>
               <th scope="col" className="px-6 py-3">Cliente</th>
-              <th scope="col" className"px-6 py-3">Cancha</th>
+              <th scope="col" className="px-6 py-3">Cancha</th>
               <th scope="col" className="px-6 py-3">Día</th>
               <th scope="col" className="px-6 py-3">Hora</th>
               <th scope="col" className="px-6 py-3">Duración</th>
