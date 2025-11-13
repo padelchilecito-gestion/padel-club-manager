@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { courtService } from '../../services/courtService';
 import { paymentService } from '../../services/paymentService'; 
@@ -17,20 +17,9 @@ import {
 import BookingFormModal from '../../components/admin/BookingFormModal';
 import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; 
 
-// (Componente PaymentActions CON CORRECCIÓN)
+// (Componente PaymentActions original)
 const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const timerRef = useRef(null); // 1. Usar useRef para guardar el ID del timer
-
-  // 2. Hook de efecto para limpiar el timer si el componente se desmonta
-  useEffect(() => {
-    // La función de limpieza se ejecutará cuando el componente se desmonte
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []); // El array vacío asegura que esto solo se ejecute al montar y desmontar
 
   if (booking.isPaid) {
     return (
@@ -50,30 +39,15 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
     setIsOpen(false);
   }
 
-  // 3. Modificamos el onBlur para que use el ref
-  const handleBlur = () => {
-    timerRef.current = setTimeout(() => {
-      setIsOpen(false);
-    }, 150);
-  };
-
-  // 4. (Opcional pero recomendado) Cancelamos el timer si el usuario vuelve a enfocar
-  const handleFocus = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-  };
-
   return (
     <div className="flex items-center gap-2">
       <span className={`px-2 py-1 text-xs font-semibold rounded-full bg-gray-500 text-white`}>
         Pendiente
       </span>
-      {/* 5. Mover los manejadores de foco/blur al div contenedor */}
-      <div className="relative" onBlur={handleBlur} onFocus={handleFocus}>
+      <div className="relative">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          // onBlur se movió al div contenedor
+          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
           className="text-secondary hover:text-green-400" 
           title="Marcar como Pagado"
         >
