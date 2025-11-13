@@ -1,7 +1,7 @@
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
-const { sendWhatsAppMessage } = require('../utils/notificationService');
+// const { sendWhatsAppMessage } = require('../utils/notificationService'); // <-- Eliminado
 const { logActivity } = require('../utils/logActivity');
 const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
@@ -71,11 +71,12 @@ const createBooking = async (req, res) => {
         await logActivity(req.user, 'BOOKING_CREATED', logDetails);
     }
 
-    // (La lógica de WhatsApp sigue siendo un placeholder)
-    if (createdBooking.user.phone) {
-        const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
-        await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
-    }
+    // --- BLOQUE DE WHATSAPP API ELIMINADO ---
+    // if (createdBooking.user.phone) {
+    //     const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
+    //     await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
+    // }
+    // ----------------------------------------
 
     res.status(201).json(createdBooking);
   } catch (error) {
