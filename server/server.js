@@ -15,19 +15,61 @@ const startServer = async () => {
   const app = express();
   const server = http.createServer(app);
 
-  // --- 1. HABILITAMOS CORS PARA TODOS (*) ---
-  // (Esto es solo para depurar)
+  // --- 1. Lista de Orígenes EXACTOS Permitidos ---
+  const allowedOrigins = [
+    process.env.CLIENT_URL || 'http://localhost:5173',
+    'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
+  ];
+  
+  // (Lógica por si CLIENT_URL está definida en Render y es diferente)
+  if (process.env.CLIENT_URL && allowedOrigins.indexOf(process.env.CLIENT_URL) === -1) {
+    allowedOrigins.push(process.env.CLIENT_URL);
+  }
+
+  // --- 2. Lista de SUFIJOS Permitidos (CORREGIDO SIN EL GUIÓN INICIAL) ---
+  const allowedSuffixes = [
+    'eduardo-miguel-riccis-projects.vercel.app'
+  ];
+
+  // --- 3. Función de Verificación de CORS (Actualizada) ---
+  const originCheck = (origin, callback) => {
+    // Normalizamos el origen quitando la barra final si existe
+    const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
+
+    if (!normalizedOrigin) {
+      callback(null, true); // Permitir peticiones sin origen (Postman, etc.)
+      return;
+    }
+
+    // Chequeo 1: ¿Está en la lista de orígenes exactos?
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    // Chequeo 2: ¿El origen TERMINA con alguno de los sufijos permitidos?
+    if (allowedSuffixes.some(suffix => normalizedOrigin.endsWith(suffix))) {
+      callback(null, true);
+      return;
+    }
+    
+    // Si no cumple ninguna, rechazar
+    console.error(`CORS Error: Origin ${origin} not allowed.`);
+    callback(new Error('Not allowed by CORS'));
+  };
+
+  // --- 4. Aplicar CORS a HTTP (Axios) ---
   app.use(cors({
-    origin: '*', // Acepta cualquier origen
+    origin: originCheck, // Usamos la nueva función
     credentials: true
   }));
   
   app.use(express.json({ extended: false }));
 
-  // --- 2. HABILITAMOS CORS PARA SOCKET.IO (*) ---
+  // --- 5. Aplicar CORS a Socket.IO ---
   const io = new Server(server, {
     cors: {
-      origin: '*', // Acepta cualquier origen
+      origin: originCheck, // Usamos la MISMA función robusta
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
