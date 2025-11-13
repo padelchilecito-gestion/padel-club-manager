@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { usePublicSettings } from '../contexts/PublicSettingsContext'; // --- IMPORTADO ---
+import { usePublicSettings } from '../contexts/PublicSettingsContext'; 
 
 // Helper para limpiar el número de WhatsApp
 const cleanPhoneNumber = (number) => {
@@ -12,11 +12,14 @@ const Navbar = () => {
   const contactNumber = settings.publicContactNumber ? cleanPhoneNumber(settings.publicContactNumber) : '';
 
   return (
-    <nav className="bg-dark-secondary shadow-md p-4 flex justify-between items-center">
-      <div className="text-2xl font-bold text-primary">
+    <nav className="bg-dark-secondary shadow-md p-4 
+                    flex flex-col gap-4 md:flex-row md:justify-between md:items-center"> {/* <-- MODIFICADO */}
+      
+      <div className="text-2xl font-bold text-primary text-center md:text-left"> {/* <-- MODIFICADO */}
         <NavLink to="/">Padel Club</NavLink>
       </div>
-      <div className="flex items-center gap-6">
+
+      <div className="flex flex-col items-center gap-4 md:flex-row md:gap-6"> {/* <-- MODIFICADO */}
         {/* Botón de Tienda (condicional, sin cambios) */}
         {settings.shopEnabled && (
           <NavLink
@@ -42,7 +45,7 @@ const Navbar = () => {
 
         <NavLink
           to="/login"
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors w-full text-center md:w-auto" // <-- MODIFICADO
         >
           Login
         </NavLink>
