@@ -11,16 +11,18 @@ import {
   DocumentChartBarIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
-  InboxStackIcon, // --- NUEVO ÍCONO ---
+  InboxStackIcon,
+  ArrowPathIcon, // <-- AÑADIDO (O puedes re-usar CalendarDaysIcon)
 } from '@heroicons/react/24/outline';
 
 const navLinks = [
   { to: 'dashboard', text: 'Dashboard', icon: ChartBarIcon, role: ['Admin', 'Operator'] },
   { to: 'bookings', text: 'Turnos', icon: CalendarDaysIcon, role: ['Admin', 'Operator'] },
+  // --- AÑADIDO ---
+  { to: 'recurring-bookings', text: 'Turnos Fijos', icon: ArrowPathIcon, role: ['Admin', 'Operator'] },
+  // ----------------
   { to: 'pos', text: 'Punto de Venta', icon: BanknotesIcon, role: ['Admin', 'Operator'] },
-  // --- NUEVO ENLACE ---
   { to: 'cashbox', text: 'Caja', icon: InboxStackIcon, role: ['Admin', 'Operator'] },
-  // --------------------
   { to: 'inventory', text: 'Inventario', icon: ArchiveBoxIcon, role: ['Admin', 'Operator'] },
   { to: 'courts', text: 'Canchas', icon: ViewColumnsIcon, role: ['Admin', 'Operator'] },
   { type: 'divider', role: ['Admin'] },
