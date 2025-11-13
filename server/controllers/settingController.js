@@ -1,13 +1,7 @@
 const Setting = require('../models/Setting');
-const mongoose = require('mongoose'); // Importar mongoose
+const mongoose = require('mongoose');
 
-// Obtener las claves válidas del modelo
-const validSettingKeys = Object.keys(Setting.schema.paths).filter(key => 
-  !['_id', 'createdAt', 'updatedAt', '__v'].includes(key) && 
-  Setting.schema.paths[key].options.enum // Solo nos interesan las claves del 'enum'
-);
-
-// NOTA: El 'enum' está en 'key', no en 'paths'. Corrijamos.
+// Obtenemos la lista de claves VÁLIDAS directamente del 'enum' en el modelo
 const validKeysEnum = Setting.schema.path('key').options.enum;
 
 // @desc    Get all settings for Admin
