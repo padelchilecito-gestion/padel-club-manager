@@ -11,8 +11,8 @@ import UsersPage from './UsersPage';
 import ReportsPage from './ReportsPage';
 import ActivityLogPage from './ActivityLogPage';
 import SettingsPage from './SettingsPage';
-// --- IMPORTAMOS LA NUEVA PÁGINA ---
 import CashboxPage from './CashboxPage';
+import RecurringBookingsPage from './RecurringBookingsPage'; // <-- AÑADIDO
 
 // Import route protectors
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
@@ -33,10 +33,11 @@ const AdminLayout = () => {
             {/* Routes for Operator and Admin */}
             <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
+            {/* --- AÑADIDO --- */}
+            <Route path="recurring-bookings" element={<ProtectedRoute><RecurringBookingsPage /></ProtectedRoute>} />
+            {/* ---------------- */}
             <Route path="pos" element={<ProtectedRoute><PosPage /></ProtectedRoute>} />
-            {/* --- AÑADIMOS LA NUEVA RUTA --- */}
             <Route path="cashbox" element={<ProtectedRoute><CashboxPage /></ProtectedRoute>} />
-            {/* --------------------------- */}
             <Route path="inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
             <Route path="courts" element={<ProtectedRoute><CourtsPage /></ProtectedRoute>} />
 
