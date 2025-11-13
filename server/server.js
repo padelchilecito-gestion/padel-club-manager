@@ -7,6 +7,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
+const generateRecurringBookings = require('./utils/generateRecurringBookings'); // <-- AÑADIDO
 
 const startServer = async () => {
   // Connect to Database first
@@ -93,6 +94,32 @@ const startServer = async () => {
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on port ${PORT}`);
+
+    // --- INICIO: LÓGICA DEL CRON JOB ---
+    // (Esta es una forma segura de correr un "cron" sin 'node-cron')
+    // Comprueba cada 30 minutos.
+    const runCron = async () => {
+      try {
+        const now = new Date();
+        const minutes = now.getMinutes();
+        
+        // Ejecutar solo si estamos cerca de la hora (ej. 2:00 - 2:30 AM)
+        if (now.getHours() === 2 && minutes < 30) {
+          console.log('[CRON] Running daily task: generateRecurringBookings');
+          await generateRecurringBookings();
+        }
+      } catch (err) {
+        console.error('[CRON] Error during scheduled task:', err);
+      } finally {
+        // Vuelve a programar la comprobación para dentro de 30 minutos
+        setTimeout(runCron, 30 * 60 * 1000); 
+      }
+    };
+    
+    // Inicia el primer ciclo del cron
+    console.log('[CRON] Scheduled job started. Will check every 30 minutes.');
+    runCron();
+    // --- FIN: LÓGICA DEL CRON JOB ---
   });
 };
 
