@@ -9,6 +9,7 @@ const BookingSchema = new mongoose.Schema({
   user: {
     name: { type: String, required: true },
     phone: { type: String, required: true },
+    email: { type: String }, // <-- NUEVO
   },
   startTime: {
     type: Date,
@@ -33,7 +34,6 @@ const BookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    // NOTA: Se añaden los nuevos métodos de pago.
     enum: ['Efectivo', 'Mercado Pago', 'Otro', 'Transferencia', 'QR'],
     default: 'Efectivo',
   },
@@ -41,9 +41,16 @@ const BookingSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  paymentId: { // <-- NUEVO: ID de Mercado Pago para idempotencia
+    type: String,
+    sparse: true,
+  },
 }, { timestamps: true });
 
 // Index to prevent double booking on the same court at the same time
 BookingSchema.index({ court: 1, startTime: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
+
+// Index para asegurar que un ID de pago solo se use una vez
+BookingSchema.index({ paymentId: 1 }, { unique: true, sparse: true }); // <-- NUEVO
 
 module.exports = mongoose.model('Booking', BookingSchema);
