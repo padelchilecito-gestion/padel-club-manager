@@ -16,6 +16,7 @@ const startServer = async () => {
   const server = http.createServer(app);
 
   // --- 1. Lista de Orígenes EXACTOS Permitidos ---
+  // (La URL de producción principal y localhost)
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
@@ -26,20 +27,20 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  // --- 2. Lista de SUFIJOS Permitidos (CORREGIDO SIN EL GUIÓN INICIAL) ---
-  const allowedSuffixes = [
-    'eduardo-miguel-riccis-projects.vercel.app'
-  ];
+  // --- 2. REGEX para Orígenes Dinámicos (LA SOLUCIÓN DEFINITIVA) ---
+  // Esto acepta: https://[CUALQUIER-COSA]-eduardo-miguel-riccis-projects.vercel.app
+  const vercelPreviewRegex = /^https:\/\/padel-club-manager-.*-eduardo-miguel-riccis-projects\.vercel\.app$/;
 
-  // --- 3. Función de Verificación de CORS (Actualizada) ---
+
+  // --- 3. Función de Verificación de CORS (Actualizada con REGEX) ---
   const originCheck = (origin, callback) => {
-    // Normalizamos el origen quitando la barra final si existe
-    const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
-
-    if (!normalizedOrigin) {
+    if (!origin) {
       callback(null, true); // Permitir peticiones sin origen (Postman, etc.)
       return;
     }
+
+    // Normalizamos el origen quitando la barra final si existe
+    const normalizedOrigin = origin.replace(/\/$/, '');
 
     // Chequeo 1: ¿Está en la lista de orígenes exactos?
     if (allowedOrigins.includes(normalizedOrigin)) {
@@ -47,8 +48,8 @@ const startServer = async () => {
       return;
     }
 
-    // Chequeo 2: ¿El origen TERMINA con alguno de los sufijos permitidos?
-    if (allowedSuffixes.some(suffix => normalizedOrigin.endsWith(suffix))) {
+    // Chequeo 2: ¿Cumple con el patrón (RegEx) de las vistas previas de Vercel?
+    if (vercelPreviewRegex.test(normalizedOrigin)) {
       callback(null, true);
       return;
     }
@@ -69,7 +70,7 @@ const startServer = async () => {
   // --- 5. Aplicar CORS a Socket.IO ---
   const io = new Server(server, {
     cors: {
-      origin: originCheck, // Usamos la MISMA función robusta
+      origin: originCheck, // Usamos la MISMA función
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
