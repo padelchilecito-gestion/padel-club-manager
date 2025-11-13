@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
-import { paymentService } from '../../services/paymentService'; // (Usaremos este)
+import { paymentService } from '../../services/paymentService';
 import { 
     PlusCircleIcon, 
     MinusCircleIcon, 
@@ -10,11 +10,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
 import socket from '../../services/socketService';
-// --- IMPORTAMOS EL MODAL REUTILIZABLE ---
 import FullScreenQRModal from '../../components/admin/FullScreenQRModal';
-// ----------------------------------------
-
-// (El sub-componente FullScreenQRModal se ha eliminado de aquí)
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -50,7 +46,6 @@ const PosPage = () => {
     socket.connect();
     
     const handleSaleCompleted = (saleData) => {
-      // Comprobamos si el pago recibido coincide con el que estamos esperando
       if (saleData.total === paymentTotal && paymentStatus === 'pending') {
           setPaymentStatus('successful');
       }
@@ -136,7 +131,7 @@ const PosPage = () => {
             unit_price: saleTotal,
             quantity: 1,
           }],
-          payer: { name: "Cliente", email: "test_user@test.com" },
+          payer: { name: "Cliente POS", email: "cliente@pos.com" }, // Email genérico para POS
           metadata: { 
             sale_items: saleData.items,
             user_id: user._id,
@@ -154,7 +149,17 @@ const PosPage = () => {
         fetchProducts(); 
       }
     } catch (err) {
-      setError(err.message || 'No se pudo completar la venta.');
+      // --- MANEJO DE ERROR MEJORADO ---
+      if (err.response && err.response.status === 409 && err.response.data.errorCode === 'INSUFFICIENT_STOCK') {
+        // Mostramos un error específico de stock
+        setError(`¡Stock insuficiente! ${err.response.data.message}. Ajusta el carrito.`);
+        // Opcional: recargar productos para ver el stock actualizado
+        fetchProducts();
+      } else {
+        // Error genérico
+        setError(err.response?.data?.message || err.message || 'No se pudo completar la venta.');
+      }
+      // --- FIN MANEJO MEJORADO ---
     } finally {
       setLoading(false);
     }
@@ -221,6 +226,7 @@ const PosPage = () => {
               <span>Total:</span>
               <span className="text-primary">${cartTotal.toFixed(2)}</span>
             </div>
+            {/* El error ahora se muestra aquí */}
             {error && <p className="text-danger text-center text-sm mb-2">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => handleFinalizeSale('Efectivo')} className="bg-secondary text-white font-bold p-3 rounded-md hover:bg-opacity-80 disabled:opacity-50" disabled={loading || cart.length === 0}>Efectivo</button>
@@ -230,7 +236,6 @@ const PosPage = () => {
         </div>
       </div>
 
-      {/* --- RENDERIZADO DEL MODAL (AHORA IMPORTADO) --- */}
       {paymentQR && (
         <FullScreenQRModal
           qrValue={paymentQR}
