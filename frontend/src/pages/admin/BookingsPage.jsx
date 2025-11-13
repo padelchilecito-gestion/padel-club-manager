@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { bookingService } from '../../services/bookingService';
-import { courtService } from '../../services/courtService'; // Importamos CourtService
+import { courtService } from '../../services/courtService';
 import { paymentService } from '../../services/paymentService'; 
 import socket from '../../services/socketService';
-import { format, startOfDay, isSameDay } from 'date-fns'; // Importamos helpers de date-fns
+import { format, startOfDay, isSameDay, parseISO } from 'date-fns';
 import { utcToZonedTime } from 'date-fns-tz';
-import { PencilIcon, XCircleIcon, CurrencyDollarIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/solid'; 
+import { 
+  PencilIcon, 
+  XCircleIcon, 
+  CurrencyDollarIcon, 
+  FunnelIcon, 
+  XMarkIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
+} from '@heroicons/react/24/solid'; 
 import BookingFormModal from '../../components/admin/BookingFormModal';
 import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; 
 
@@ -60,20 +68,23 @@ const PaymentActions = ({ booking, onUpdate, onShowQR }) => {
 
 
 const BookingsPage = () => {
-  const [bookings, setBookings] = useState([]); // Lista original de la API
-  const [courts, setCourts] = useState([]); // Lista de canchas para el filtro
+  const [bookings, setBookings] = useState([]); // ¡Ahora solo contiene la página actual!
+  const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  // --- ESTADOS PARA LOS FILTROS (CON EL NUEVO FILTRO DE NOMBRE) ---
+  // --- ESTADOS DE FILTRO Y PAGINACIÓN ---
   const [filters, setFilters] = useState({
-    name: '', // <-- TU NUEVO FILTRO
+    name: '',
     court: 'all',
     payment: 'all',
-    date: '' 
+    date: format(new Date(), 'yyyy-MM-dd') // Filtramos por hoy por defecto
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalBookings, setTotalBookings] = useState(0);
   // -----------------------------------
 
   const [qrData, setQrData] = useState({
@@ -85,44 +96,62 @@ const BookingsPage = () => {
 
   const timeZone = 'America/Argentina/Buenos_Aires';
 
-  // Función para cargar canchas y turnos
+  // --- NUEVA FUNCIÓN DE CARGA DE DATOS ---
+  const fetchBookings = useCallback(async (page, currentFilters) => {
+    setLoading(true);
+    setError('');
+    try {
+      // Preparamos los parámetros para la API
+      const params = {
+        page,
+        limit: 15, // 15 por página
+        ...currentFilters
+      };
+      
+      const data = await bookingService.getBookings(params);
+      
+      setBookings(data.bookings);
+      setCurrentPage(data.page);
+      setTotalPages(data.totalPages);
+      setTotalBookings(data.totalBookings);
+
+    } catch (err) {
+      setError('No se pudieron cargar las reservas.');
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Sin dependencias, no necesita recrearse
+
+  // Cargar canchas solo una vez al montar
   useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true);
-      setError('');
+    const loadCourts = async () => {
       try {
-        const [bookingsData, courtsData] = await Promise.all([
-          bookingService.getAllBookings(),
-          courtService.getAllCourts() // <-- Cargamos las canchas para el selector
-        ]);
-        setBookings(bookingsData);
+        const courtsData = await courtService.getAllCourts();
         setCourts(courtsData);
       } catch (err) {
-        setError('No se pudieron cargar los datos.');
-      } finally {
-        setLoading(false);
+        console.error("Failed to load courts", err);
       }
     };
-    
-    loadInitialData();
-  }, []); 
+    loadCourts();
+  }, []);
 
-  // (Efecto de Socket.IO sin cambios)
+  // Efecto para recargar datos cuando cambian los filtros o la página
+  useEffect(() => {
+    // Usamos 'filters' y 'currentPage' del estado
+    fetchBookings(currentPage, filters);
+  }, [filters, currentPage, fetchBookings]);
+  // ----------------------------------------
+
+
+  // (Efecto de Socket.IO modificado para recargar la página actual)
   useEffect(() => {
     socket.connect();
 
     const handleBookingUpdate = (updatedBooking) => {
-        setBookings(prevBookings => {
-            const index = prevBookings.findIndex(b => b._id === updatedBooking._id);
-            if (index !== -1) {
-                const newBookings = [...prevBookings];
-                newBookings[index] = updatedBooking;
-                return newBookings;
-            } else {
-                return [...prevBookings, updatedBooking].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-            }
-        });
+        // Simple: solo recargamos la data de la página actual
+        fetchBookings(currentPage, filters);
         
+        // Lógica del QR (sin cambios)
         if (
             qrData.bookingId === updatedBooking._id && 
             updatedBooking.isPaid &&
@@ -133,7 +162,8 @@ const BookingsPage = () => {
     };
     
     const handleBookingDelete = ({ id }) => {
-        setBookings(prevBookings => prevBookings.filter(b => b._id !== id));
+        // Simple: solo recargamos la data
+        fetchBookings(currentPage, filters);
     };
 
     socket.on('booking_update', handleBookingUpdate);
@@ -144,59 +174,45 @@ const BookingsPage = () => {
       socket.off('booking_deleted', handleBookingDelete);
       socket.disconnect();
     };
-  }, [qrData.bookingId, qrData.status]);
-
-  // --- LÓGICA DE FILTRADO (CON EL NUEVO FILTRO DE NOMBRE) ---
-  const filteredBookings = useMemo(() => {
-    let filtered = [...bookings];
-
-    // --- 1. Filtro por Nombre (NUEVO) ---
-    if (filters.name) {
-      filtered = filtered.filter(b => 
-        b.user.name.toLowerCase().includes(filters.name.toLowerCase())
-      );
-    }
-
-    // --- 2. Filtro por Cancha ---
-    if (filters.court !== 'all') {
-      filtered = filtered.filter(b => b.court?._id === filters.court);
-    }
-
-    // --- 3. Filtro por Pago ---
-    if (filters.payment !== 'all') {
-      const isPaidFilter = filters.payment === 'paid';
-      filtered = filtered.filter(b => b.isPaid === isPaidFilter);
-    }
-
-    // --- 4. Filtro por Fecha ---
-    if (filters.date) {
-      const filterDateStart = startOfDay(new Date(filters.date + 'T00:00:00'));
-      filtered = filtered.filter(b => {
-        const bookingDate = startOfDay(utcToZonedTime(new Date(b.startTime), timeZone));
-        // Usamos isSameDay para comparar fechas ignorando la hora
-        return isSameDay(bookingDate, filterDateStart);
-      });
-    }
-
-    return filtered;
-  }, [bookings, filters]);
+  }, [currentPage, filters, fetchBookings, qrData.bookingId, qrData.status]);
   
-  // Manejador de Filtros (sin cambios)
+  // Manejador de Filtros (ahora resetea la página a 1)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
       ...prev,
       [name]: value
     }));
+    setCurrentPage(1); // Volver a la página 1 al cambiar filtros
   };
 
   // Reseteador de Filtros (actualizado)
   const clearFilters = () => {
-    setFilters({ name: '', court: 'all', payment: 'all', date: '' });
+    setFilters({ 
+      name: '', 
+      court: 'all', 
+      payment: 'all', 
+      date: '' // Limpiamos la fecha también
+    });
+    setCurrentPage(1);
   };
   // ---------------------------------
+  
+  // --- PAGINACIÓN ---
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+  // ------------------
 
-  // --- (Funciones de Modales y Pago sin cambios, incluyendo la corrección del bug) ---
+
+  // --- (Funciones de Modales y Pago sin cambios) ---
   const handleOpenModal = (booking = null) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
@@ -206,17 +222,13 @@ const BookingsPage = () => {
     setSelectedBooking(null);
   };
   const handleSuccess = () => {
-    fetchBookings(); // Recargamos todo al crear/editar
+    fetchBookings(currentPage, filters); // Recargamos la página actual
     handleCloseModal();
   };
   const handleUpdateStatus = async (id, status, isPaid, paymentMethod) => {
     try {
-        const updatedBooking = await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
-        setBookings(prevBookings => 
-          prevBookings.map(b => 
-            b._id === updatedBooking._id ? updatedBooking : b
-          )
-        );
+        await bookingService.updateBookingStatus(id, { status, isPaid, paymentMethod });
+        // El socket se encargará de actualizar la UI
     } catch (err) {
         alert('Error al actualizar la reserva.');
     }
@@ -225,7 +237,7 @@ const BookingsPage = () => {
       if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
           try {
               await bookingService.cancelBooking(id);
-              // El socket actualizará la UI
+              // El socket se encargará de actualizar la UI
           } catch (err) {
               alert('Error al cancelar la reserva.');
           }
@@ -241,7 +253,7 @@ const BookingsPage = () => {
             unit_price: booking.price,
             quantity: 1,
           }],
-          payer: { name: booking.user.name, email: "test_user@test.com" },
+          payer: { name: booking.user.name, email: booking.user.email || "test_user@test.com" }, // Usamos el email guardado
           metadata: { 
             booking_id: booking._id, 
           }
@@ -267,9 +279,6 @@ const BookingsPage = () => {
   };
   // ----------------------------------------------------
 
-  if (loading && bookings.length === 0) return <div className="text-center p-8">Cargando reservas...</div>;
-  if (error) return <div className="text-center p-8 text-danger">{error}</div>;
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -282,11 +291,10 @@ const BookingsPage = () => {
         </button>
       </div>
 
-      {/* --- BARRA DE FILTROS (CON EL NUEVO FILTRO DE NOMBRE) --- */}
+      {/* --- BARRA DE FILTROS --- */}
       <div className="mb-6 p-4 bg-dark-secondary rounded-lg shadow-md flex flex-wrap items-end gap-4">
         <FunnelIcon className="h-6 w-6 text-primary flex-shrink-0" />
         
-        {/* --- Filtro por Nombre (NUEVO) --- */}
         <div className="flex-grow min-w-[200px]">
           <label htmlFor="name" className="block text-sm font-medium text-text-secondary">Nombre Cliente</label>
           <input
@@ -300,7 +308,6 @@ const BookingsPage = () => {
           />
         </div>
         
-        {/* Filtro por Fecha */}
         <div className="flex-grow min-w-[150px]">
           <label htmlFor="date" className="block text-sm font-medium text-text-secondary">Fecha</label>
           <input
@@ -313,7 +320,6 @@ const BookingsPage = () => {
           />
         </div>
 
-        {/* Filtro por Cancha */}
         <div className="flex-grow min-w-[150px]">
           <label htmlFor="court" className="block text-sm font-medium text-text-secondary">Cancha</label>
           <select
@@ -330,7 +336,6 @@ const BookingsPage = () => {
           </select>
         </div>
 
-        {/* Filtro por Pago */}
         <div className="flex-grow min-w-[150px]">
           <label htmlFor="payment" className="block text-sm font-medium text-text-secondary">Pago</label>
           <select
@@ -346,7 +351,6 @@ const BookingsPage = () => {
           </select>
         </div>
 
-        {/* Botón de Limpiar */}
         <button
           onClick={clearFilters}
           className="p-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white flex-shrink-0"
@@ -355,8 +359,8 @@ const BookingsPage = () => {
           <XMarkIcon className="h-5 w-5" />
         </button>
       </div>
-      {/* --- FIN DE LA BARRA DE FILTROS --- */}
 
+      {/* --- TABLA DE RESERVAS --- */}
       <div className="bg-dark-secondary shadow-lg rounded-lg overflow-x-auto">
         <table className="w-full text-sm text-left text-text-secondary">
           <thead className="text-xs text-text-primary uppercase bg-dark-primary">
@@ -370,9 +374,12 @@ const BookingsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {/* Usamos 'filteredBookings' en lugar de 'bookings' */}
-            {filteredBookings.length > 0 ? (
-              filteredBookings.map((booking) => {
+            {loading ? (
+              <tr><td colSpan="6" className="text-center p-8 text-text-secondary">Cargando...</td></tr>
+            ) : error ? (
+              <tr><td colSpan="6" className="text-center p-8 text-danger">{error}</td></tr>
+            ) : bookings.length > 0 ? (
+              bookings.map((booking) => {
                 const zonedStartTime = utcToZonedTime(new Date(booking.startTime), timeZone);
                 const zonedEndTime = utcToZonedTime(new Date(booking.endTime), timeZone);
                 const whatsappLink = `https://wa.me/${cleanPhoneNumber(booking.user.phone)}`;
@@ -431,6 +438,34 @@ const BookingsPage = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* --- PAGINACIÓN --- */}
+      <div className="flex justify-between items-center bg-dark-secondary px-6 py-3 rounded-b-lg border-t border-gray-700">
+        <span className="text-sm text-text-secondary">
+          Total de reservas: {totalBookings}
+        </span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage <= 1 || loading}
+            className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
+          >
+            <ChevronLeftIcon className="h-4 w-4 mr-1" />
+            Anterior
+          </button>
+          <span className="text-text-primary font-semibold">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage >= totalPages || loading}
+            className="flex items-center px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md disabled:opacity-50"
+          >
+            Siguiente
+            <ChevronRightIcon className="h-4 w-4 ml-1" />
+          </button>
+        </div>
       </div>
 
       {isModalOpen && (
