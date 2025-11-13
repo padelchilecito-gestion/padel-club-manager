@@ -11,7 +11,6 @@ const apiRoutes = require('./routes');
 const startServer = async () => {
   // Connect to Database first
   await connectDB();
-
   const app = express();
   const server = http.createServer(app);
 
