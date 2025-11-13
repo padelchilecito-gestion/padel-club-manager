@@ -7,7 +7,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes');
-const generateRecurringBookings = require('./utils/generateRecurringBookings'); // <-- AÑADIDO
+const generateRecurringBookings = require('./utils/generateRecurringBookings'); 
 
 const startServer = async () => {
   // Connect to Database first
@@ -27,10 +27,16 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
+  // --- INICIO DE LA CORRECCIÓN ---
   const corsOptions = {
     origin: function (origin, callback) {
-      // Permitimos peticiones sin 'origin' (como Postman) y las de la lista
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      // 1. Permitir localhost (de la lista)
+      // 2. Permitir peticiones sin 'origin' (como Postman)
+      // 3. Permitir CUALQUIER subdominio que termine en .vercel.app
+      if (!origin || 
+          allowedOrigins.indexOf(origin) !== -1 || 
+          (origin && origin.endsWith('.vercel.app'))
+      ) {
         callback(null, true);
       } else {
         console.error(`CORS Error (HTTP): Origin ${origin} not allowed.`);
@@ -39,14 +45,26 @@ const startServer = async () => {
     },
     credentials: true
   };
+  // --- FIN DE LA CORRECCIÓN ---
 
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- Configuración de Socket.IO ---
+  // --- Configuración de Socket.IO (MODIFICADA TAMBIÉN) ---
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins, 
+      origin: function (origin, callback) {
+        // Aplicamos la MISMA lógica de CORS a Socket.IO
+        if (!origin || 
+            allowedOrigins.indexOf(origin) !== -1 || 
+            (origin && origin.endsWith('.vercel.app'))
+        ) {
+          callback(null, true);
+        } else {
+          console.error(`CORS Error (Socket): Origin ${origin} not allowed.`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      }, 
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
@@ -62,12 +80,11 @@ const startServer = async () => {
   });
 
   // --- Seguridad: Rate Limiting ---
-  // Habilitamos 'trust proxy' si estás detrás de un proxy (Render, Vercel)
   app.set('trust proxy', 1);
 
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 200, // Límite de 200 peticiones por IP cada 15 min
+    max: 200, 
     message: 'Demasiadas peticiones desde esta IP, por favor intente de nuevo en 15 minutos',
     standardHeaders: true,
     legacyHeaders: false,
@@ -75,15 +92,15 @@ const startServer = async () => {
 
   const authLimiter = rateLimit({
     windowMs: 10 * 60 * 1000, // 10 minutos
-    max: 10, // Límite de 10 intentos de login por IP cada 10 min
+    max: 10, 
     message: 'Demasiados intentos de inicio de sesión, por favor intente de nuevo en 10 minutos',
     standardHeaders: true,
     legacyHeaders: false,
   });
 
   // Aplicar limitadores
-  app.use('/api', apiLimiter); // Límite general para /api
-  app.use('/api/auth/login', authLimiter); // Límite estricto para /api/auth/login
+  app.use('/api', apiLimiter); 
+  app.use('/api/auth/login', authLimiter); 
 
   app.get('/', (req, res) => res.send('Padel Club Manager API Running'));
 
@@ -95,15 +112,12 @@ const startServer = async () => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on port ${PORT}`);
 
-    // --- INICIO: LÓGICA DEL CRON JOB ---
-    // (Esta es una forma segura de correr un "cron" sin 'node-cron')
-    // Comprueba cada 30 minutos.
+    // --- LÓGICA DEL CRON JOB ---
     const runCron = async () => {
       try {
         const now = new Date();
         const minutes = now.getMinutes();
         
-        // Ejecutar solo si estamos cerca de la hora (ej. 2:00 - 2:30 AM)
         if (now.getHours() === 2 && minutes < 30) {
           console.log('[CRON] Running daily task: generateRecurringBookings');
           await generateRecurringBookings();
@@ -111,15 +125,12 @@ const startServer = async () => {
       } catch (err) {
         console.error('[CRON] Error during scheduled task:', err);
       } finally {
-        // Vuelve a programar la comprobación para dentro de 30 minutos
         setTimeout(runCron, 30 * 60 * 1000); 
       }
     };
     
-    // Inicia el primer ciclo del cron
     console.log('[CRON] Scheduled job started. Will check every 30 minutes.');
     runCron();
-    // --- FIN: LÓGICA DEL CRON JOB ---
   });
 };
 
