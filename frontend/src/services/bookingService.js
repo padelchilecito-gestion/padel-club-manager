@@ -22,17 +22,18 @@ const createBooking = async (bookingData) => {
   }
 };
 
-// (createPaymentPreference fue movido a paymentService.js)
-
-const getAllBookings = async () => {
+// --- FUNCIÓN MODIFICADA PARA PAGINACIÓN ---
+const getBookings = async (params) => {
     try {
-        const response = await apiClient.get('/bookings');
-        return response.data;
+        // params = { page: 1, limit: 15, name: '...', court: '...', ... }
+        const response = await apiClient.get('/bookings', { params });
+        return response.data; // Devuelve { bookings: [], page, totalPages, ... }
     } catch (error) {
         console.error('Error fetching all bookings:', error);
         throw error;
     }
 };
+// ----------------------------------------
 
 const updateBookingStatus = async (id, statusData) => {
     try {
@@ -83,12 +84,11 @@ const getPublicCourtOptions = async (startTime, endTime) => {
 // --------------------------------
 
 export const bookingService = {
-  getAvailability, // (Esta ya no la usará el TimeSlotFinder, pero la dejamos)
+  getAvailability, 
   createBooking,
-  getAllBookings,
+  getBookings, // <-- Exportamos la nueva
   updateBookingStatus,
   cancelBooking,
-  // --- AÑADIMOS LAS NUEVAS FUNCIONES ---
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
 };
