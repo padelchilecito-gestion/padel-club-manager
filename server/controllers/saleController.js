@@ -25,6 +25,7 @@ const createSale = async (req, res) => {
       }
 
       if (product.stock < item.quantity) {
+        // --- Error de stock específico ---
         throw new Error(`Not enough stock for ${product.name}. Available: ${product.stock}, Required: ${item.quantity}.`);
       }
 
@@ -58,6 +59,19 @@ const createSale = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     console.error('Transaction aborted:', error.message);
+
+    // --- MANEJO DE ERROR MEJORADO ---
+    if (error.message.includes('Not enough stock')) {
+      // Enviamos un 409 (Conflicto) con un código de error
+      const productName = error.message.split('for ')[1]?.split('.')[0] || 'producto';
+      return res.status(409).json({
+        message: error.message,
+        errorCode: 'INSUFFICIENT_STOCK',
+        productName: productName
+      });
+    }
+    // --- FIN MANEJO MEJORADO ---
+
     res.status(400).json({ message: error.message || 'Transaction failed. Please try again.' });
   }
 };
