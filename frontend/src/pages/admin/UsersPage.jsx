@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import UserFormModal from '../../components/admin/UserFormModal';
-import UserRoleModal from '../../components/admin/UserRoleModal'; // <-- Importar nuevo modal
-import { TrashIcon, PencilIcon } from '@heroicons/react/24/solid'; // <-- Importar PencilIcon
+import UserRoleModal from '../../components/admin/UserRoleModal'; 
+import { TrashIcon, PencilIcon } from '@heroicons/react/24/solid'; 
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -11,8 +11,8 @@ const UsersPage = () => {
   const [error, setError] = useState('');
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // <-- Nuevo estado
-  const [selectedUser, setSelectedUser] = useState(null); // <-- Nuevo estado
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
+  const [selectedUser, setSelectedUser] = useState(null); 
   
   const { user: currentUser } = useAuth();
 
@@ -40,7 +40,6 @@ const UsersPage = () => {
     setIsCreateModalOpen(false);
   };
 
-  // --- Nuevos manejadores para el modal de edición ---
   const handleOpenEditModal = (user) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
@@ -50,12 +49,11 @@ const UsersPage = () => {
     setSelectedUser(null);
     setIsEditModalOpen(false);
   };
-  // ------------------------------------------------
 
   const handleSuccess = () => {
-    fetchUsers(); // Refrescar usuarios
+    fetchUsers(); 
     handleCloseCreateModal();
-    handleCloseEditModal(); // Cerrar ambos modales por si acaso
+    handleCloseEditModal(); 
   };
 
   const handleDelete = async (userId) => {
@@ -79,11 +77,12 @@ const UsersPage = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      {/* --- HEADER MODIFICADO --- */}
+      <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary">Gestión de Usuarios</h1>
         <button
           onClick={handleOpenCreateModal}
-          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-md transition-colors w-full md:w-auto"
         >
           Añadir Usuario
         </button>
@@ -112,7 +111,6 @@ const UsersPage = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 flex items-center gap-4">
-                  {/* --- ACCIONES MODIFICADAS --- */}
                   {user._id !== currentUser._id ? (
                     <>
                       <button onClick={() => handleOpenEditModal(user)} className="text-blue-400 hover:text-blue-300" title="Editar Rol">
@@ -125,7 +123,6 @@ const UsersPage = () => {
                   ) : (
                     <span className="text-xs italic text-gray-500"> (Tú) </span>
                   )}
-                  {/* --------------------------- */}
                 </td>
               </tr>
             ))}
@@ -140,7 +137,6 @@ const UsersPage = () => {
         />
       )}
 
-      {/* --- NUEVO MODAL RENDERIZADO --- */}
       {isEditModalOpen && selectedUser && (
         <UserRoleModal
           user={selectedUser}
