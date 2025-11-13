@@ -3,14 +3,11 @@ const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
 const { sendWhatsAppMessage } = require('../utils/notificationService');
 const { logActivity } = require('../utils/logActivity');
-// --- Importación de date-fns-tz ---
 const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// --- (createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking) ---
-// (Estas funciones no cambian, las incluyo para que el archivo esté completo)
 // @desc    Create a new booking
 // @route   POST /api/bookings
 // @access  Public or Admin
@@ -74,6 +71,7 @@ const createBooking = async (req, res) => {
         await logActivity(req.user, 'BOOKING_CREATED', logDetails);
     }
 
+    // (La lógica de WhatsApp sigue siendo un placeholder)
     if (createdBooking.user.phone) {
         const messageBody = `¡Hola ${createdBooking.user.name}! Tu reserva ha sido confirmada para la cancha "${court.name}" el ${start.toLocaleString()}. ¡Te esperamos!`;
         await sendWhatsAppMessage(createdBooking.user.phone, messageBody);
@@ -86,7 +84,7 @@ const createBooking = async (req, res) => {
   }
 };
 
-// @desc    Get availability for a court on a specific date
+// @desc    Get availability for a court on a specific date (Legacy)
 // @route   GET /api/bookings/availability
 // @access  Public
 const getBookingAvailability = async (req, res) => {
@@ -114,22 +112,58 @@ const getBookingAvailability = async (req, res) => {
 };
 
 
-// @desc    Get all bookings
+// @desc    Get all bookings with pagination and filters
 // @route   GET /api/bookings
 // @access  Operator/Admin
 const getBookings = async (req, res) => {
   try {
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const skip = (page - 1) * limit;
 
-    const bookings = await Booking.find({
-      $or: [
-        { status: { $ne: 'Cancelled' } },
-        { status: 'Cancelled', updatedAt: { $gte: twoDaysAgo } }
-      ]
-    }).populate('court', 'name courtType').sort({ startTime: -1 });
+    // --- Construir objeto de filtros ---
+    const filters = {};
 
-    res.json(bookings);
+    if (req.query.name) {
+      filters['user.name'] = { $regex: req.query.name, $options: 'i' };
+    }
+    if (req.query.court && req.query.court !== 'all') {
+      filters.court = req.query.court;
+    }
+    if (req.query.payment && req.query.payment !== 'all') {
+      filters.isPaid = req.query.payment === 'paid';
+    }
+    if (req.query.date) {
+      // Convertir la fecha 'yyyy-MM-dd' a la zona horaria correcta
+      const zonedDate = zonedTimeToUtc(req.query.date + 'T00:00:00', timeZone);
+      const startOfDay = new Date(zonedDate);
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+      
+      filters.startTime = { $gte: startOfDay, $lte: endOfDay };
+    } else {
+      // Por defecto, no mostramos turnos super antiguos
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      filters.startTime = { $gte: twoDaysAgo };
+    }
+
+    // Contar total de documentos con filtros
+    const totalBookings = await Booking.countDocuments(filters);
+    const totalPages = Math.ceil(totalBookings / limit);
+
+    const bookings = await Booking.find(filters)
+      .populate('court', 'name courtType')
+      .sort({ startTime: -1 }) // Ordenar por más reciente
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      bookings,
+      page,
+      totalPages,
+      totalBookings,
+    });
+    
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -257,8 +291,6 @@ const getPublicAvailabilitySlots = async (req, res) => {
         const settingsPromise = Setting.findOne({ key: 'BUSINESS_HOURS' });
         const courtsPromise = Court.find({ isActive: true }).select('_id');
         
-        // El 'date' que recibimos (ej: 2025-11-11) se interpreta como UTC (00:00 UTC)
-        // Lo convertimos a la zona horaria de Argentina para que sea 00:00 ARGT
         const startOfDayArg = zonedTimeToUtc(date + 'T00:00:00', timeZone);
         
         const endOfWindow = new Date(startOfDayArg.getTime() + 36 * 60 * 60 * 1000); 
@@ -305,9 +337,7 @@ const getPublicAvailabilitySlots = async (req, res) => {
                 currentSlotTime = slotEnd;
                 continue;
             }
-
-            // Convertimos el slot (que está en UTC) a la hora local de Argentina
-            // para consultar la grilla de horarios de apertura.
+            
             const localSlotTime = utcToZonedTime(currentSlotTime, timeZone);
             
             const dayIndex = localSlotTime.getDay(); // 0 = Domingo (AR), 1 = Lunes (AR)...
