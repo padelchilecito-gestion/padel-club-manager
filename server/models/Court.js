@@ -12,10 +12,20 @@ const CourtSchema = new mongoose.Schema({
     required: true,
     enum: ['Cemento', 'Césped Sintético', 'Cristal'],
   },
-  pricePerHour: {
+  pricePerHour: { // Este será el precio de 60 MINUTOS
     type: Number,
     required: true,
   },
+  // --- CAMPOS NUEVOS ---
+  pricePer90Min: { // Precio especial para 90 MINUTOS
+    type: Number,
+    required: false,
+  },
+  pricePer120Min: { // Precio especial para 120 MINUTOS
+    type: Number,
+    required: false,
+  },
+  // --------------------
   isActive: {
     type: Boolean,
     default: true,
