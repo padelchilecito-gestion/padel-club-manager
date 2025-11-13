@@ -1,4 +1,14 @@
 const Setting = require('../models/Setting');
+const mongoose = require('mongoose'); // Importar mongoose
+
+// Obtener las claves válidas del modelo
+const validSettingKeys = Object.keys(Setting.schema.paths).filter(key => 
+  !['_id', 'createdAt', 'updatedAt', '__v'].includes(key) && 
+  Setting.schema.paths[key].options.enum // Solo nos interesan las claves del 'enum'
+);
+
+// NOTA: El 'enum' está en 'key', no en 'paths'. Corrijamos.
+const validKeysEnum = Setting.schema.path('key').options.enum;
 
 // @desc    Get all settings for Admin
 // @route   GET /api/settings
@@ -24,22 +34,23 @@ const updateSettings = async (req, res) => {
     const settings = req.body; // Espera un objeto { KEY: 'value', ... }
 
     try {
-        // --- LÓGICA DE FILTRO CORREGIDA ---
-        // Ahora procesamos todas las claves que nos envía el frontend.
-        // La validación de 'enum' en el modelo se encargará de rechazar claves inválidas.
-        const promises = Object.keys(settings).map(key => {
-            const value = settings[key];
-            
-            // Usamos findOneAndUpdate con 'upsert'
-            return Setting.findOneAndUpdate(
-                { key },
-                { value: value, lastUpdatedBy: req.user.id },
-                { new: true, upsert: true, runValidators: true } // upsert: crea si no existe
-            );
-        });
+        // --- LÓGICA DE FILTRO CORREGIDA (MÁS ROBUSTA) ---
+        // 1. Filtramos el objeto 'settings' que nos llega del frontend.
+        // 2. Solo nos quedamos con las claves que SÍ existen en el enum de nuestro modelo.
+        
+        const validUpdates = Object.keys(settings)
+            .filter(key => validKeysEnum.includes(key)) // ¡Esta es la validación!
+            .map(key => {
+                const value = settings[key];
+                return Setting.findOneAndUpdate(
+                    { key },
+                    { value: value, lastUpdatedBy: req.user.id },
+                    { new: true, upsert: true, runValidators: true } // upsert: crea si no existe
+                );
+            });
         // ---------------------------------
 
-        await Promise.all(promises);
+        await Promise.all(validUpdates);
 
         res.json({ message: 'Settings updated successfully' });
     } catch (error) {
@@ -54,7 +65,6 @@ const updateSettings = async (req, res) => {
 // @access  Public
 const getPublicSettings = async (req, res) => {
     try {
-        // --- Claves públicas que el frontend necesita ---
         const publicKeys = [
             'BUSINESS_HOURS', 
             'SHOP_ENABLED',
@@ -68,7 +78,6 @@ const getPublicSettings = async (req, res) => {
             key: { $in: publicKeys } 
         });
 
-        // --- Valores por defecto ---
         const publicSettings = {
             businessHours: null,
             shopEnabled: false,
@@ -78,17 +87,13 @@ const getPublicSettings = async (req, res) => {
             ownerNotificationNumber: ''
         };
 
-        // --- Mapeamos los valores de la BD ---
         settingsArray.forEach(setting => {
             if (setting.key === 'BUSINESS_HOURS') {
-                // --- AÑADIDA PROTECCIÓN ---
-                // Si el JSON está corrupto, lo ignoramos y usamos el default (null)
                 try {
                     publicSettings.businessHours = JSON.parse(setting.value);
                 } catch (e) {
                     console.error("Error al parsear BUSINESS_HOURS, usando default.", e.message);
                 }
-                // --------------------------
             }
             if (setting.key === 'SHOP_ENABLED') {
                 publicSettings.shopEnabled = (setting.value === 'true');
@@ -114,7 +119,6 @@ const getPublicSettings = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
-// ---------------------
 
 module.exports = {
     getSettings,
