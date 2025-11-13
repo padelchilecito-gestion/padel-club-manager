@@ -16,7 +16,6 @@ const startServer = async () => {
   const server = http.createServer(app);
 
   // --- 1. Lista de Orígenes EXACTOS Permitidos ---
-  // (La URL de producción principal y localhost)
   const allowedOrigins = [
     process.env.CLIENT_URL || 'http://localhost:5173',
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel (Producción)
@@ -27,10 +26,9 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  // --- 2. Lista de SUFIJOS Permitidos (LA SOLUCIÓN PERMANENTE) ---
-  // Esto permitirá CUALQUIER URL de Vercel que termine con este sufijo
+  // --- 2. Lista de SUFIJOS Permitidos (CORREGIDO SIN EL GUIÓN INICIAL) ---
   const allowedSuffixes = [
-    '-eduardo-miguel-riccis-projects.vercel.app'
+    'eduardo-miguel-riccis-projects.vercel.app'
   ];
 
   // --- 3. Función de Verificación de CORS (Actualizada) ---
