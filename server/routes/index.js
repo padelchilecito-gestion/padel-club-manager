@@ -13,6 +13,7 @@ const paymentRoutes = require('./payments');
 const reportRoutes = require('./reports');
 const logRoutes = require('./logs');
 const settingRoutes = require('./settings');
+const recurringBookingRoutes = require('./recurringBookings'); // <-- AÑADIDO
 
 console.log('[Routes] Index router loaded.');
 
@@ -28,5 +29,6 @@ router.use('/payments', paymentRoutes);
 router.use('/reports', reportRoutes);
 router.use('/logs', logRoutes);
 router.use('/settings', settingRoutes);
+router.use('/recurring-bookings', recurringBookingRoutes); // <-- AÑADIDO
 
 module.exports = router;
