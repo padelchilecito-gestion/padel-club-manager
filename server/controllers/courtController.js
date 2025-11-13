@@ -5,13 +5,16 @@ const { logActivity } = require('../utils/logActivity');
 // @route   POST /api/courts
 // @access  Admin
 const createCourt = async (req, res) => {
-  const { name, courtType, pricePerHour, isActive } = req.body;
+  // --- CAMPOS NUEVOS AÑADIDOS ---
+  const { name, courtType, pricePerHour, pricePer90Min, pricePer120Min, isActive } = req.body;
 
   try {
     const court = new Court({
       name,
       courtType,
       pricePerHour,
+      pricePer90Min: pricePer90Min || null, // <-- AÑADIDO
+      pricePer120Min: pricePer120Min || null, // <-- AÑADIDO
       isActive,
     });
 
@@ -62,7 +65,8 @@ const getCourtById = async (req, res) => {
 // @route   PUT /api/courts/:id
 // @access  Admin
 const updateCourt = async (req, res) => {
-  const { name, courtType, pricePerHour, isActive } = req.body;
+  // --- CAMPOS NUEVOS AÑADIDOS ---
+  const { name, courtType, pricePerHour, pricePer90Min, pricePer120Min, isActive } = req.body;
 
   try {
     const court = await Court.findById(req.params.id);
@@ -71,6 +75,12 @@ const updateCourt = async (req, res) => {
       court.name = name || court.name;
       court.courtType = courtType || court.courtType;
       court.pricePerHour = pricePerHour !== undefined ? pricePerHour : court.pricePerHour;
+      
+      // --- LÓGICA DE ACTUALIZACIÓN AÑADIDA ---
+      court.pricePer90Min = pricePer90Min !== undefined ? pricePer90Min : court.pricePer90Min;
+      court.pricePer120Min = pricePer120Min !== undefined ? pricePer120Min : court.pricePer120Min;
+      // ------------------------------------
+
       court.isActive = isActive !== undefined ? isActive : court.isActive;
 
       const updatedCourt = await court.save();
@@ -97,7 +107,8 @@ const deleteCourt = async (req, res) => {
 
     if (court) {
       const courtName = court.name;
-      await court.remove();
+      // await court.remove(); // .remove() está obsoleto
+      await Court.deleteOne({ _id: req.params.id }); // Usar deleteOne
       await logActivity(req.user, 'COURT_DELETED', `Court '${courtName}' was deleted.`);
       res.json({ message: 'Court removed' });
     } else {
