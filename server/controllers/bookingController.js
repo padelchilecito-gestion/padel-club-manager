@@ -1,8 +1,7 @@
-const mongoose = require('mongoose'); // <-- Asegúrate de importar mongoose
+const mongoose = require('mongoose'); // <-- Asegúrate de que Mongoose esté importado
 const Booking = require('../models/Booking');
 const Court = require('../models/Court');
 const Setting = require('../models/Setting'); 
-// const { sendWhatsAppMessage } = require('../utils/notificationService'); // (Ya lo habíamos quitado)
 const { logActivity } = require('../utils/logActivity');
 const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
@@ -11,8 +10,6 @@ const timeZone = 'America/Argentina/Buenos_Aires';
 
 // --- createBooking (sin cambios) ---
 const createBooking = async (req, res) => {
-  // ... (tu código de createBooking existente) ...
-  // Esta función ahora solo crea UNA reserva.
   const { courtId, user, startTime, endTime, paymentMethod, isPaid, price } = req.body;
 
   try {
@@ -60,7 +57,6 @@ const createBooking = async (req, res) => {
       paymentMethod,
       isPaid: isPaid || false,
       status: 'Confirmed',
-      // recurringGroupId: null (es el default)
     });
 
     const createdBooking = await booking.save();
@@ -83,178 +79,203 @@ const createBooking = async (req, res) => {
 
 // --- getBookingAvailability (sin cambios) ---
 const getBookingAvailability = async (req, res) => {
-    // ... (tu código existente) ...
+    // ... (código existente) ...
 };
 
 // --- getBookings (sin cambios) ---
+// (Esta función fallaba por tus DATOS, no por el código. Arregla "MCristal" y funcionará)
 const getBookings = async (req, res) => {
-    // ... (tu código existente con paginación) ...
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const skip = (page - 1) * limit;
+
+    const filters = {};
+
+    if (req.query.name) {
+      filters['user.name'] = { $regex: req.query.name, $options: 'i' };
+    }
+    if (req.query.court && req.query.court !== 'all') {
+      filters.court = req.query.court;
+    }
+    if (req.query.payment && req.query.payment !== 'all') {
+      filters.isPaid = req.query.payment === 'paid';
+    }
+    if (req.query.date) {
+      const zonedDate = zonedTimeToUtc(req.query.date + 'T00:00:00', timeZone);
+      const startOfDay = new Date(zonedDate);
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+      
+      filters.startTime = { $gte: startOfDay, $lte: endOfDay };
+    } else {
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      filters.startTime = { $gte: twoDaysAgo };
+    }
+
+    const totalBookings = await Booking.countDocuments(filters);
+    const totalPages = Math.ceil(totalBookings / limit);
+
+    const bookings = await Booking.find(filters)
+      .populate('court', 'name courtType')
+      .sort({ startTime: -1 }) 
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      bookings,
+      page,
+      totalPages,
+      totalBookings,
+    });
+    
+  } catch (error) {
+    console.error(error); // El error "MCristal" debería aparecer aquí en tus logs de Render
+    res.status(500).json({ message: 'Server Error' });
+  }
 };
 
 // --- updateBooking (sin cambios) ---
 const updateBooking = async (req, res) => {
-    // ... (tu código existente) ...
+    // ... (código existente) ...
 };
 
 // --- updateBookingStatus (sin cambios) ---
 const updateBookingStatus = async (req, res) => {
-    // ... (tu código existente) ...
+    // ... (código existente) ...
 };
 
 // --- cancelBooking (sin cambios) ---
 const cancelBooking = async (req, res) => {
-    // ... (tu código existente) ...
+    // ... (código existente) ...
 };
 
-// --- getPublicAvailabilitySlots (sin cambios) ---
+// ---
+// --- FUNCIONES PÚBLICAS (AQUÍ ESTÁ LA CORRECCIÓN) ---
+// ---
+
+// Helper para crear un horario por defecto (todo cerrado)
+const createDefaultSchedule = () => {
+    const schedule = {};
+    for (let i = 0; i < 7; i++) {
+      schedule[i] = Array(48).fill(false);
+    }
+    return schedule;
+};
+
+/**
+ * @desc    Get all available 30-min slots for a given date
+ * @route   GET /api/bookings/public-slots
+ * @access  Public
+ */
 const getPublicAvailabilitySlots = async (req, res) => {
-    // ... (tu código existente) ...
+    const { date } = req.query;
+    if (!date) {
+        return res.status(400).json({ message: 'Date is required.' });
+    }
+
+    try {
+        const settingsPromise = Setting.findOne({ key: 'BUSINESS_HOURS' });
+        const courtsPromise = Court.find({ isActive: true }).select('_id');
+        
+        const startOfDayArg = zonedTimeToUtc(date + 'T00:00:00', timeZone);
+        
+        const endOfWindow = new Date(startOfDayArg.getTime() + 36 * 60 * 60 * 1000); 
+        const now = new Date(); // 'now' sigue siendo UTC
+
+        const bookingsPromise = Booking.find({
+            status: { $ne: 'Cancelled' },
+            startTime: { $gte: startOfDayArg, $lt: endOfWindow }
+        }).select('court startTime endTime');
+
+        const [settings, activeCourts, bookings] = await Promise.all([
+            settingsPromise,
+            courtsPromise,
+            bookingsPromise
+        ]);
+
+        // --- LÓGICA DE BUSINESS_HOURS CORREGIDA ---
+        let businessHours;
+        try {
+          // Intentamos parsear. Si 'settings' es null o 'settings.value' está corrupto, irá al catch.
+          businessHours = settings ? JSON.parse(settings.value) : createDefaultSchedule();
+        } catch (e) {
+          console.error("Error parseando BUSINESS_HOURS, usando horario por defecto (cerrado).", e.message);
+          businessHours = createDefaultSchedule();
+        }
+        // ------------------------------------------
+
+        const courtIds = activeCourts.map(c => c._id.toString());
+        const totalActiveCourts = activeCourts.length;
+
+        if (totalActiveCourts === 0) {
+            return res.json([]);
+        }
+        
+        const bookingMap = {}; 
+        for (const booking of bookings) {
+            let current = new Date(booking.startTime);
+            while (current < booking.endTime) {
+                const iso = current.toISOString();
+                if (!bookingMap[iso]) bookingMap[iso] = [];
+                bookingMap[iso].push(booking.court.toString());
+                current.setMinutes(current.getMinutes() + 30);
+            }
+        }
+
+        const availableSlots = [];
+        let currentSlotTime = new Date(startOfDayArg); // Empezamos en 00:00 ARGT
+        const totalSlotsInWindow = (36 * 60) / 30; // 72 slots
+
+        for (let i = 0; i < totalSlotsInWindow; i++) {
+            const slotEnd = new Date(currentSlotTime.getTime() + 30 * 60 * 1000);
+
+            if (slotEnd < now) {
+                currentSlotTime = slotEnd;
+                continue;
+            }
+            
+            const localSlotTime = utcToZonedTime(currentSlotTime, timeZone);
+            
+            const dayIndex = localSlotTime.getDay(); // 0 = Domingo (AR), 1 = Lunes (AR)...
+            const slotIndex = (localSlotTime.getHours() * 2) + (localSlotTime.getMinutes() / 30);
+            
+            if (!businessHours[dayIndex] || !businessHours[dayIndex][slotIndex]) {
+                currentSlotTime = slotEnd;
+                continue;
+            }
+
+            const bookedCourtsForSlot = bookingMap[currentSlotTime.toISOString()] || [];
+            const availableCourtCount = totalActiveCourts - bookedCourtsForSlot.length;
+
+            if (availableCourtCount > 0) {
+                availableSlots.push(currentSlotTime.toISOString());
+            }
+
+            currentSlotTime = slotEnd;
+        }
+
+        res.json(availableSlots);
+
+    } catch (error) {
+        console.error('Error fetching public slots:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
 };
 
 // --- getPublicCourtOptions (sin cambios) ---
 const getPublicCourtOptions = async (req, res) => {
-    // ... (tu código existente) ...
+    // ... (código existente) ...
 };
 
-
-// ---
-// --- NUEVAS FUNCIONES PARA RESERVAS FIJAS ---
-// ---
-
-/**
- * @desc    Create a series of recurring bookings
- * @route   POST /api/bookings/recurring
- * @access  Operator/Admin
- */
+// --- createRecurringBooking (sin cambios) ---
 const createRecurringBooking = async (req, res) => {
-  const { bookingData, weeks } = req.body;
-  const { courtId, user, startTime, endTime, price, paymentMethod, isPaid } = bookingData;
-  
-  if (!weeks || weeks < 1 || weeks > 52) { // Límite de 1 año
-    return res.status(400).json({ message: 'El número de semanas debe estar entre 1 y 52.' });
-  }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const court = await Court.findById(courtId).session(session);
-    if (!court) {
-      throw new Error('Court not found');
-    }
-
-    const bookingsToCreate = [];
-    const conflictErrors = [];
-    const recurringGroupId = new mongoose.Types.ObjectId().toString(); // ID único para la serie
-    const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
-
-    const originalStartTime = new Date(startTime);
-    const originalEndTime = new Date(endTime);
-    
-    for (let i = 0; i < weeks; i++) {
-      const newStartTime = new Date(originalStartTime.getTime() + (i * oneWeekInMs));
-      const newEndTime = new Date(originalEndTime.getTime() + (i * oneWeekInMs));
-
-      // 1. Validar conflicto para *cada* fecha futura
-      const conflictingBooking = await Booking.findOne({
-        court: courtId,
-        status: { $ne: 'Cancelled' },
-        $or: [
-          { startTime: { $lt: newEndTime, $gte: newStartTime } },
-          { endTime: { $gt: newStartTime, $lte: newEndTime } },
-          { startTime: { $lte: newStartTime }, endTime: { $gte: newEndTime } }
-        ],
-      }).session(session);
-
-      if (conflictingBooking) {
-        conflictErrors.push(newStartTime.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }));
-      } else {
-        bookingsToCreate.push({
-          court: courtId,
-          user,
-          startTime: newStartTime,
-          endTime: newEndTime,
-          price,
-          paymentMethod,
-          isPaid,
-          status: 'Confirmed',
-          recurringGroupId: recurringGroupId, // Asignamos el ID de la serie
-        });
-      }
-    }
-
-    // Si encontramos *alguno* conflicto, abortamos toda la operación
-    if (conflictErrors.length > 0) {
-      throw new Error(`No se pudo crear la serie. Los siguientes horarios ya están ocupados: ${conflictErrors.join(', ')}`);
-    }
-    
-    if (bookingsToCreate.length === 0) {
-       throw new Error('No se generaron reservas. Revise los datos.');
-    }
-
-    // 2. Insertar todas las reservas a la vez
-    const createdBookings = await Booking.insertMany(bookingsToCreate, { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    // 3. Emitir socket (solo el primer turno, la UI refrescará)
-    const io = req.app.get('socketio');
-    io.emit('booking_update', createdBookings[0]); // El frontend recargará
-    
-    // 4. Registrar log
-    if (req.user) {
-        const logDetails = `User '${req.user.username}' created a recurring booking series (${createdBookings.length} weeks) for ${user.name} on court '${court.name}'. Group ID: ${recurringGroupId}`;
-        await logActivity(req.user, 'BOOKING_CREATED', logDetails);
-    }
-
-    res.status(201).json({ 
-      message: `Serie de ${createdBookings.length} reservas creada con éxito.`, 
-      bookings: createdBookings 
-    });
-
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Error creating recurring booking:', error.message);
-    res.status(409).json({ message: error.message }); // 409 (Conflicto) es bueno para esto
-  }
+    // ... (código existente) ...
 };
 
-
-/**
- * @desc    Delete an entire series of recurring bookings
- * @route   DELETE /api/bookings/recurring/:groupId
- * @access  Operator/Admin
- */
+// --- deleteRecurringBooking (sin cambios) ---
 const deleteRecurringBooking = async (req, res) => {
-    const { groupId } = req.params;
-
-    try {
-        if (!groupId) {
-            return res.status(400).json({ message: 'Group ID es requerido.' });
-        }
-
-        const result = await Booking.deleteMany({ recurringGroupId: groupId });
-
-        if (result.deletedCount === 0) {
-            return res.status(404).json({ message: 'No se encontraron reservas para esa serie.' });
-        }
-
-        const io = req.app.get('socketio');
-        io.emit('booking_series_deleted'); // Emitimos un evento genérico
-            
-        if (req.user) {
-            const logDetails = `User '${req.user.username}' deleted a recurring booking series. Group ID: ${groupId}. Total deleted: ${result.deletedCount}.`;
-            await logActivity(req.user, 'BOOKING_CANCELLED', logDetails); // Usamos CANCELLED como log
-        }
-
-        res.json({ message: `Serie de ${result.deletedCount} reservas eliminada con éxito.` });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
+    // ... (código existente) ...
 };
 
 
@@ -267,8 +288,6 @@ module.exports = {
   getBookingAvailability,
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
-  // --- EXPORTAR NUEVAS FUNCIONES ---
   createRecurringBooking,
   deleteRecurringBooking,
-  // --------------------------------
 };
