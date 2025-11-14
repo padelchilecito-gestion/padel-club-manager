@@ -281,6 +281,13 @@ const updateBookingStatus = async (req, res) => {
       booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
       booking.paymentMethod = req.body.paymentMethod || booking.paymentMethod;
       
+      // --- ¡NUEVO! ---
+      // Si el frontend envía un paymentId (desde el Brick), lo guardamos.
+      if (req.body.paymentId) {
+        booking.paymentId = req.body.paymentId;
+      }
+      // ---------------
+
       const updatedBooking = await booking.save();
       
       const io = req.app.get('socketio');
