@@ -85,7 +85,8 @@ const InventoryPage = () => {
             {products.map((product) => (
               <tr key={product._id} className="border-b border-gray-700 hover:bg-dark-primary">
                 <td className="px-6 py-4">
-                  <img src={product.imageUrl || 'https://via.placeholder.com/50'} alt={product.name} className="h-10 w-10 rounded-md object-cover" />
+                  {/* --- ¡LÍNEA CORREGIDA! --- */}
+                  <img src={product.imageUrl || 'https://placeholder.com/50'} alt={product.name} className="h-10 w-10 rounded-md object-cover" />
                 </td>
                 <td className="px-6 py-4 font-medium text-text-primary">{product.name}</td>
                 <td className="px-6 py-4">{product.category}</td>
