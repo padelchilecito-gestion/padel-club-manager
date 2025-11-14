@@ -24,12 +24,8 @@ const PosPage = () => {
   const [paymentTotal, setPaymentTotal] = useState(0); 
   const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pending, successful
   
-  // --- ¡NUEVO! ID Único para la Venta del POS ---
   const [currentPosSaleId, setCurrentPosSaleId] = useState(null); 
-  
-  // Estado del Modal de Éxito
   const [showSuccess, setShowSuccess] = useState(false);
-
   const { user } = useAuth();
 
   const fetchProducts = async () => {
@@ -48,13 +44,10 @@ const PosPage = () => {
     fetchProducts();
   }, []);
 
-  // --- EFECTO SOCKET.IO MODIFICADO ---
   useEffect(() => {
     socket.connect();
     
-    // El 'handle' ahora comprueba el ID único
     const handleSaleCompleted = (saleData) => {
-      // Compara el ID de la venta que llegó por socket con el ID que este modal está esperando
       if (saleData && saleData.posSaleId === currentPosSaleId && paymentStatus === 'pending') {
           setPaymentStatus('successful');
       }
@@ -66,8 +59,7 @@ const PosPage = () => {
       socket.off('pos_sale_completed', handleSaleCompleted);
       socket.disconnect();
     };
-  }, [currentPosSaleId, paymentStatus]); // <-- Agregamos el ID al array de dependencias
-  // --- FIN DEL EFECTO SOCKET ---
+  }, [currentPosSaleId, paymentStatus]); 
 
   const filteredProducts = useMemo(() => {
     return products.filter(p =>
@@ -107,7 +99,6 @@ const PosPage = () => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
-  // --- LÓGICA DE VENTA MODIFICADA ---
   const handleFinalizeSale = async (paymentMethod) => {
     if (cart.length === 0) return;
     
@@ -137,7 +128,6 @@ const PosPage = () => {
       
       } else if (paymentMethod === 'Mercado Pago') {
         
-        // --- ¡NUEVO! Generamos un ID único para esta venta ---
         const posSaleId = `pos_${Date.now()}`;
 
         const paymentData = {
@@ -151,8 +141,8 @@ const PosPage = () => {
             sale_items: saleData.items,
             user_id: user._id,
             username: user.username,
-            isPosSale: true, // <-- Flag para el backend (Arregla Bug 3)
-            posSaleId: posSaleId // <-- ID Único (Arregla Bug 1)
+            isPosSale: true, 
+            posSaleId: posSaleId 
           }
         };
 
@@ -161,7 +151,7 @@ const PosPage = () => {
         setPaymentTotal(saleTotal); 
         setPaymentQR(preference.init_point);
         setPaymentStatus('pending');
-        setCurrentPosSaleId(posSaleId); // <-- Guardamos el ID que estamos esperando
+        setCurrentPosSaleId(posSaleId); 
         
         setCart([]); 
         fetchProducts(); 
@@ -177,14 +167,12 @@ const PosPage = () => {
       setLoading(false);
     }
   };
-  // --- FIN DE LA LÓGICA MODIFICADA ---
 
-  // --- Esta función es para CERRAR el modal QR ---
   const handleNewSale = () => {
     setPaymentQR('');
     setPaymentStatus('idle');
     setPaymentTotal(0);
-    setCurrentPosSaleId(null); // <-- Limpiamos el ID
+    setCurrentPosSaleId(null); 
     setCart([]);
     setError('');
   };
@@ -207,7 +195,7 @@ const PosPage = () => {
             {filteredProducts.map(product => (
               <div key={product._id} onClick={() => addToCart(product)} className="bg-dark-primary p-3 rounded-lg text-center cursor-pointer hover:bg-primary-dark transition-colors">
                 {/* --- ¡LÍNEA CORREGIDA! --- */}
-                <img src={product.imageUrl || 'https://placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
+                <img src={product.imageUrl || 'https://via.placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
                 <p className="font-semibold truncate">{product.name}</p>
                 <p className="text-sm text-secondary">${product.price.toFixed(2)}</p>
               </div>
