@@ -117,7 +117,9 @@ const receiveWebhook = async (req, res) => {
             console.log(`Booking ${createdBooking._id} created and paid via webhook.`);
             
             // 3. Emitimos al socket
-            io.emit('booking_update', createdBooking);
+            if (io) {
+                io.emit('booking_update', createdBooking);
+            }
 
           } catch (bookingError) {
              console.error('Webhook booking creation failed:', bookingError.message);
@@ -136,7 +138,9 @@ const receiveWebhook = async (req, res) => {
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
             
-            io.emit('booking_update', booking);
+            if (io) {
+                io.emit('booking_update', booking);
+            }
           }
         }
 
@@ -168,7 +172,9 @@ const receiveWebhook = async (req, res) => {
             await session.commitTransaction();
             console.log(`Sale created and stock updated for payment ${data.id}.`);
             
-            io.emit('pos_sale_completed', sale);
+            if (io) {
+                io.emit('pos_sale_completed', sale);
+            }
 
           } catch (saleError) {
             await session.abortTransaction();
