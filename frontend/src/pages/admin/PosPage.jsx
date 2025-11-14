@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
+import { paymentService } from '../../services/paymentService'; // <-- Re-importado
 import { 
     PlusCircleIcon, 
     MinusCircleIcon, 
     XCircleIcon, 
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
-
-// --- ¡NUEVAS IMPORTACIONES! ---
-import SaleSuccessModal from '../../components/admin/SaleSuccessModal';
-
-// (Se eliminan las importaciones de MP, socket, y QRModal que no se usan)
+import socket from '../../services/socketService'; // <-- Re-importado
+import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; // <-- Re-importado
+import SaleSuccessModal from '../../components/admin/SaleSuccessModal'; // <-- El modal de éxito
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -20,9 +19,14 @@ const PosPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // --- NUEVO ESTADO PARA CONTROLAR EL MODAL DE ÉXITO ---
-  const [showSuccess, setShowSuccess] = useState(false);
+  // --- Estados del Modal QR (Restaurados) ---
+  const [paymentQR, setPaymentQR] = useState(''); 
+  const [paymentTotal, setPaymentTotal] = useState(0); 
+  const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pending, successful
   
+  // --- Estado del Modal de Éxito (El nuevo) ---
+  const [showSuccess, setShowSuccess] = useState(false);
+
   const { user } = useAuth();
 
   const fetchProducts = async () => {
@@ -40,6 +44,26 @@ const PosPage = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  // --- Efecto para Socket.IO (Restaurado) ---
+  useEffect(() => {
+    socket.connect();
+    
+    const handleSaleCompleted = (saleData) => {
+      // Esto solo se activa si el modal QR está abierto y esperando
+      if (saleData.total === paymentTotal && paymentStatus === 'pending') {
+          setPaymentStatus('successful');
+      }
+    };
+
+    socket.on('pos_sale_completed', handleSaleCompleted);
+
+    return () => {
+      socket.off('pos_sale_completed', handleSaleCompleted);
+      socket.disconnect();
+    };
+  }, [paymentTotal, paymentStatus]); 
+  // --- Fin del Efecto Socket ---
 
   const filteredProducts = useMemo(() => {
     return products.filter(p =>
@@ -79,12 +103,15 @@ const PosPage = () => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
-  // --- FUNCIÓN DE VENTA MODIFICADA ---
+  // --- ¡AQUÍ ESTÁ LA LÓGICA CORREGIDA! ---
+  // Vuelve a diferenciar entre 'Efectivo' y 'Mercado Pago'
   const handleFinalizeSale = async (paymentMethod) => {
     if (cart.length === 0) return;
     
     setLoading(true);
     setError('');
+    setShowSuccess(false); // Resetea el modal de éxito
+    setPaymentQR('');      // Resetea el modal de QR
 
     const saleTotal = cartTotal; 
     const saleData = {
@@ -95,23 +122,51 @@ const PosPage = () => {
           price: item.price 
       })),
       total: saleTotal,
-      paymentMethod, // 'Efectivo' o 'Mercado Pago'
+      paymentMethod,
     };
 
     try {
-      // Ambas opciones (Efectivo y Mercado Pago) ahora solo registran la venta.
-      await saleService.createSale(saleData);
+      if (paymentMethod === 'Efectivo') {
+        // --- LÓGICA DE EFECTIVO ---
+        // 1. Guarda la venta
+        await saleService.createSale(saleData);
+        // 2. Muestra el modal de éxito personalizado
+        setShowSuccess(true); 
+        // 3. Limpia el carrito y recarga
+        setCart([]);
+        fetchProducts(); 
       
-      // --- ¡ESTE ES EL CAMBIO! ---
-      // alert('Venta registrada con éxito.'); // Se elimina esto
-      setShowSuccess(true); // Se muestra el modal personalizado
-      // -------------------------------
-      
-      setCart([]);
-      fetchProducts(); // Recarga productos para actualizar stock
-      
+      } else if (paymentMethod === 'Mercado Pago') {
+        // --- LÓGICA DE MERCADO PAGO (Restaurada) ---
+        // 1. Prepara los datos para la preferencia de pago
+        const paymentData = {
+          items: [{
+            title: 'Compra en Padel Club',
+            unit_price: saleTotal,
+            quantity: 1,
+          }],
+          payer: { name: "Cliente POS", email: "cliente@pos.com" }, // Email genérico
+          metadata: { 
+            sale_items: saleData.items,
+            user_id: user._id,
+            username: user.username,
+          }
+        };
+
+        // 2. Crea la preferencia (el link de pago/QR)
+        const preference = await paymentService.createPaymentPreference(paymentData);
+        
+        // 3. Configura los estados para MOSTRAR EL MODAL QR
+        setPaymentTotal(saleTotal); 
+        setPaymentQR(preference.init_point); // <-- Esto activa el FullScreenQRModal
+        setPaymentStatus('pending'); 
+        
+        // 4. Limpia el carrito y recarga
+        setCart([]); 
+        fetchProducts(); 
+      }
     } catch (err) {
-      // Manejo de error de stock
+      // Manejo de error de stock (funciona para ambos)
       if (err.response && err.response.status === 409 && err.response.data.errorCode === 'INSUFFICIENT_STOCK') {
         setError(`¡Stock insuficiente! ${err.response.data.message}. Ajusta el carrito.`);
         fetchProducts();
@@ -122,7 +177,16 @@ const PosPage = () => {
       setLoading(false);
     }
   };
-  // --- FIN DE LA FUNCIÓN MODIFICADA ---
+  // --- FIN DE LA LÓGICA CORREGIDA ---
+
+  // --- Esta función es para CERRAR el modal QR ---
+  const handleNewSale = () => {
+    setPaymentQR('');
+    setPaymentStatus('idle');
+    setPaymentTotal(0);
+    setCart([]);
+    setError('');
+  };
 
   return (
     <>
@@ -180,16 +244,28 @@ const PosPage = () => {
             {error && <p className="text-danger text-center text-sm mb-2">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => handleFinalizeSale('Efectivo')} className="bg-secondary text-white font-bold p-3 rounded-md hover:bg-opacity-80 disabled:opacity-50" disabled={loading || cart.length === 0}>Efectivo</button>
-              <button onClick={() => handleFinalizeSale('Mercado Pago')} className="bg-blue-500 text-white font-bold p-3 rounded-md hover:bg-blue-600 disabled:opacity-50" disabled={loading || cart.length === 0}>Mercado Pago</button>
+              <button onClick={() => handleFinalizeSale('Mercado Pago')} className="bg-blue-500 text-white font-bold p-3 rounded-md hover:bg-blue-600 disabled:opacity-50" disabled={loading || cart.length === 0}>Mercado Pago (QR)</button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- RENDERIZADO CONDICIONAL DEL MODAL DE ÉXITO --- */}
+      {/* --- RENDERIZADO DE LOS DOS MODALES --- */}
+
+      {/* 1. El Modal de QR (Solo aparece si paymentQR tiene un valor) */}
+      {paymentQR && (
+        <FullScreenQRModal
+          qrValue={paymentQR}
+          total={paymentTotal}
+          status={paymentStatus}
+          onClose={handleNewSale} // Al cerrar, llama a handleNewSale
+        />
+      )}
+
+      {/* 2. El Modal de Éxito (Solo aparece si showSuccess es true) */}
       {showSuccess && (
         <SaleSuccessModal 
-          onClose={() => setShowSuccess(false)}
+          onClose={() => setShowSuccess(false)} // Al cerrar, solo oculta el modal
         />
       )}
     </>
