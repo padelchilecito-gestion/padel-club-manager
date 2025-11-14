@@ -21,14 +21,14 @@ const { protect } = require('../middlewares/authMiddleware');
 router.post('/public', createPublicBooking);
 // ---------------------------------------------
 
-// --- NUEVAS RUTAS PÚBLICAS ---
+// --- RUTAS PÚBLICAS (GET) ---
 router.get('/public-slots', getPublicAvailabilitySlots);
 router.get('/public-options', getPublicCourtOptions);
+router.get('/availability', getBookingAvailability); // Legacy
 
 // --- RUTAS DE ADMIN (PROTEGIDAS) ---
-// Esta ruta ahora solo la usa el admin
+// Esta ruta (POST /) ahora solo la usa el admin
 router.post('/', protect, createBooking); 
-router.get('/availability', getBookingAvailability);
 router.get('/', protect, getBookings);
 router.put('/:id', protect, updateBooking);
 router.put('/:id/status', protect, updateBookingStatus);
