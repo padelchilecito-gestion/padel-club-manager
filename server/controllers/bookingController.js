@@ -31,7 +31,7 @@ const createPublicBooking = async (req, res) => {
       throw new Error('End time must be after start time.');
     }
 
-    // Comprobar conflicto (igual que en createBooking)
+    // Comprobar conflicto
     const conflictingBooking = await Booking.findOne({
       court: courtId,
       status: { $ne: 'Cancelled' },
@@ -47,7 +47,7 @@ const createPublicBooking = async (req, res) => {
       throw new Error('The selected time slot is already booked.');
     }
     
-    // --- Lógica de precio (igual que en createBooking) ---
+    // --- Lógica de precio ---
     let finalPrice = totalPrice; // Usamos el precio que envía el frontend
     if (finalPrice === undefined) {
       const durationMinutes = (end - start) / (1000 * 60);
@@ -92,6 +92,7 @@ const createPublicBooking = async (req, res) => {
   } catch (error) {
     console.error("Error in createPublicBooking:", error);
     if (res) {
+        // Enviamos el mensaje de error real (ej. "Slot already booked")
         res.status(500).json({ message: error.message || 'Server Error' });
     }
     // Si falla, lanzamos el error para que el webhook lo sepa
@@ -314,7 +315,7 @@ const cancelBooking = async (req, res) => {
 
             res.json({ message: 'Booking cancelled successfully' });
         } else {
-            res.status(404).json({ message: 'Booking not found' }); // Corregido de 4404
+            res.status(404).json({ message: 'Booking not found' });
         }
     } catch (error) {
         console.error(error);
@@ -323,7 +324,7 @@ const cancelBooking = async (req, res) => {
 };
 
 // ---
-// --- NUEVAS FUNCIONES DE API PÚBLICA (CON CORRECCIÓN DE IMPORT) ---
+// --- FUNCIONES PÚBLICAS (SIN CAMBIOS) ---
 // ---
 
 // Helper para crear un horario por defecto (todo cerrado)
@@ -439,7 +440,6 @@ const getPublicCourtOptions = async (req, res) => {
     try {
         const start = new Date(startTime);
         const end = new Date(endTime);
-        // --- LÓGICA DE DURACIÓN MODIFICADA ---
         const durationMinutes = (end - start) / (1000 * 60);
 
         if (durationMinutes <= 0) {
@@ -461,9 +461,8 @@ const getPublicCourtOptions = async (req, res) => {
         const availableCourts = await Court.find({
             isActive: true,
             _id: { $nin: uniqueBookedCourtIds }
-        }).select('name courtType pricePerHour pricePer90Min pricePer120Min'); // <-- AÑADIDO
+        }).select('name courtType pricePerHour pricePer90Min pricePer120Min');
 
-        // --- LÓGICA DE PRECIOS MODIFICADA ---
         const options = availableCourts.map(court => {
             let finalPrice;
             if (durationMinutes === 120 && court.pricePer120Min) {
@@ -471,7 +470,6 @@ const getPublicCourtOptions = async (req, res) => {
             } else if (durationMinutes === 90 && court.pricePer90Min) {
               finalPrice = court.pricePer90Min;
             } else {
-              // Cálculo estándar si no hay oferta
               const durationHours = durationMinutes / 60;
               finalPrice = court.pricePerHour * durationHours;
             }
@@ -480,10 +478,9 @@ const getPublicCourtOptions = async (req, res) => {
                 id: court._id,
                 name: court.name,
                 type: court.courtType,
-                price: finalPrice // <-- Precio con oferta
+                price: finalPrice
             };
         });
-        // ------------------------------------
 
         res.json(options);
 
@@ -495,12 +492,12 @@ const getPublicCourtOptions = async (req, res) => {
 
 
 module.exports = {
-  createBooking,
-  createPublicBooking, // <-- Exportamos la nueva
+  createBooking, // Para el Admin
+  createPublicBooking, // <-- EXPORTAMOS LA NUEVA
   getBookings,
   updateBooking,
   updateBookingStatus,
-  cancelBooking, // <-- Exportamos la versión corregida
+  cancelBooking,
   getBookingAvailability,
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
