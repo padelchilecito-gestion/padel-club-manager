@@ -16,7 +16,8 @@ import { es } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
 import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
-// (No necesitamos el modal de pago interno ni initMercadoPago aquí)
+// --- ¡NUEVA IMPORTACIÓN! ---
+import PaymentBrickModal from './PaymentBrickModal'; // Importamos el nuevo modal
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
@@ -72,6 +73,11 @@ const TimeSlotFinder = () => {
   
   const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
 
+  // --- NUEVOS ESTADOS PARA EL BRICK ---
+  const [preferenceId, setPreferenceId] = useState(null);
+  const [bookingDataForPayment, setBookingDataForPayment] = useState(null);
+  // ------------------------------------
+
   // --- Lógica para PWA (Instalar App) ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
@@ -124,6 +130,7 @@ const TimeSlotFinder = () => {
     fetchSlots();
   }, [fetchSlots]); 
 
+  // (Lógica de todaySlots/nextDaySlots sin cambios)
   const { todaySlots, nextDaySlots } = useMemo(() => {
     const selectedDayStart = startOfDay(selectedDate);
     const today = [];
@@ -139,7 +146,7 @@ const TimeSlotFinder = () => {
     return { todaySlots: today, nextDaySlots: nextDay };
   }, [allSlots, selectedDate]);
 
-
+  // (Lógica de handleSlotClick sin cambios)
   const handleSlotClick = (slotISO) => {
     setCashBookingSuccess(null); 
     const newSelection = [...selectedSlots];
@@ -171,6 +178,7 @@ const TimeSlotFinder = () => {
     setBookingError('');
   };
 
+  // (Lógica de selectedTimeRange sin cambios)
   const selectedTimeRange = useMemo(() => {
     if (selectedSlots.length === 0) return null;
     const sortedTimestamps = selectedSlots.map(s => parseISO(s).getTime()).sort((a, b) => a - b);
@@ -179,6 +187,7 @@ const TimeSlotFinder = () => {
     return { start, end };
   }, [selectedSlots]);
 
+  // (Lógica de useEffect para fetchCourtOptions sin cambios)
   useEffect(() => {
     if (!selectedTimeRange) {
       setCourtOptions([]); 
@@ -211,9 +220,8 @@ const TimeSlotFinder = () => {
   }, [selectedTimeRange]);
   
   
-  // --- FUNCIÓN handleFinalizeBooking MODIFICADA (SOLUCIONA BUG 1) ---
+  // --- FUNCIÓN handleFinalizeBooking TOTALMENTE MODIFICADA ---
   const handleFinalizeBooking = async (paymentMethod) => {
-    // 1. Validar solo nombre y teléfono
     if (!userName || !userPhone) {
       setBookingError('El nombre y el teléfono son obligatorios.');
       return;
@@ -228,20 +236,21 @@ const TimeSlotFinder = () => {
 
     const { start, end } = selectedTimeRange;
     
-    // El objeto bookingData ahora envía el email o un string vacío.
+    // 1. Preparamos los datos de la reserva
     const bookingData = {
       courtId: selectedCourt.id,
       user: { name: userName, phone: userPhone, email: userEmail || '' },
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       paymentMethod,
-      isPaid: paymentMethod !== 'Efectivo',
+      isPaid: false, // Se marcará como pagada después (si es MP)
       totalPrice: selectedCourt.price
     };
 
     try {
       if (paymentMethod === 'Mercado Pago') {
         
+        // 2. Preparamos los datos para la PREFERENCIA de MP
         const paymentData = {
           items: [{
             title: `Reserva ${selectedCourt.name} - ${format(start, 'dd/MM HH:mm')}`,
@@ -249,28 +258,19 @@ const TimeSlotFinder = () => {
             quantity: 1,
           }],
           payer: { name: userName, email: userEmail || "test_user@test.com" }, 
-          // Adjuntamos los datos para la URL de éxito (Bug 3)
-          metadata: { 
-            booking_id: "PENDING", 
-            booking_data: {
-                ...bookingData, // bookingData ya tiene todo (user, courtId, price, etc)
-                startTime: start.toISOString(), // Aseguramos formato ISO
-                endTime: end.toISOString()
-            }
-          }
+          // Ya no necesitamos metadata, la reserva se crea en el onSubmit del Brick
         };
-
+        
+        // 3. Creamos la preferencia en el backend
         const preference = await paymentService.createPaymentPreference(paymentData);
         
-        // Redirigimos al checkout de MP
-        window.location.href = preference.init_point; 
-      
+        // 4. Guardamos los datos para dárselos al Brick
+        setBookingDataForPayment(bookingData);
+        setPreferenceId(preference.id); // <-- Esto abrirá el modal
+
       } else {
-        
-        // --- ¡ESTE ES EL CAMBIO PARA BUG 1! ---
-        // Usamos el nuevo servicio público en lugar de 'createBooking'
+        // --- Flujo "Pago en club" (Arreglado con 'createPublicBooking') ---
         await bookingService.createPublicBooking(bookingData);
-        // --- FIN DEL CAMBIO ---
         
         const fechaStr = formatSlotLabel(start);
         const diaStr = formatDateHeader(start, true);
@@ -282,23 +282,43 @@ const TimeSlotFinder = () => {
             whatsappLink: whatsappLink
         });
         
-        fetchSlots(); 
-        
-        setSelectedSlots([]);
-        setSelectedCourt(null);
-        setCourtOptions([]);
-        setUserName('');
-        setUserPhone('');
-        setUserEmail('');
+        resetForm();
       }
     } catch (err) {
-      // El error de la API (ej. "Slot already booked") se mostrará aquí
       setBookingError(err.message || 'Ocurrió un error al crear la reserva.');
     } finally {
-      setIsBooking(false);
+      setIsBooking(false); // Habilitamos los botones de nuevo
     }
   };
   // --- FIN DE LA FUNCIÓN MODIFICADA ---
+
+  // Función para resetear el formulario (evita duplicar código)
+  const resetForm = () => {
+    fetchSlots(); 
+    setSelectedSlots([]);
+    setSelectedCourt(null);
+    setCourtOptions([]);
+    setUserName('');
+    setUserPhone('');
+    setUserEmail('');
+    setBookingDataForPayment(null);
+    setPreferenceId(null);
+  }
+
+  // Se llama cuando el PaymentBrickModal tiene éxito
+  const handlePaymentSuccess = () => {
+    // Mostramos un mensaje de éxito similar al de "pago en club"
+    const { start } = selectedTimeRange;
+    const fechaStr = formatSlotLabel(start);
+    const diaStr = formatDateHeader(start, true);
+
+    setCashBookingSuccess({
+        message: `¡Reserva pagada y confirmada para ${diaStr} a las ${fechaStr}!`,
+        whatsappLink: null // No pedimos notificar, ya está paga.
+    });
+    
+    resetForm();
+  }
 
 
   const today = startOfToday();
@@ -327,7 +347,7 @@ const TimeSlotFinder = () => {
   return (
     <div className="bg-dark-secondary p-6 md:p-8 rounded-lg shadow-lg">
       
-      {/* NAVEGADOR DE FECHA */}
+      {/* (Navegador de fecha y botón PWA sin cambios) */}
       <div className="flex justify-between items-center mb-6">
         <button onClick={handlePrevDay} disabled={isViewingToday || loadingSlots} className="p-3 bg-dark-primary rounded-full disabled:opacity-30 hover:bg-primary-dark transition-colors">
           <ChevronLeftIcon className="h-6 w-6" />
@@ -339,8 +359,6 @@ const TimeSlotFinder = () => {
           <ChevronRightIcon className="h-6 w-6" />
         </button>
       </div>
-
-      {/* --- BOTÓN DE INSTALAR PWA --- */}
       {showInstallButton && (
         <button
           onClick={handleInstallClick}
@@ -352,23 +370,15 @@ const TimeSlotFinder = () => {
           Instalar Aplicación
         </button>
       )}
-      {/* --- FIN BOTÓN PWA --- */}
       
-      {/* GRILLAS DE HORARIOS */}
+      {/* (Grillas de horarios sin cambios) */}
       <div>
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
-        
         {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
-        {/*
-          Este es el error que ves en la foto. 
-          Ahora mostrará el mensaje específico del backend (ej. "El turno ya está ocupado")
-        */}
         {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
-        
         {!loadingSlots && allSlots.length === 0 && (
           <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
         )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
           {todaySlots.length > 0 && (
             <div>
@@ -397,24 +407,29 @@ const TimeSlotFinder = () => {
         </div>
       </div>
 
-      {/* --- MENSAJE DE ÉXITO (PARA PAGO EN EFECTIVO) --- */}
+      {/* --- Mensaje de éxito (AHORA TAMBIÉN PARA MP) --- */}
       {cashBookingSuccess && (
         <div className="mt-6 p-4 bg-green-800 border border-secondary rounded-lg text-center">
             <CheckCircleIcon className="h-12 w-12 text-secondary mx-auto mb-2" />
             <h3 className="text-xl font-bold text-white mb-2">{cashBookingSuccess.message}</h3>
-            <p className="text-gray-300 mb-4">Por favor, notifica al club para confirmar tu llegada.</p>
-            <a
-                href={cashBookingSuccess.whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-6 py-2 bg-secondary text-dark-primary font-bold rounded-md transition-colors hover:bg-green-400"
-            >
-                Notificar por WhatsApp
-            </a>
+            {/* Mostramos el botón de WA solo si el link existe (pago en club) */}
+            {cashBookingSuccess.whatsappLink && (
+              <>
+                <p className="text-gray-300 mb-4">Por favor, notifica al club para confirmar tu llegada.</p>
+                <a
+                    href={cashBookingSuccess.whatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-6 py-2 bg-secondary text-dark-primary font-bold rounded-md transition-colors hover:bg-green-400"
+                >
+                    Notificar por WhatsApp
+                </a>
+              </>
+            )}
         </div>
       )}
 
-      {/* --- ELEGIR CANCHA (Oculto si hay éxito) --- */}
+      {/* --- Elegir cancha (sin cambios) --- */}
       {selectedSlots.length > 0 && !cashBookingSuccess && (
         <div className="mt-6 pt-6 border-t border-gray-700">
           <h3 className="text-xl font-semibold text-text-primary mb-3">Elige tu cancha</h3>
@@ -429,7 +444,7 @@ const TimeSlotFinder = () => {
         </div>
       )}
 
-      {/* --- DATOS Y PAGO (Oculto si hay éxito) --- */}
+      {/* --- Datos y Pago (sin cambios) --- */}
       {selectedCourt && !cashBookingSuccess && (
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
@@ -445,7 +460,6 @@ const TimeSlotFinder = () => {
 
           <div className="mt-4 pt-4 border-t border-gray-600">
             <h4 className="text-md font-semibold text-text-primary mb-3">Completa tus datos</h4>
-            {/* --- Error de booking general --- */}
             {bookingError && <p className="text-danger text-sm text-center mb-2">{bookingError}</p>}
             
             <div className="space-y-4">
@@ -457,12 +471,10 @@ const TimeSlotFinder = () => {
                 <label htmlFor="userPhone" className="block text-sm font-medium text-text-secondary">Teléfono (con código de área)</label>
                 <input type="tel" id="userPhone" value={userPhone} onChange={(e) => setUserPhone(e.target.value)} required className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
-              {/* --- CAMPO DE EMAIL (OPCIONAL) --- */}
               <div>
                 <label htmlFor="userEmail" className="block text-sm font-medium text-text-secondary">Email (Opcional)</label>
                 <input type="email" id="userEmail" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="Para recibir comprobante de Mercado Pago" className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
-              {/* ------------------------- */}
             </div>
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
               <button
@@ -484,6 +496,19 @@ const TimeSlotFinder = () => {
         </div>
       )}
       
+      {/* --- RENDERIZADO DEL NUEVO MODAL --- */}
+      {preferenceId && bookingDataForPayment && (
+        <PaymentBrickModal
+          preferenceId={preferenceId}
+          bookingData={bookingDataForPayment}
+          onClose={() => {
+            setPreferenceId(null);
+            setBookingDataForPayment(null);
+          }}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
     </div>
   );
 };
