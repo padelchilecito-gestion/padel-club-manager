@@ -8,11 +8,8 @@ const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 const timeZone = 'America/Argentina/Buenos_Aires';
 
 
-// --- NUEVA FUNCIÓN HELPER INTERNA (SOLUCIONA BUG 2) ---
-// Esta función NO es un controlador. Es pura lógica.
-// Recibe los datos de la reserva y la crea.
+// --- FUNCIÓN HELPER INTERNA (VITAL) ---
 const _createBookingFromData = async (bookingData) => {
-  // AHORA SÍ: 'bookingData' es el objeto, no 'req.body'
   const { courtId, user, startTime, endTime, paymentMethod, isPaid, totalPrice } = bookingData;
 
   try {
@@ -27,7 +24,6 @@ const _createBookingFromData = async (bookingData) => {
       throw new Error('End time must be after start time.');
     }
 
-    // Comprobar conflicto
     const conflictingBooking = await Booking.findOne({
       court: courtId,
       status: { $ne: 'Cancelled' },
@@ -42,8 +38,7 @@ const _createBookingFromData = async (bookingData) => {
       throw new Error('The selected time slot is already booked.');
     }
     
-    // --- Lógica de precio ---
-    let finalPrice = totalPrice; // Usamos el precio que envía el frontend
+    let finalPrice = totalPrice; 
     if (finalPrice === undefined) {
       const durationMinutes = (end - start) / (1000 * 60);
       
@@ -56,57 +51,48 @@ const _createBookingFromData = async (bookingData) => {
         finalPrice = durationHours * court.pricePerHour;
       }
     }
-    // ----------------------------------------------------
 
     const booking = new Booking({
       court: courtId,
-      user, // user (name, phone, email) viene completo
+      user, 
       startTime: start,
       endTime: end,
       price: finalPrice,
       paymentMethod,
       isPaid: isPaid || false,
-      status: 'Confirmed', // Las reservas públicas se confirman al instante
+      status: 'Confirmed', 
     });
 
     const createdBooking = await booking.save();
-    return createdBooking; // Devuelve la reserva
+    return createdBooking; 
 
   } catch (error) {
     console.error("Error in _createBookingFromData helper:", error);
-    throw error; // Lanza el error para que el llamador (webhook o API) lo maneje
+    throw error; 
   }
 };
 // --- FIN DE LA FUNCIÓN HELPER ---
 
 
-// --- CONTROLADOR PÚBLICO (SOLUCIONA BUG 1) ---
-// Este es el "wrapper" que usa la ruta /api/bookings/public
+// --- CONTROLADOR PÚBLICO (VITAL) ---
 const createPublicBooking = async (req, res) => {
   try {
-    // 1. Llama al helper con req.body
     const createdBooking = await _createBookingFromData(req.body);
 
-    // 2. Emite el socket
     if (req && req.app) {
         const io = req.app.get('socketio');
         io.emit('booking_update', createdBooking);
     }
     
-    // 3. Responde al frontend
     res.status(201).json(createdBooking);
 
   } catch (error) {
-    // 4. Si el helper falla (ej. "Slot already booked"), envía ese error
-    // Esto es lo que verá el usuario en la foto, en lugar del error genérico
     res.status(409).json({ message: error.message || 'Server Error' });
   }
 };
 // --- FIN DEL CONTROLADOR PÚBLICO ---
 
 // @desc    Create a new booking (SOLO ADMIN)
-// @route   POST /api/bookings
-// @access  Admin
 const createBooking = async (req, res) => {
   const { courtId, user, startTime, endTime, paymentMethod, isPaid, price, status } = req.body;
 
@@ -124,10 +110,10 @@ const createBooking = async (req, res) => {
       user,
       startTime: start,
       endTime: end,
-      price: price, // Precio manual del admin
+      price: price, 
       paymentMethod,
       isPaid: isPaid || false,
-      status: status || 'Confirmed', // Status que ponga el admin
+      status: status || 'Confirmed', 
     });
 
     const createdBooking = await booking.save();
@@ -151,8 +137,6 @@ const createBooking = async (req, res) => {
 };
 
 // @desc    Get availability for a court on a specific date (Legacy)
-// @route   GET /api/bookings/availability
-// @access  Public
 const getBookingAvailability = async (req, res) => {
     const { courtId, date } = req.query;
     if (!courtId || !date) {
@@ -179,8 +163,6 @@ const getBookingAvailability = async (req, res) => {
 
 
 // @desc    Get all bookings with pagination and filters
-// @route   GET /api/bookings
-// @access  Operator/Admin
 const getBookings = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -233,8 +215,6 @@ const getBookings = async (req, res) => {
 };
 
 // @desc    Update a booking completely
-// @route   PUT /api/bookings/:id
-// @access  Operator/Admin
 const updateBooking = async (req, res) => {
   try {
     const { courtId, user, startTime, endTime, price, status, isPaid, paymentMethod } = req.body;
@@ -271,8 +251,6 @@ const updateBooking = async (req, res) => {
 
 
 // @desc    Update booking status and payment
-// @route   PUT /api/bookings/:id/status
-// @access  Operator/Admin
 const updateBookingStatus = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -281,12 +259,9 @@ const updateBookingStatus = async (req, res) => {
       booking.isPaid = req.body.isPaid !== undefined ? req.body.isPaid : booking.isPaid;
       booking.paymentMethod = req.body.paymentMethod || booking.paymentMethod;
       
-      // --- ¡NUEVO! ---
-      // Si el frontend envía un paymentId (desde el Brick), lo guardamos.
       if (req.body.paymentId) {
         booking.paymentId = req.body.paymentId;
       }
-      // ---------------
 
       const updatedBooking = await booking.save();
       
@@ -307,8 +282,6 @@ const updateBookingStatus = async (req, res) => {
 };
 
 // @desc    Cancel a booking
-// @route   PUT /api/bookings/:id/cancel
-// @access  Operator/Admin
 const cancelBooking = async (req, res) => {
     try {
         const booking = await Booking.findById(req.params.id);
@@ -501,8 +474,8 @@ const getPublicCourtOptions = async (req, res) => {
 
 
 module.exports = {
-  _createBookingFromData, // <-- EXPORTAMOS LA NUEVA HELPER
-  createPublicBooking, // <-- EXPORTAMOS EL WRAPPER PÚBLICO
+  _createBookingFromData, // Exportamos la helper
+  createPublicBooking, // Exportamos el wrapper público
   createBooking, // Para el Admin
   getBookings,
   updateBooking,
