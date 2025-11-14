@@ -16,6 +16,8 @@ import { es } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
 import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
+// (No necesitamos el modal de pago interno ni initMercadoPago aquí)
+
 const timeZone = 'America/Argentina/Buenos_Aires';
 
 // (Componentes SlotButton y CourtOptionButton no cambian)
@@ -251,7 +253,7 @@ const TimeSlotFinder = () => {
           metadata: { 
             booking_id: "PENDING", 
             booking_data: {
-                ...bookingData,
+                ...bookingData, // bookingData ya tiene todo (user, courtId, price, etc)
                 startTime: start.toISOString(), // Aseguramos formato ISO
                 endTime: end.toISOString()
             }
@@ -290,7 +292,8 @@ const TimeSlotFinder = () => {
         setUserEmail('');
       }
     } catch (err) {
-      setBookingError(err.response?.data?.message || 'Ocurrió un error al crear la reserva.');
+      // El error de la API (ej. "Slot already booked") se mostrará aquí
+      setBookingError(err.message || 'Ocurrió un error al crear la reserva.');
     } finally {
       setIsBooking(false);
     }
@@ -356,7 +359,12 @@ const TimeSlotFinder = () => {
         <h3 className="text-xl font-semibold text-text-primary mb-4">Selecciona los horarios (puedes elegir varios seguidos)</h3>
         
         {loadingSlots && <p className="text-text-secondary text-center">Cargando turnos...</p>}
+        {/*
+          Este es el error que ves en la foto. 
+          Ahora mostrará el mensaje específico del backend (ej. "El turno ya está ocupado")
+        */}
         {bookingError && !loadingOptions && <p className="text-danger text-center mb-4">{bookingError}</p>}
+        
         {!loadingSlots && allSlots.length === 0 && (
           <p className="text-text-secondary text-center">No hay turnos disponibles para este día.</p>
         )}
@@ -476,8 +484,6 @@ const TimeSlotFinder = () => {
         </div>
       )}
       
-      {/* Ya no usamos el modal de pago interno */}
-
     </div>
   );
 };
