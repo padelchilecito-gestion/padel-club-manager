@@ -7,27 +7,23 @@ const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// --- NUEVA FUNCIÓN PÚBLICA (SOLUCIONA BUG 1 y 2) ---
-// @desc    Create a new booking from public page
-// @route   POST /api/bookings/public
-// @access  Public
-const createPublicBooking = async (req, res) => {
-  // Esta función es llamada por el frontend (Pago en club)
-  // y por el Webhook (Mercado Pago)
-  const { courtId, user, startTime, endTime, paymentMethod, isPaid, totalPrice } = req.body;
+
+// --- NUEVA FUNCIÓN HELPER INTERNA (SOLUCIONA BUG 2) ---
+// Esta función NO es un controlador. Es pura lógica.
+// Recibe los datos de la reserva y la crea.
+const _createBookingFromData = async (bookingData) => {
+  // AHORA SÍ: 'bookingData' es el objeto, no 'req.body'
+  const { courtId, user, startTime, endTime, paymentMethod, isPaid, totalPrice } = bookingData;
 
   try {
     const court = await Court.findById(courtId);
     if (!court) {
-      // Si 'res' existe, es una llamada API. Si no, es del webhook.
-      if (res) return res.status(404).json({ message: 'Court not found' });
-      throw new Error('Court not found'); // Para el webhook
+      throw new Error('Court not found');
     }
 
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
-      if (res) return res.status(400).json({ message: 'End time must be after start time.' });
       throw new Error('End time must be after start time.');
     }
 
@@ -43,7 +39,6 @@ const createPublicBooking = async (req, res) => {
     });
 
     if (conflictingBooking) {
-      if (res) return res.status(409).json({ message: 'The selected time slot is already booked.' });
       throw new Error('The selected time slot is already booked.');
     }
     
@@ -65,7 +60,7 @@ const createPublicBooking = async (req, res) => {
 
     const booking = new Booking({
       court: courtId,
-      user, // user (name, phone, email) viene completo desde el req.body
+      user, // user (name, phone, email) viene completo
       startTime: start,
       endTime: end,
       price: finalPrice,
@@ -75,31 +70,39 @@ const createPublicBooking = async (req, res) => {
     });
 
     const createdBooking = await booking.save();
-    
-    // Si la llamada vino de la API (no del webhook), enviamos respuesta
-    if (res) {
-        // Emitir a socket.io si 'req' está disponible
-        if (req && req.app) {
-            const io = req.app.get('socketio');
-            io.emit('booking_update', createdBooking);
-        }
-        res.status(201).json(createdBooking);
-    }
-    
-    // Devolvemos la reserva creada (para que el webhook la use)
-    return createdBooking; 
+    return createdBooking; // Devuelve la reserva
 
   } catch (error) {
-    console.error("Error in createPublicBooking:", error);
-    if (res) {
-        // Enviamos el mensaje de error real (ej. "Slot already booked")
-        res.status(500).json({ message: error.message || 'Server Error' });
-    }
-    // Si falla, lanzamos el error para que el webhook lo sepa
-    throw error;
+    console.error("Error in _createBookingFromData helper:", error);
+    throw error; // Lanza el error para que el llamador (webhook o API) lo maneje
   }
 };
-// --- FIN DE LA NUEVA FUNCIÓN ---
+// --- FIN DE LA FUNCIÓN HELPER ---
+
+
+// --- CONTROLADOR PÚBLICO (SOLUCIONA BUG 1) ---
+// Este es el "wrapper" que usa la ruta /api/bookings/public
+const createPublicBooking = async (req, res) => {
+  try {
+    // 1. Llama al helper con req.body
+    const createdBooking = await _createBookingFromData(req.body);
+
+    // 2. Emite el socket
+    if (req && req.app) {
+        const io = req.app.get('socketio');
+        io.emit('booking_update', createdBooking);
+    }
+    
+    // 3. Responde al frontend
+    res.status(201).json(createdBooking);
+
+  } catch (error) {
+    // 4. Si el helper falla (ej. "Slot already booked"), envía ese error
+    // Esto es lo que verá el usuario en la foto, en lugar del error genérico
+    res.status(409).json({ message: error.message || 'Server Error' });
+  }
+};
+// --- FIN DEL CONTROLADOR PÚBLICO ---
 
 // @desc    Create a new booking (SOLO ADMIN)
 // @route   POST /api/bookings
@@ -107,7 +110,6 @@ const createPublicBooking = async (req, res) => {
 const createBooking = async (req, res) => {
   const { courtId, user, startTime, endTime, paymentMethod, isPaid, price, status } = req.body;
 
-  // Esta función es ahora más simple, confía en el admin
   try {
     const court = await Court.findById(courtId);
     if (!court) {
@@ -492,8 +494,9 @@ const getPublicCourtOptions = async (req, res) => {
 
 
 module.exports = {
+  _createBookingFromData, // <-- EXPORTAMOS LA NUEVA HELPER
+  createPublicBooking, // <-- EXPORTAMOS EL WRAPPER PÚBLICO
   createBooking, // Para el Admin
-  createPublicBooking, // <-- EXPORTAMOS LA NUEVA
   getBookings,
   updateBooking,
   updateBookingStatus,
