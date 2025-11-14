@@ -8,7 +8,7 @@ const ProductCard = ({ product }) => {
       <img 
         className="w-full h-48 object-cover" 
         // --- ¡LÍNEA CORREGIDA! ---
-        src={imageUrl || 'https://placeholder.com/400x300?text=No+Image'} 
+        src={imageUrl || 'https://via.placeholder.com/400x300?text=No+Image'} 
         alt={`Imagen de ${name}`} 
       />
       <div className="p-4">
