@@ -4,7 +4,8 @@ const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
-// (Ya no necesitamos importar el bookingController)
+// Importamos el helper de booking
+const { _createBookingFromData } = require('./bookingController'); 
 
 // @desc    Create a Mercado Pago payment preference
 // @route   POST /api/payments/create-preference
@@ -12,14 +13,45 @@ const mongoose = require('mongoose');
 const createPaymentPreference = async (req, res) => {
   const { items, payer, metadata } = req.body;
 
-  // Asegurarse de que el email del payer es válido
   if (!payer || !payer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payer.email)) {
     return res.status(400).json({ message: 'A valid payer email is required.' });
   }
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
-  // --- LÓGICA DE URL DE ÉXITO ELIMINADA (YA NO SE USA) ---
+  // --- LÓGICA DE BACK_URLS CORREGIDA (Arregla Bug 3) ---
+  let successUrl = `${process.env.CLIENT_URL}/payment-success`; // Default para reservas
+  let backUrls = {
+    failure: `${process.env.CLIENT_URL}/payment-failure`,
+    pending: `${process.env.CLIENT_URL}/payment-pending`,
+  };
+
+  if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
+    // --- Lógica para RESERVAS ---
+    try {
+        const { user, startTime, endTime } = metadata.booking_data;
+        const params = new URLSearchParams({
+            name: user.name,
+            startTime: startTime,
+            endTime: endTime
+        }).toString();
+        successUrl = `${process.env.CLIENT_URL}/payment-success?${params}`;
+    } catch (e) { console.error("Error creating booking success URL", e); }
+    backUrls.success = successUrl;
+    backUrls.auto_return = 'approved';
+
+  } else if (metadata && metadata.isPosSale === true) {
+    // --- ¡NUEVO! Lógica para VENTAS DEL POS ---
+    // El cliente (que paga con su tel) vuelve al inicio, no a la pág. de éxito de reservas.
+    backUrls.success = `${process.env.CLIENT_URL}/`; 
+    backUrls.auto_return = 'approved'; 
+  
+  } else {
+    // --- Lógica para otros casos (ej. admin pagando una reserva existente) ---
+    backUrls.success = successUrl;
+    backUrls.auto_return = 'approved';
+  }
+  // --- FIN DE LA LÓGICA CORREGIDA ---
 
   const preferenceBody = {
     items: items.map(item => ({
@@ -32,21 +64,14 @@ const createPaymentPreference = async (req, res) => {
       name: payer.name,
       email: payer.email,
     },
-    // Estas URLs ahora son solo un fallback por si el Brick falla
-    back_urls: {
-      success: `${process.env.CLIENT_URL}/payment-success`, 
-      failure: `${process.env.CLIENT_URL}/payment-failure`,
-      pending: `${process.env.CLIENT_URL}/payment-pending`,
-    },
-    auto_return: 'approved',
+    back_urls: backUrls, // <-- Usamos el objeto de URLs dinámico
     notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
-    metadata: metadata, // Pasamos la metadata (si la hay, ej. para POS)
+    metadata: metadata,
   };
 
   try {
     const preference = new Preference(client);
     const result = await preference.create({ body: preferenceBody });
-    // Devolvemos el ID de la preferencia
     res.json({ id: result.id, init_point: result.init_point });
   } catch (error) {
     console.error('Error creating Mercado Pago preference:', error);
@@ -59,7 +84,7 @@ const createPaymentPreference = async (req, res) => {
 // @access  Public
 const receiveWebhook = async (req, res) => {
   const { type, data } = req.body;
-  const io = req.app.get('socketio'); // Obtenemos socket.io
+  const io = req.app.get('socketio'); 
 
   if (type === 'payment') {
     try {
@@ -69,7 +94,7 @@ const receiveWebhook = async (req, res) => {
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
 
-        // --- IDEMPOTENCY CHECK (SIN CAMBIOS) ---
+        // --- IDEMPOTENCY CHECK (Sin cambios) ---
         const existingBooking = await Booking.findOne({ paymentId: payment.id });
         const existingSale = await Sale.findOne({ paymentId: payment.id });
 
@@ -77,19 +102,22 @@ const receiveWebhook = async (req, res) => {
           console.log(`Webhook: Payment ${payment.id} already processed. Ignoring.`);
           return res.status(200).send('Webhook received (already processed).');
         }
-        // --- END IDEMPOTENCY CHECK ---
 
-
-        // ----------------------------------------------------
-        // Lógica de Reservas (MODIFICADA PARA BUG 2)
-        // ----------------------------------------------------
-        
-        // ELIMINAMOS la lógica 'PENDING'
-        // El Brick's onSubmit se encarga de crear la reserva.
-        
-        // Esta lógica SÍ se queda. Es para pagos que se inician
-        // desde el panel de admin (ej. un QR de BookingsPage)
-        if (metadata && metadata.booking_id) {
+        // --- Lógica de Reservas (Sin cambios) ---
+        if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
+          try {
+            const bookingData = metadata.booking_data;
+            const createdBooking = await _createBookingFromData(bookingData); 
+            createdBooking.paymentId = payment.id;
+            await createdBooking.save();
+            console.log(`Booking ${createdBooking._id} created and paid via webhook.`);
+            if (io) {
+                io.emit('booking_update', createdBooking);
+            }
+          } catch (bookingError) {
+             console.error('Webhook booking creation failed:', bookingError.message);
+          }
+        } else if (metadata && metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
           if (booking && !booking.isPaid) { 
             booking.isPaid = true;
@@ -98,16 +126,13 @@ const receiveWebhook = async (req, res) => {
             booking.paymentId = payment.id; 
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid via webhook.`);
-            
             if (io) {
                 io.emit('booking_update', booking);
             }
           }
         }
 
-        // ----------------------------------------------------
-        // Lógica de Ventas POS (Sin cambios)
-        // ----------------------------------------------------
+        // --- LÓGICA DE VENTAS POS MODIFICADA (Arregla Bug 1) ---
         if (metadata && metadata.sale_items) {
           const saleData = {
             items: metadata.sale_items,
@@ -133,9 +158,14 @@ const receiveWebhook = async (req, res) => {
             await session.commitTransaction();
             console.log(`Sale created and stock updated for payment ${data.id}.`);
             
+            // --- ¡NUEVO! Emitimos el objeto completo con el ID único ---
             if (io) {
-                io.emit('pos_sale_completed', sale);
+                io.emit('pos_sale_completed', {
+                    ...sale.toObject(), // Enviamos los datos de la venta
+                    posSaleId: metadata.posSaleId // Enviamos el ID único
+                });
             }
+            // --- FIN DEL CAMBIO ---
 
           } catch (saleError) {
             await session.abortTransaction();
