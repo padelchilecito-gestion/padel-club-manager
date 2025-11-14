@@ -22,17 +22,13 @@ const startServer = async () => {
     'https://padel-club-manager-xi.vercel.app', // Tu frontend de Vercel
   ];
   
-  // (Lógica por si CLIENT_URL está definida en Render y es diferente)
   if (process.env.CLIENT_URL && allowedOrigins.indexOf(process.env.CLIENT_URL) === -1) {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  // --- INICIO DE LA CORRECCIÓN ---
+  // --- INICIO DE LA CORRECCIÓN DEL CRASH (503) ---
   const corsOptions = {
     origin: function (origin, callback) {
-      // 1. Permitir localhost (de la lista)
-      // 2. Permitir peticiones sin 'origin' (como Postman)
-      // 3. Permitir CUALQUIER subdominio que termine en .vercel.app
       if (!origin || 
           allowedOrigins.indexOf(origin) !== -1 || 
           (origin && origin.endsWith('.vercel.app'))
@@ -40,7 +36,10 @@ const startServer = async () => {
         callback(null, true);
       } else {
         console.error(`CORS Error (HTTP): Origin ${origin} not allowed.`);
-        callback(new Error('Not allowed by CORS'));
+        // --- ESTE ES EL CAMBIO ---
+        // En lugar de lanzar un error, solo lo bloqueamos.
+        callback(null, false);
+        // callback(new Error('Not allowed by CORS')); // <-- ESTO CAUSA EL CRASH
       }
     },
     credentials: true
@@ -50,7 +49,7 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- Configuración de Socket.IO (MODIFICADA TAMBIÉN) ---
+  // --- Configuración de Socket.IO (CORREGIDA TAMBIÉN) ---
   const io = new Server(server, {
     cors: {
       origin: function (origin, callback) {
@@ -62,7 +61,9 @@ const startServer = async () => {
           callback(null, true);
         } else {
           console.error(`CORS Error (Socket): Origin ${origin} not allowed.`);
-          callback(new Error('Not allowed by CORS'));
+          // --- ESTE ES EL CAMBIO ---
+          callback(null, false);
+          // callback(new Error('Not allowed by CORS')); // <-- ESTO CAUSABA EL CRASH
         }
       }, 
       methods: ["GET", "POST", "PUT", "DELETE"],
