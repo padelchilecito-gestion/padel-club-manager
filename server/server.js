@@ -26,7 +26,7 @@ const startServer = async () => {
     allowedOrigins.push(process.env.CLIENT_URL);
   }
 
-  // --- INICIO DE LA CORRECCIÓN DEL CRASH (503) ---
+  // --- Configuración de CORS para HTTP (Corregida para no crashear) ---
   const corsOptions = {
     origin: function (origin, callback) {
       if (!origin || 
@@ -36,10 +36,7 @@ const startServer = async () => {
         callback(null, true);
       } else {
         console.error(`CORS Error (HTTP): Origin ${origin} not allowed.`);
-        // --- ESTE ES EL CAMBIO ---
-        // En lugar de lanzar un error, solo lo bloqueamos.
-        callback(null, false);
-        // callback(new Error('Not allowed by CORS')); // <-- ESTO CAUSA EL CRASH
+        callback(null, false); // No lanza error, solo bloquea
       }
     },
     credentials: true
@@ -49,27 +46,15 @@ const startServer = async () => {
   app.use(cors(corsOptions));
   app.use(express.json({ extended: false }));
 
-  // --- Configuración de Socket.IO (CORREGIDA TAMBIÉN) ---
+  // --- ¡ESTA ES LA CORRECCIÓN DEL SOCKET (ERROR 400)! ---
   const io = new Server(server, {
     cors: {
-      origin: function (origin, callback) {
-        // Aplicamos la MISMA lógica de CORS a Socket.IO
-        if (!origin || 
-            allowedOrigins.indexOf(origin) !== -1 || 
-            (origin && origin.endsWith('.vercel.app'))
-        ) {
-          callback(null, true);
-        } else {
-          console.error(`CORS Error (Socket): Origin ${origin} not allowed.`);
-          // --- ESTE ES EL CAMBIO ---
-          callback(null, false);
-          // callback(new Error('Not allowed by CORS')); // <-- ESTO CAUSABA EL CRASH
-        }
-      }, 
+      origin: allowedOrigins, // Pasamos el array directamente
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true
     },
   });
+  // --- FIN DE LA CORRECCIÓN DEL SOCKET ---
 
   app.set('socketio', io);
 
