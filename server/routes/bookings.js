@@ -7,28 +7,28 @@ const {
   updateBookingStatus,
   cancelBooking,
   getBookingAvailability,
-  // --- IMPORTAMOS LAS NUEVAS FUNCIONES ---
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
+  // --- IMPORTAMOS LA NUEVA FUNCIÓN ---
+  createPublicBooking, 
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/authMiddleware');
 
+// --- NUEVA RUTA PÚBLICA (SOLUCIONA BUG 1 y 2) ---
+// @route   POST /api/bookings/public
+// @desc    Create a new booking from the public page
+// @access  Public
+router.post('/public', createPublicBooking);
+// ---------------------------------------------
+
 // --- NUEVAS RUTAS PÚBLICAS ---
-
-// @route   GET /api/bookings/public-slots
-// @desc    Get all available 30-min slots for a given date
-// @access  Public
 router.get('/public-slots', getPublicAvailabilitySlots);
-
-// @route   GET /api/bookings/public-options
-// @desc    Get available courts and prices for a selected time range
-// @access  Public
 router.get('/public-options', getPublicCourtOptions);
 
-// --- RUTAS EXISTENTES ---
-
-router.post('/', protect, createBooking);
-router.get('/availability', getBookingAvailability); // <- Esta la reemplazaremos en el front
+// --- RUTAS DE ADMIN (PROTEGIDAS) ---
+// Esta ruta ahora solo la usa el admin
+router.post('/', protect, createBooking); 
+router.get('/availability', getBookingAvailability);
 router.get('/', protect, getBookings);
 router.put('/:id', protect, updateBooking);
 router.put('/:id/status', protect, updateBookingStatus);
