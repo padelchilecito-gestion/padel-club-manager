@@ -206,7 +206,8 @@ const PosPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map(product => (
               <div key={product._id} onClick={() => addToCart(product)} className="bg-dark-primary p-3 rounded-lg text-center cursor-pointer hover:bg-primary-dark transition-colors">
-                <img src={product.imageUrl || 'https://via.placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
+                {/* --- ¡LÍNEA CORREGIDA! --- */}
+                <img src={product.imageUrl || 'https://placeholder.com/150'} alt={product.name} className="h-24 w-24 mx-auto rounded-md object-cover mb-2" />
                 <p className="font-semibold truncate">{product.name}</p>
                 <p className="text-sm text-secondary">${product.price.toFixed(2)}</p>
               </div>
