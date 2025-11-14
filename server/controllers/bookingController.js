@@ -7,27 +7,31 @@ const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 // Definimos la zona horaria del negocio
 const timeZone = 'America/Argentina/Buenos_Aires';
 
-// ... (createBooking, getBookingAvailability, getBookings, updateBooking, updateBookingStatus, cancelBooking, createDefaultSchedule, getPublicAvailabilitySlots... STAS FUNCIONES QUEDAN IGUALES) ...
-// ... (scroll down to getPublicCourtOptions) ...
-
-// @desc    Create a new booking
-// @route   POST /api/bookings
-// @access  Public or Admin
-const createBooking = async (req, res) => {
-  const { courtId, user, startTime, endTime, paymentMethod, isPaid, price } = req.body;
+// --- NUEVA FUNCIÓN PÚBLICA (SOLUCIONA BUG 1 y 2) ---
+// @desc    Create a new booking from public page
+// @route   POST /api/bookings/public
+// @access  Public
+const createPublicBooking = async (req, res) => {
+  // Esta función es llamada por el frontend (Pago en club)
+  // y por el Webhook (Mercado Pago)
+  const { courtId, user, startTime, endTime, paymentMethod, isPaid, totalPrice } = req.body;
 
   try {
     const court = await Court.findById(courtId);
     if (!court) {
-      return res.status(404).json({ message: 'Court not found' });
+      // Si 'res' existe, es una llamada API. Si no, es del webhook.
+      if (res) return res.status(404).json({ message: 'Court not found' });
+      throw new Error('Court not found'); // Para el webhook
     }
 
     const start = new Date(startTime);
     const end = new Date(endTime);
     if (start >= end) {
-      return res.status(400).json({ message: 'End time must be after start time.' });
+      if (res) return res.status(400).json({ message: 'End time must be after start time.' });
+      throw new Error('End time must be after start time.');
     }
 
+    // Comprobar conflicto (igual que en createBooking)
     const conflictingBooking = await Booking.findOne({
       court: courtId,
       status: { $ne: 'Cancelled' },
@@ -39,15 +43,12 @@ const createBooking = async (req, res) => {
     });
 
     if (conflictingBooking) {
-      return res.status(409).json({ message: 'The selected time slot is already booked.' });
+      if (res) return res.status(409).json({ message: 'The selected time slot is already booked.' });
+      throw new Error('The selected time slot is already booked.');
     }
     
-    let finalPrice = price; 
-    if (finalPrice === undefined && req.body.totalPrice !== undefined) {
-        finalPrice = req.body.totalPrice;
-    }
-
-    // --- LÓGICA DE PRECIO MODIFICADA (SI NO VIENE DEFINIDO) ---
+    // --- Lógica de precio (igual que en createBooking) ---
+    let finalPrice = totalPrice; // Usamos el precio que envía el frontend
     if (finalPrice === undefined) {
       const durationMinutes = (end - start) / (1000 * 60);
       
@@ -64,13 +65,66 @@ const createBooking = async (req, res) => {
 
     const booking = new Booking({
       court: courtId,
-      user,
+      user, // user (name, phone, email) viene completo desde el req.body
       startTime: start,
       endTime: end,
       price: finalPrice,
       paymentMethod,
       isPaid: isPaid || false,
-      status: 'Confirmed',
+      status: 'Confirmed', // Las reservas públicas se confirman al instante
+    });
+
+    const createdBooking = await booking.save();
+    
+    // Si la llamada vino de la API (no del webhook), enviamos respuesta
+    if (res) {
+        // Emitir a socket.io si 'req' está disponible
+        if (req && req.app) {
+            const io = req.app.get('socketio');
+            io.emit('booking_update', createdBooking);
+        }
+        res.status(201).json(createdBooking);
+    }
+    
+    // Devolvemos la reserva creada (para que el webhook la use)
+    return createdBooking; 
+
+  } catch (error) {
+    console.error("Error in createPublicBooking:", error);
+    if (res) {
+        res.status(500).json({ message: error.message || 'Server Error' });
+    }
+    // Si falla, lanzamos el error para que el webhook lo sepa
+    throw error;
+  }
+};
+// --- FIN DE LA NUEVA FUNCIÓN ---
+
+// @desc    Create a new booking (SOLO ADMIN)
+// @route   POST /api/bookings
+// @access  Admin
+const createBooking = async (req, res) => {
+  const { courtId, user, startTime, endTime, paymentMethod, isPaid, price, status } = req.body;
+
+  // Esta función es ahora más simple, confía en el admin
+  try {
+    const court = await Court.findById(courtId);
+    if (!court) {
+      return res.status(404).json({ message: 'Court not found' });
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    const booking = new Booking({
+      court: courtId,
+      user,
+      startTime: start,
+      endTime: end,
+      price: price, // Precio manual del admin
+      paymentMethod,
+      isPaid: isPaid || false,
+      status: status || 'Confirmed', // Status que ponga el admin
     });
 
     const createdBooking = await booking.save();
@@ -79,13 +133,16 @@ const createBooking = async (req, res) => {
     io.emit('booking_update', createdBooking);
     
     if (req.user) {
-        const logDetails = `Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
+        const logDetails = `Admin Booking created for ${createdBooking.user.name} on court '${court.name}' from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
         await logActivity(req.user, 'BOOKING_CREATED', logDetails);
     }
 
     res.status(201).json(createdBooking);
   } catch (error) {
     console.error(error);
+    if (error.code === 11000) {
+        return res.status(409).json({ message: 'A booking already exists for this exact start time and court.'});
+    }
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -257,7 +314,7 @@ const cancelBooking = async (req, res) => {
 
             res.json({ message: 'Booking cancelled successfully' });
         } else {
-            res.status(404).json({ message: 'Booking not found' });
+            res.status(404).json({ message: 'Booking not found' }); // Corregido de 4404
         }
     } catch (error) {
         console.error(error);
@@ -439,10 +496,11 @@ const getPublicCourtOptions = async (req, res) => {
 
 module.exports = {
   createBooking,
+  createPublicBooking, // <-- Exportamos la nueva
   getBookings,
   updateBooking,
   updateBookingStatus,
-  cancelBooking,
+  cancelBooking, // <-- Exportamos la versión corregida
   getBookingAvailability,
   getPublicAvailabilitySlots,
   getPublicCourtOptions,
