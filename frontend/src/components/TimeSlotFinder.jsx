@@ -70,7 +70,7 @@ const TimeSlotFinder = () => {
   
   const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
 
-  // --- LÓGICA PARA PWA (INSTALAR APP) ---
+  // --- Lógica para PWA (Instalar App) ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
 
@@ -95,7 +95,7 @@ const TimeSlotFinder = () => {
       setDeferredPrompt(null);
     }
   };
-  // --- FIN LÓGICA PWA ---
+  // --- Fin Lógica PWA ---
 
   const fetchSlots = useCallback(async () => {
     if (settingsLoading) return;
@@ -209,7 +209,7 @@ const TimeSlotFinder = () => {
   }, [selectedTimeRange]);
   
   
-  // --- VERSIÓN DE handleFinalizeBooking CON EMAIL OPCIONAL ---
+  // --- FUNCIÓN handleFinalizeBooking MODIFICADA (SOLUCIONA BUG 1) ---
   const handleFinalizeBooking = async (paymentMethod) => {
     // 1. Validar solo nombre y teléfono
     if (!userName || !userPhone) {
@@ -246,17 +246,29 @@ const TimeSlotFinder = () => {
             unit_price: selectedCourt.price,
             quantity: 1,
           }],
-          // Si el email está vacío, usa uno genérico. Si existe, usa el del cliente.
           payer: { name: userName, email: userEmail || "test_user@test.com" }, 
-          metadata: { booking_id: "PENDING", booking_data: bookingData }
+          // Adjuntamos los datos para la URL de éxito (Bug 3)
+          metadata: { 
+            booking_id: "PENDING", 
+            booking_data: {
+                ...bookingData,
+                startTime: start.toISOString(), // Aseguramos formato ISO
+                endTime: end.toISOString()
+            }
+          }
         };
 
         const preference = await paymentService.createPaymentPreference(paymentData);
-        window.location.href = preference.init_point;
+        
+        // Redirigimos al checkout de MP
+        window.location.href = preference.init_point; 
       
       } else {
-        // Pago en Efectivo (ya no necesita el email)
-        await bookingService.createBooking(bookingData);
+        
+        // --- ¡ESTE ES EL CAMBIO PARA BUG 1! ---
+        // Usamos el nuevo servicio público en lugar de 'createBooking'
+        await bookingService.createPublicBooking(bookingData);
+        // --- FIN DEL CAMBIO ---
         
         const fechaStr = formatSlotLabel(start);
         const diaStr = formatDateHeader(start, true);
@@ -270,7 +282,6 @@ const TimeSlotFinder = () => {
         
         fetchSlots(); 
         
-        // Reseteamos el formulario
         setSelectedSlots([]);
         setSelectedCourt(null);
         setCourtOptions([]);
@@ -285,6 +296,7 @@ const TimeSlotFinder = () => {
     }
   };
   // --- FIN DE LA FUNCIÓN MODIFICADA ---
+
 
   const today = startOfToday();
   const isViewingToday = isSameDay(selectedDate, today);
@@ -457,12 +469,14 @@ const TimeSlotFinder = () => {
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
                 disabled={isBooking}
               >
-                {isBooking ? 'Procesando...' : 'Pagar con Mercado Pago'}
+                {isBooking ? 'Generando pago...' : 'Pagar con Mercado Pago'}
               </button>
             </div>
           </div>
         </div>
       )}
+      
+      {/* Ya no usamos el modal de pago interno */}
 
     </div>
   );
