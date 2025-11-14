@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { productService } from '../../services/productService';
 import { saleService } from '../../services/saleService';
-import { paymentService } from '../../services/paymentService'; // <-- Re-importado
+import { paymentService } from '../../services/paymentService';
 import { 
     PlusCircleIcon, 
     MinusCircleIcon, 
     XCircleIcon, 
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
-import socket from '../../services/socketService'; // <-- Re-importado
-import FullScreenQRModal from '../../components/admin/FullScreenQRModal'; // <-- Re-importado
-import SaleSuccessModal from '../../components/admin/SaleSuccessModal'; // <-- El modal de éxito
+import socket from '../../services/socketService';
+import FullScreenQRModal from '../../components/admin/FullScreenQRModal';
+import SaleSuccessModal from '../../components/admin/SaleSuccessModal';
 
 const PosPage = () => {
   const [products, setProducts] = useState([]);
@@ -19,12 +19,15 @@ const PosPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // --- Estados del Modal QR (Restaurados) ---
+  // Estados del Modal QR
   const [paymentQR, setPaymentQR] = useState(''); 
   const [paymentTotal, setPaymentTotal] = useState(0); 
   const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pending, successful
   
-  // --- Estado del Modal de Éxito (El nuevo) ---
+  // --- ¡NUEVO! ID Único para la Venta del POS ---
+  const [currentPosSaleId, setCurrentPosSaleId] = useState(null); 
+  
+  // Estado del Modal de Éxito
   const [showSuccess, setShowSuccess] = useState(false);
 
   const { user } = useAuth();
@@ -45,13 +48,14 @@ const PosPage = () => {
     fetchProducts();
   }, []);
 
-  // --- Efecto para Socket.IO (Restaurado) ---
+  // --- EFECTO SOCKET.IO MODIFICADO ---
   useEffect(() => {
     socket.connect();
     
+    // El 'handle' ahora comprueba el ID único
     const handleSaleCompleted = (saleData) => {
-      // Esto solo se activa si el modal QR está abierto y esperando
-      if (saleData.total === paymentTotal && paymentStatus === 'pending') {
+      // Compara el ID de la venta que llegó por socket con el ID que este modal está esperando
+      if (saleData && saleData.posSaleId === currentPosSaleId && paymentStatus === 'pending') {
           setPaymentStatus('successful');
       }
     };
@@ -62,8 +66,8 @@ const PosPage = () => {
       socket.off('pos_sale_completed', handleSaleCompleted);
       socket.disconnect();
     };
-  }, [paymentTotal, paymentStatus]); 
-  // --- Fin del Efecto Socket ---
+  }, [currentPosSaleId, paymentStatus]); // <-- Agregamos el ID al array de dependencias
+  // --- FIN DEL EFECTO SOCKET ---
 
   const filteredProducts = useMemo(() => {
     return products.filter(p =>
@@ -103,15 +107,14 @@ const PosPage = () => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
 
-  // --- ¡AQUÍ ESTÁ LA LÓGICA CORREGIDA! ---
-  // Vuelve a diferenciar entre 'Efectivo' y 'Mercado Pago'
+  // --- LÓGICA DE VENTA MODIFICADA ---
   const handleFinalizeSale = async (paymentMethod) => {
     if (cart.length === 0) return;
     
     setLoading(true);
     setError('');
-    setShowSuccess(false); // Resetea el modal de éxito
-    setPaymentQR('');      // Resetea el modal de QR
+    setShowSuccess(false); 
+    setPaymentQR('');      
 
     const saleTotal = cartTotal; 
     const saleData = {
@@ -127,46 +130,43 @@ const PosPage = () => {
 
     try {
       if (paymentMethod === 'Efectivo') {
-        // --- LÓGICA DE EFECTIVO ---
-        // 1. Guarda la venta
         await saleService.createSale(saleData);
-        // 2. Muestra el modal de éxito personalizado
         setShowSuccess(true); 
-        // 3. Limpia el carrito y recarga
         setCart([]);
         fetchProducts(); 
       
       } else if (paymentMethod === 'Mercado Pago') {
-        // --- LÓGICA DE MERCADO PAGO (Restaurada) ---
-        // 1. Prepara los datos para la preferencia de pago
+        
+        // --- ¡NUEVO! Generamos un ID único para esta venta ---
+        const posSaleId = `pos_${Date.now()}`;
+
         const paymentData = {
           items: [{
             title: 'Compra en Padel Club',
             unit_price: saleTotal,
             quantity: 1,
           }],
-          payer: { name: "Cliente POS", email: "cliente@pos.com" }, // Email genérico
+          payer: { name: "Cliente POS", email: "cliente@pos.com" },
           metadata: { 
             sale_items: saleData.items,
             user_id: user._id,
             username: user.username,
+            isPosSale: true, // <-- Flag para el backend (Arregla Bug 3)
+            posSaleId: posSaleId // <-- ID Único (Arregla Bug 1)
           }
         };
 
-        // 2. Crea la preferencia (el link de pago/QR)
         const preference = await paymentService.createPaymentPreference(paymentData);
         
-        // 3. Configura los estados para MOSTRAR EL MODAL QR
         setPaymentTotal(saleTotal); 
-        setPaymentQR(preference.init_point); // <-- Esto activa el FullScreenQRModal
-        setPaymentStatus('pending'); 
+        setPaymentQR(preference.init_point);
+        setPaymentStatus('pending');
+        setCurrentPosSaleId(posSaleId); // <-- Guardamos el ID que estamos esperando
         
-        // 4. Limpia el carrito y recarga
         setCart([]); 
         fetchProducts(); 
       }
     } catch (err) {
-      // Manejo de error de stock (funciona para ambos)
       if (err.response && err.response.status === 409 && err.response.data.errorCode === 'INSUFFICIENT_STOCK') {
         setError(`¡Stock insuficiente! ${err.response.data.message}. Ajusta el carrito.`);
         fetchProducts();
@@ -177,13 +177,14 @@ const PosPage = () => {
       setLoading(false);
     }
   };
-  // --- FIN DE LA LÓGICA CORREGIDA ---
+  // --- FIN DE LA LÓGICA MODIFICADA ---
 
   // --- Esta función es para CERRAR el modal QR ---
   const handleNewSale = () => {
     setPaymentQR('');
     setPaymentStatus('idle');
     setPaymentTotal(0);
+    setCurrentPosSaleId(null); // <-- Limpiamos el ID
     setCart([]);
     setError('');
   };
