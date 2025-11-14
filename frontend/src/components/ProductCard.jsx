@@ -7,7 +7,8 @@ const ProductCard = ({ product }) => {
     <div className="bg-dark-secondary rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
       <img 
         className="w-full h-48 object-cover" 
-        src={imageUrl || 'https://via.placeholder.com/400x300?text=No+Image'} 
+        // --- ¡LÍNEA CORREGIDA! ---
+        src={imageUrl || 'https://placeholder.com/400x300?text=No+Image'} 
         alt={`Imagen de ${name}`} 
       />
       <div className="p-4">
