@@ -12,17 +12,30 @@ const getAvailability = async (courtId, date) => {
   }
 };
 
+// Esta es la función de ADMIN
 const createBooking = async (bookingData) => {
   try {
     const response = await apiClient.post('/bookings', bookingData);
     return response.data;
   } catch (error) {
-    console.error('Error creating booking:', error);
+    console.error('Error creating admin booking:', error);
     throw error.response?.data || error;
   }
 };
 
-// --- FUNCIÓN MODIFICADA PARA PAGINACIÓN ---
+// --- NUEVA FUNCIÓN PÚBLICA (SOLUCIONA BUG 1) ---
+const createPublicBooking = async (bookingData) => {
+  try {
+    // Llama a la nueva ruta PÚBLICA, sin token
+    const response = await apiClient.post('/bookings/public', bookingData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating public booking:', error);
+    throw error.response?.data || error;
+  }
+};
+// ------------------------------------------
+
 const getBookings = async (params) => {
     try {
         // params = { page: 1, limit: 15, name: '...', court: '...', ... }
@@ -33,7 +46,6 @@ const getBookings = async (params) => {
         throw error;
     }
 };
-// ----------------------------------------
 
 const updateBookingStatus = async (id, statusData) => {
     try {
@@ -55,7 +67,7 @@ const cancelBooking = async (id) => {
     }
 }
 
-// --- NUEVAS FUNCIONES PÚBLICAS ---
+// --- NUEVAS FUNCIONES PÚBLICAS (SIN CAMBIOS) ---
 
 const getPublicAvailabilitySlots = async (date) => {
   try {
@@ -85,8 +97,9 @@ const getPublicCourtOptions = async (startTime, endTime) => {
 
 export const bookingService = {
   getAvailability, 
-  createBooking,
-  getBookings, // <-- Exportamos la nueva
+  createBooking, // Para el Admin
+  createPublicBooking, // <-- EXPORTAMOS LA NUEVA
+  getBookings,
   updateBookingStatus,
   cancelBooking,
   getPublicAvailabilitySlots,
