@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bookingService } from '../services/bookingService';
 import { usePublicSettings } from '../contexts/PublicSettingsContext';
-import { paymentService } from '../services/paymentService';
+// import { paymentService } from '../services/paymentService'; // Ya no se usa aquí
 import { 
   format, 
   addMinutes, 
@@ -16,8 +16,7 @@ import { es } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
 import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
-// --- ¡NUEVA IMPORTACIÓN! ---
-import PaymentBrickModal from './PaymentBrickModal'; // Importamos el nuevo modal
+// Ya no importamos el PaymentBrickModal
 
 const timeZone = 'America/Argentina/Buenos_Aires';
 
@@ -69,14 +68,13 @@ const TimeSlotFinder = () => {
   
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
-  const [userEmail, setUserEmail] = useState('');
+  const [userEmail, setUserEmail] = useState(''); // Se mantiene por si lo quieres en el backend
   
   const [cashBookingSuccess, setCashBookingSuccess] = useState(null);
 
-  // --- NUEVOS ESTADOS PARA EL BRICK ---
-  const [preferenceId, setPreferenceId] = useState(null);
-  const [bookingDataForPayment, setBookingDataForPayment] = useState(null);
-  // ------------------------------------
+  // --- Estados de Mercado Pago eliminados ---
+  // const [preferenceId, setPreferenceId] = useState(null);
+  // const [bookingDataForPayment, setBookingDataForPayment] = useState(null);
 
   // --- Lógica para PWA (Instalar App) ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -220,8 +218,9 @@ const TimeSlotFinder = () => {
   }, [selectedTimeRange]);
   
   
-  // --- FUNCIÓN handleFinalizeBooking TOTALMENTE MODIFICADA ---
-  const handleFinalizeBooking = async (paymentMethod) => {
+  // --- FUNCIÓN handleFinalizeBooking SIMPLIFICADA ---
+  const handleFinalizeBooking = async () => {
+    // 1. Validar nombre y teléfono (email ya no es necesario)
     if (!userName || !userPhone) {
       setBookingError('El nombre y el teléfono son obligatorios.');
       return;
@@ -236,63 +235,46 @@ const TimeSlotFinder = () => {
 
     const { start, end } = selectedTimeRange;
     
-    // 1. Preparamos los datos de la reserva
+    // 2. Preparamos los datos de la reserva (siempre Efectivo)
     const bookingData = {
       courtId: selectedCourt.id,
       user: { name: userName, phone: userPhone, email: userEmail || '' },
       startTime: start.toISOString(),
       endTime: end.toISOString(),
-      paymentMethod,
-      isPaid: false, // Se marcará como pagada después (si es MP)
+      paymentMethod: 'Efectivo', // Siempre "Efectivo"
+      isPaid: false,             // Siempre "false"
       totalPrice: selectedCourt.price
     };
 
     try {
-      if (paymentMethod === 'Mercado Pago') {
-        
-        // 2. Preparamos los datos para la PREFERENCIA de MP
-        const paymentData = {
-          items: [{
-            title: `Reserva ${selectedCourt.name} - ${format(start, 'dd/MM HH:mm')}`,
-            unit_price: selectedCourt.price,
-            quantity: 1,
-          }],
-          payer: { name: userName, email: userEmail || "test_user@test.com" }, 
-          // Ya no necesitamos metadata, la reserva se crea en el onSubmit del Brick
-        };
-        
-        // 3. Creamos la preferencia en el backend
-        const preference = await paymentService.createPaymentPreference(paymentData);
-        
-        // 4. Guardamos los datos para dárselos al Brick
-        setBookingDataForPayment(bookingData);
-        setPreferenceId(preference.id); // <-- Esto abrirá el modal
+      // 3. Llamamos a la función pública para crear la reserva
+      // (Esta es la que arreglamos en el backend)
+      await bookingService.createPublicBooking(bookingData);
+      
+      // 4. Mostramos el mensaje de éxito con el link de WhatsApp
+      const fechaStr = formatSlotLabel(start);
+      const diaStr = formatDateHeader(start, true);
+      const msg = `¡Nueva reserva (pago en club)!\nCliente: ${userName}\nCancha: ${selectedCourt.name}\nDía: ${diaStr}\nHora: ${fechaStr}`;
+      const whatsappLink = `https://wa.me/${ownerNumber}?text=${encodeURIComponent(msg)}`;
 
-      } else {
-        // --- Flujo "Pago en club" (Arreglado con 'createPublicBooking') ---
-        await bookingService.createPublicBooking(bookingData);
-        
-        const fechaStr = formatSlotLabel(start);
-        const diaStr = formatDateHeader(start, true);
-        const msg = `¡Nueva reserva (pago en club)!\nCliente: ${userName}\nCancha: ${selectedCourt.name}\nDía: ${diaStr}\nHora: ${fechaStr}`;
-        const whatsappLink = `https://wa.me/${ownerNumber}?text=${encodeURIComponent(msg)}`;
+      setCashBookingSuccess({
+          message: `¡Reserva confirmada para ${diaStr} a las ${fechaStr}!`,
+          whatsappLink: whatsappLink
+      });
+      
+      // 5. Reseteamos el formulario
+      resetForm();
 
-        setCashBookingSuccess({
-            message: `¡Reserva confirmada para ${diaStr} a las ${fechaStr}!`,
-            whatsappLink: whatsappLink
-        });
-        
-        resetForm();
-      }
     } catch (err) {
+      // Mostramos el error (ej. "El turno ya está ocupado")
       setBookingError(err.message || 'Ocurrió un error al crear la reserva.');
     } finally {
-      setIsBooking(false); // Habilitamos los botones de nuevo
+      setIsBooking(false); // Habilitamos el botón de nuevo
     }
   };
-  // --- FIN DE LA FUNCIÓN MODIFICADA ---
+  // --- FIN DE LA FUNCIÓN SIMPLIFICADA ---
 
-  // Función para resetear el formulario (evita duplicar código)
+  // Función para resetear el formulario
   const resetForm = () => {
     fetchSlots(); 
     setSelectedSlots([]);
@@ -301,26 +283,9 @@ const TimeSlotFinder = () => {
     setUserName('');
     setUserPhone('');
     setUserEmail('');
-    setBookingDataForPayment(null);
-    setPreferenceId(null);
   }
 
-  // Se llama cuando el PaymentBrickModal tiene éxito
-  const handlePaymentSuccess = () => {
-    // Mostramos un mensaje de éxito similar al de "pago en club"
-    const { start } = selectedTimeRange;
-    const fechaStr = formatSlotLabel(start);
-    const diaStr = formatDateHeader(start, true);
-
-    setCashBookingSuccess({
-        message: `¡Reserva pagada y confirmada para ${diaStr} a las ${fechaStr}!`,
-        whatsappLink: null // No pedimos notificar, ya está paga.
-    });
-    
-    resetForm();
-  }
-
-
+  // (El resto de las funciones helper no cambian)
   const today = startOfToday();
   const isViewingToday = isSameDay(selectedDate, today);
 
@@ -407,12 +372,11 @@ const TimeSlotFinder = () => {
         </div>
       </div>
 
-      {/* --- Mensaje de éxito (AHORA TAMBIÉN PARA MP) --- */}
+      {/* --- Mensaje de éxito (sin cambios) --- */}
       {cashBookingSuccess && (
         <div className="mt-6 p-4 bg-green-800 border border-secondary rounded-lg text-center">
             <CheckCircleIcon className="h-12 w-12 text-secondary mx-auto mb-2" />
             <h3 className="text-xl font-bold text-white mb-2">{cashBookingSuccess.message}</h3>
-            {/* Mostramos el botón de WA solo si el link existe (pago en club) */}
             {cashBookingSuccess.whatsappLink && (
               <>
                 <p className="text-gray-300 mb-4">Por favor, notifica al club para confirmar tu llegada.</p>
@@ -444,7 +408,7 @@ const TimeSlotFinder = () => {
         </div>
       )}
 
-      {/* --- Datos y Pago (sin cambios) --- */}
+      {/* --- Datos y Pago (SIMPLIFICADO) --- */}
       {selectedCourt && !cashBookingSuccess && (
         <div className="mt-6 p-4 bg-dark-primary rounded-lg border border-gray-700">
           <h3 className="text-lg font-bold text-primary">Resumen de tu Reserva</h3>
@@ -473,41 +437,28 @@ const TimeSlotFinder = () => {
               </div>
               <div>
                 <label htmlFor="userEmail" className="block text-sm font-medium text-text-secondary">Email (Opcional)</label>
-                <input type="email" id="userEmail" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="Para recibir comprobante de Mercado Pago" className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
+                <input type="email" id="userEmail" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="Email (opcional)" className="w-full mt-1 bg-dark-secondary p-2 rounded-md border border-gray-600" />
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+
+            {/* --- SECCIÓN DE BOTONES SIMPLIFICADA --- */}
+            <div className="flex flex-col gap-4 mt-4">
               <button
-                onClick={() => handleFinalizeBooking('Efectivo')}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
+                onClick={handleFinalizeBooking} // Ya no pasa 'Efectivo'
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50"
                 disabled={isBooking}
               >
-                {isBooking ? 'Procesando...' : 'Confirmar (Pago en club)'}
+                {isBooking ? 'Confirmando...' : 'Confirmar Reserva (Pago en club)'}
               </button>
-              <button
-                onClick={() => handleFinalizeBooking('Mercado Pago')}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:opacity-50"
-                disabled={isBooking}
-              >
-                {isBooking ? 'Generando pago...' : 'Pagar con Mercado Pago'}
-              </button>
+              {/* Se elimina el botón de Mercado Pago */}
             </div>
+            {/* --- FIN DE LA SECCIÓN SIMPLIFICADA --- */}
+
           </div>
         </div>
       )}
       
-      {/* --- RENDERIZADO DEL NUEVO MODAL --- */}
-      {preferenceId && bookingDataForPayment && (
-        <PaymentBrickModal
-          preferenceId={preferenceId}
-          bookingData={bookingDataForPayment}
-          onClose={() => {
-            setPreferenceId(null);
-            setBookingDataForPayment(null);
-          }}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+      {/* --- Se elimina el modal de Mercado Pago --- */}
 
     </div>
   );
