@@ -4,8 +4,8 @@ const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
-// --- IMPORTAMOS EL CONTROLADOR DE BOOKING ---
-const { createPublicBooking } = require('./bookingController'); 
+// --- IMPORTAMOS EL HELPER DE BOOKING ---
+const { _createBookingFromData } = require('./bookingController'); 
 
 // @desc    Create a Mercado Pago payment preference
 // @route   POST /api/payments/create-preference
@@ -106,9 +106,10 @@ const receiveWebhook = async (req, res) => {
           try {
             const bookingData = metadata.booking_data;
             
-            // 1. Usamos la función centralizada (sin 'res' ni 'req')
-            // Esta función ya guarda la reserva en la BD
-            const createdBooking = await createPublicBooking(bookingData); 
+            // --- ¡ESTE ES EL CAMBIO CLAVE! ---
+            // Llamamos a la helper, no al controlador
+            const createdBooking = await _createBookingFromData(bookingData); 
+            // --- FIN DEL CAMBIO ---
             
             // 2. Actualizamos la reserva recién creada con el ID de pago
             createdBooking.paymentId = payment.id;
@@ -122,9 +123,8 @@ const receiveWebhook = async (req, res) => {
             }
 
           } catch (bookingError) {
+             // ¡Este es el log que viste!
              console.error('Webhook booking creation failed:', bookingError.message);
-             // Si falla (ej. cancha ocupada), el pago está aprobado pero la reserva no se creó.
-             // (Aquí se podría agregar lógica para notificar al admin o reembolsar)
           }
 
         // Lógica de Reservas (Existente - sin cambios)
@@ -134,7 +134,7 @@ const receiveWebhook = async (req, res) => {
             booking.isPaid = true;
             booking.status = 'Confirmed';
             booking.paymentMethod = 'Mercado Pago';
-            booking.paymentId = payment.id; // <-- Guardamos el ID de pago
+            booking.paymentId = payment.id;
             await booking.save();
             console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
             
@@ -153,7 +153,7 @@ const receiveWebhook = async (req, res) => {
             total: payment.transaction_amount,
             paymentMethod: 'Mercado Pago',
             user: metadata.user_id,
-            paymentId: payment.id, // <-- Guardamos el ID de pago
+            paymentId: payment.id,
           };
           
           const session = await mongoose.startSession();
