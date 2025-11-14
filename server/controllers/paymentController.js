@@ -4,8 +4,7 @@ const Booking = require('../models/Booking');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
-// --- IMPORTAMOS EL HELPER DE BOOKING ---
-const { _createBookingFromData } = require('./bookingController'); 
+// (Ya no necesitamos importar el bookingController)
 
 // @desc    Create a Mercado Pago payment preference
 // @route   POST /api/payments/create-preference
@@ -20,26 +19,7 @@ const createPaymentPreference = async (req, res) => {
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
 
-  // --- MODIFICACIÓN PARA BUG 3 ---
-  let successUrl = `${process.env.CLIENT_URL}/payment-success`;
-
-  // Si es una reserva PENDIENTE, adjuntamos los datos a la URL de éxito
-  if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
-    try {
-        // Usamos los datos de la reserva para construir los parámetros
-        const { user, startTime, endTime } = metadata.booking_data;
-        const params = new URLSearchParams({
-            name: user.name,
-            startTime: startTime, // Ya debe estar en ISO string
-            endTime: endTime     // Ya debe estar en ISO string
-        }).toString();
-        
-        successUrl = `${process.env.CLIENT_URL}/payment-success?${params}`;
-    } catch (e) {
-        console.error("Error creating success URL params", e);
-    }
-  }
-  // --- FIN MODIFICACIÓN BUG 3 ---
+  // --- LÓGICA DE URL DE ÉXITO ELIMINADA (YA NO SE USA) ---
 
   const preferenceBody = {
     items: items.map(item => ({
@@ -52,19 +32,21 @@ const createPaymentPreference = async (req, res) => {
       name: payer.name,
       email: payer.email,
     },
+    // Estas URLs ahora son solo un fallback por si el Brick falla
     back_urls: {
-      success: successUrl, // <-- URL MODIFICADA
+      success: `${process.env.CLIENT_URL}/payment-success`, 
       failure: `${process.env.CLIENT_URL}/payment-failure`,
       pending: `${process.env.CLIENT_URL}/payment-pending`,
     },
     auto_return: 'approved',
     notification_url: `${baseUrl}/api/payments/webhook?source_news=webhooks`,
-    metadata: metadata,
+    metadata: metadata, // Pasamos la metadata (si la hay, ej. para POS)
   };
 
   try {
     const preference = new Preference(client);
     const result = await preference.create({ body: preferenceBody });
+    // Devolvemos el ID de la preferencia
     res.json({ id: result.id, init_point: result.init_point });
   } catch (error) {
     console.error('Error creating Mercado Pago preference:', error);
@@ -87,7 +69,7 @@ const receiveWebhook = async (req, res) => {
       if (payment && payment.status === 'approved') {
         const metadata = payment.metadata;
 
-        // --- IDEMPOTENCY CHECK ---
+        // --- IDEMPOTENCY CHECK (SIN CAMBIOS) ---
         const existingBooking = await Booking.findOne({ paymentId: payment.id });
         const existingSale = await Sale.findOne({ paymentId: payment.id });
 
@@ -101,42 +83,21 @@ const receiveWebhook = async (req, res) => {
         // ----------------------------------------------------
         // Lógica de Reservas (MODIFICADA PARA BUG 2)
         // ----------------------------------------------------
-        if (metadata && metadata.booking_id === 'PENDING' && metadata.booking_data) {
-          
-          try {
-            const bookingData = metadata.booking_data;
-            
-            // --- ¡ESTE ES EL CAMBIO CLAVE! ---
-            // Llamamos a la helper, no al controlador
-            const createdBooking = await _createBookingFromData(bookingData); 
-            // --- FIN DEL CAMBIO ---
-            
-            // 2. Actualizamos la reserva recién creada con el ID de pago
-            createdBooking.paymentId = payment.id;
-            await createdBooking.save();
-
-            console.log(`Booking ${createdBooking._id} created and paid via webhook.`);
-            
-            // 3. Emitimos al socket
-            if (io) {
-                io.emit('booking_update', createdBooking);
-            }
-
-          } catch (bookingError) {
-             // ¡Este es el log que viste!
-             console.error('Webhook booking creation failed:', bookingError.message);
-          }
-
-        // Lógica de Reservas (Existente - sin cambios)
-        } else if (metadata && metadata.booking_id) {
+        
+        // ELIMINAMOS la lógica 'PENDING'
+        // El Brick's onSubmit se encarga de crear la reserva.
+        
+        // Esta lógica SÍ se queda. Es para pagos que se inician
+        // desde el panel de admin (ej. un QR de BookingsPage)
+        if (metadata && metadata.booking_id) {
           const booking = await Booking.findById(metadata.booking_id);
-          if (booking && !booking.isPaid) { // Solo actualiza si no está pagada
+          if (booking && !booking.isPaid) { 
             booking.isPaid = true;
             booking.status = 'Confirmed';
             booking.paymentMethod = 'Mercado Pago';
-            booking.paymentId = payment.id;
+            booking.paymentId = payment.id; 
             await booking.save();
-            console.log(`Booking ${metadata.booking_id} confirmed and paid.`);
+            console.log(`Booking ${metadata.booking_id} confirmed and paid via webhook.`);
             
             if (io) {
                 io.emit('booking_update', booking);
